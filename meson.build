@@ -12,8 +12,17 @@ add_project_arguments(macro_prefix_map_flag, language: 'c')
 
 subdir('src')
 
-thread_dep = dependency('threads')
-json_dep = dependency('json-c')
+thread_dep = dependency(
+  'threads',
+  required: true,
+  static: true
+)
+json_dep = dependency(
+  'json-c',
+  method: 'pkg-config',
+  required: true,
+  static: true
+)
 
 #--- Lua ---------------------------------------------------------------
 # Lua’s pkg‑config file is annoyingly named differently on each distro.
@@ -26,15 +35,21 @@ lua_pc_names = [
   'luajit'   # if you prefer LuaJIT
 ]
 
-lua_dep = dependency(lua_pc_names,
+lua_dep = dependency(
+  lua_pc_names,
   method   : 'pkg-config',
-  required : true,          # change to false if you want a fallback
+  required : true,
   static   : true
 )
 
-# You can inspect what you got while configuring:
-message('Found Lua: ' + lua_dep.version())
 #----------------------------------------------------------------------
+
+libsp_dep = dependency(
+  'libserialport',
+  method : 'pkg-config',
+  required : true,
+  static : true
+)
 
 executable(
   'herness',
@@ -43,8 +58,10 @@ executable(
     thread_dep,
     json_dep,
     lua_dep,
+    libsp_dep,
   ],
   include_directories: [
+    include_dir,
   ],
   install: true,
 )

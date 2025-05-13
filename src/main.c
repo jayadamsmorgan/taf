@@ -1,42 +1,15 @@
+#include "test_case.h"
+
 #include <lauxlib.h>
 #include <lua.h>
 #include <lualib.h>
 
-#include <unistd.h>
-
 #include <stdlib.h>
-#include <string.h>
-
-/* --------------------------------------------------------------------
- * Test‑case queue (grow‑able array of {name, Lua registry reference})
- * ------------------------------------------------------------------*/
-typedef struct {
-    char *name; /* strdup‑ed test name   */
-    int ref;    /* reference to Lua fn   */
-} TestCase;
-
-static TestCase *tests = NULL;
-static size_t tests_len = 0;
-static size_t tests_cap = 0;
-
-static void queue_test(const char *name, int ref) {
-    if (tests_len == tests_cap) { /* grow 2× */
-        tests_cap = tests_cap ? tests_cap * 2 : 8;
-        tests = realloc(tests, tests_cap * sizeof(TestCase));
-        if (!tests) {
-            perror("realloc");
-            exit(EXIT_FAILURE);
-        }
-    }
-    tests[tests_len].name = strdup(name);
-    tests[tests_len].ref = ref;
-    tests_len++;
-}
+#include <unistd.h>
 
 static int c_sleep_ms(lua_State *L) {
     int ms = luaL_checkinteger(L, 1);
     usleep(ms * 1000);
-    printf("SLEEEP!!\n");
 
     return 0; /* no Lua return values */
 }
@@ -48,7 +21,8 @@ static int l_register_test(lua_State *L) {
     lua_pushvalue(L, 2);                      /* duplicate fn -> top */
     int ref = luaL_ref(L, LUA_REGISTRYINDEX); /* pop & ref */
 
-    queue_test(name, ref); /* remember it */
+    test_case_t test_case = {.name = name, .ref = ref};
+    test_case_enqueue(&test_case);
 
     return 0; /* no Lua returns */
 }
@@ -56,7 +30,10 @@ static int l_register_test(lua_State *L) {
 static int run_all_tests(lua_State *L) {
     size_t passed = 0;
 
-    for (size_t i = 0; i < tests_len; ++i) {
+    size_t amount;
+    test_case_t *tests = test_case_get_all(&amount);
+
+    for (size_t i = 0; i < amount; ++i) {
         printf("▶ %s … ", tests[i].name);
         fflush(stdout);
 
@@ -72,8 +49,8 @@ static int run_all_tests(lua_State *L) {
         }
     }
 
-    printf("\nSummary: %zu / %zu passed\n", passed, tests_len);
-    return passed == tests_len ? EXIT_SUCCESS : EXIT_FAILURE;
+    printf("\nSummary: %zu / %zu passed\n", passed, amount);
+    return passed == amount ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 void register_test_api(lua_State *L) {
@@ -98,6 +75,7 @@ int main(int argc, char **argv) {
             fprintf(stderr, "Lua error loading %s: %s\n", argv[i],
                     lua_tostring(L, -1));
             lua_pop(L, 1);
+            return EXIT_FAILURE;
         }
     }
 
@@ -105,11 +83,8 @@ int main(int argc, char **argv) {
     int exitcode = run_all_tests(L);
 
     /* -------- tidy‑up ------------------------------- */
-    for (size_t i = 0; i < tests_len; ++i) {
-        luaL_unref(L, LUA_REGISTRYINDEX, tests[i].ref);
-        free(tests[i].name);
-    }
-    free(tests);
+    test_case_free_all(L);
+
     lua_close(L);
 
     return exitcode;
