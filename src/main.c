@@ -1,3 +1,4 @@
+#include "modules/serial.h"
 #include "test_case.h"
 
 #include <lauxlib.h>
@@ -54,14 +55,20 @@ static int run_all_tests(lua_State *L) {
 }
 
 void register_test_api(lua_State *L) {
-    lua_newtable(L); /* test */
+    /* ---- helpers, test_case, … --------------------------------- */
+    lua_newtable(L);
     lua_pushcfunction(L, c_sleep_ms);
     lua_setfield(L, -2, "sleep");
-    /* …more helpers… */
-    lua_setglobal(L, "test"); /* global "test" table */
+    lua_setglobal(L, "test");
 
     lua_pushcfunction(L, l_register_test);
     lua_setglobal(L, "test_case");
+
+    /* ---- make C serial module visible to require() -------------- */
+    /* pushes the module table, sets package.loaded["serial"], and   */
+    /* stores the C function in package.preload for future require() */
+    luaL_requiref(L, "serial", l_module_serial_register_module, 1);
+    lua_pop(L, 1); /* remove the module table we just required */
 }
 
 int main(int argc, char **argv) {

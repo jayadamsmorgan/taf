@@ -10,8 +10,6 @@ project_root = meson.project_source_root()
 macro_prefix_map_flag = '-fmacro-prefix-map=' + project_root + '=.'
 add_project_arguments(macro_prefix_map_flag, language: 'c')
 
-subdir('src')
-
 thread_dep = dependency(
   'threads',
   required: true,
@@ -41,15 +39,35 @@ lua_dep = dependency(
   required : true,
   static   : true
 )
-
 #----------------------------------------------------------------------
 
+#--- libserialport ----------------------------------------------------
 libsp_dep = dependency(
   'libserialport',
   method : 'pkg-config',
   required : true,
   static : true
 )
+# libserialport requires apple frameworks when used statically
+# on x86-64 macOS
+apple_fw_deps = []
+if host_machine.system() == 'darwin'
+  apple_fw_deps += [
+    dependency('CoreFoundation'),
+    dependency('IOKit'),
+  ]
+endif
+#----------------------------------------------------------------------
+
+sources = [
+  'src/main.c',
+  'src/test_case.c',
+  'src/module.c',
+
+  'src/modules/serial.c'
+]
+
+include_dir = include_directories('include')
 
 executable(
   'herness',
@@ -59,7 +77,7 @@ executable(
     json_dep,
     lua_dep,
     libsp_dep,
-  ],
+  ] + apple_fw_deps,
   include_directories: [
     include_dir,
   ],
