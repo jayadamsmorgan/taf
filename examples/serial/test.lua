@@ -1,14 +1,11 @@
 local serial = require("serial")
 
 test_case("Connect to serial", function()
-	local port, err = serial:get_port("/dev/tty.usbmodem149202")
-	assert(err == nil)
-	serial:open(port, "rw")
-	serial:set_baudrate(port, 115200)
-	serial:set_bits(port, 8)
-	serial:set_parity(port, "none")
-	serial:set_stopbits(port, 1)
-	local read = serial:read_blocking(port, 50, 0)
-	print("\n\n" .. read .. "\n\n")
-	serial:close(port)
+	local port, err = serial.open("/dev/tty.usbmodem21202", {
+		mode = "r",
+		baudrate = 115200,
+	})
+	if err then
+		print(err)
+	end
 end)

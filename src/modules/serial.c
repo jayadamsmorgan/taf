@@ -19,7 +19,7 @@ static inline int selfshift(lua_State *L) { /* 1 = dot‑call, 2 = colon‑call 
 }
 
 static inline l_module_serial_t *check_port(lua_State *L, int idx) {
-    return luaL_checkudata(L, idx, "serial.port");
+    return luaL_checkudata(L, idx, "serial");
 }
 
 /* serial:get_port(path:string) -> port_ud,nil | nil,err */
@@ -38,7 +38,7 @@ int l_module_serial_get_port_by_name(lua_State *L) {
         return 2;
     }
 
-    luaL_getmetatable(L, "serial.port");
+    luaL_getmetatable(L, "serial");
     lua_setmetatable(L, -2);
     lua_pushnil(L);
     return 2;
@@ -287,7 +287,7 @@ static const luaL_Reg module_fns[] = {
 
 int l_module_serial_register_module(lua_State *L) {
     /* metatable for port userdata */
-    luaL_newmetatable(L, "serial.port");
+    luaL_newmetatable(L, "serial");
     luaL_setfuncs(L, port_mt, 0);
     lua_pop(L, 1);
 

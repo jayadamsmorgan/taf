@@ -54,6 +54,23 @@ static int run_all_tests(lua_State *L) {
     return passed == amount ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
+static void inject_modules_dir(lua_State *L) {
+
+    const char *module_path = getenv("HERNESS_LIB_PATH");
+    if (!module_path || !*module_path) {
+        fprintf(stderr, "Environment variable HERNESS_LIB_PATH is not set.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    lua_getglobal(L, "package");
+    lua_getfield(L, -1, "path"); /* pkg.path string */
+    const char *old_path = lua_tostring(L, -1);
+    lua_pushfstring(L, "%s;%s/?.lua;%s/?/init.lua", old_path, module_path,
+                    module_path);
+    lua_setfield(L, -3, "path"); /* package.path = … */
+    lua_pop(L, 2);               /* pop path + package */
+}
+
 void register_test_api(lua_State *L) {
     /* ---- helpers, test_case, … --------------------------------- */
     lua_newtable(L);
@@ -67,8 +84,10 @@ void register_test_api(lua_State *L) {
     /* ---- make C serial module visible to require() -------------- */
     /* pushes the module table, sets package.loaded["serial"], and   */
     /* stores the C function in package.preload for future require() */
-    luaL_requiref(L, "serial", l_module_serial_register_module, 1);
+    luaL_requiref(L, "herness-serial", l_module_serial_register_module, 1);
     lua_pop(L, 1); /* remove the module table we just required */
+
+    inject_modules_dir(L);
 }
 
 int main(int argc, char **argv) {
