@@ -83,3 +83,12 @@ executable(
   ],
   install: true,
 )
+
+#--- lua libraries ----------------------------------------------------
+fs = import('fs')
+herness_lib_path = fs.expanduser('~/.herness') / meson.project_version()
+
+install_subdir(
+  'lib',
+  install_dir : herness_lib_path
+)
