@@ -1,4 +1,5 @@
 #include "modules/serial.h"
+#include "modules/taf.h"
 #include "test_case.h"
 #include "version.h"
 
@@ -113,6 +114,8 @@ void register_test_api(lua_State *L) {
     /* pushes the module table, sets package.loaded["serial"], and   */
     /* stores the C function in package.preload for future require() */
     luaL_requiref(L, "herness-serial", l_module_serial_register_module, 1);
+    lua_pop(L, 1); /* remove the module table we just required */
+    luaL_requiref(L, "taf", l_module_taf_register_module, 1);
     lua_pop(L, 1); /* remove the module table we just required */
 
     inject_modules_dir(L);

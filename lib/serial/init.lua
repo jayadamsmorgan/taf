@@ -1,3 +1,4 @@
+local taf = require("taf")
 local hs = require("herness-serial")
 
 local M = {}
@@ -337,7 +338,7 @@ end
 --- @return string result, string? error
 M.read_until = function(port, pattern, timeout, chunk_size)
 	local now_ms = function()
-		return os.clock() * 1000
+		return taf:millis()
 	end
 	chunk_size = chunk_size or 1
 	pattern = pattern or "\n" -- default to newline
@@ -350,7 +351,7 @@ M.read_until = function(port, pattern, timeout, chunk_size)
 	while true do
 		local remaining = 0
 		if deadline then
-			remaining = math.max(0, deadline - now_ms())
+			remaining = math.max(0, math.ceil(deadline - now_ms()))
 			if remaining == 0 then
 				return "", "timeout"
 			end

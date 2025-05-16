@@ -62,9 +62,11 @@ endif
 sources = [
   'src/main.c',
   'src/test_case.c',
-  'src/module.c',
 
-  'src/modules/serial.c'
+  'src/util/time.c',
+
+  'src/modules/serial.c',
+  'src/modules/taf.c',
 ]
 
 include_dir = include_directories('include')

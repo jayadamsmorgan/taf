@@ -611,7 +611,11 @@ int l_module_serial_close(lua_State *L) /* optional explicit close */
     return 1;
 }
 
-int l_gc(lua_State *L) { return l_module_serial_close(L); }
+// FIXME
+//
+// it would probably be a good idea to keep track of allocated ports
+// and then free and close them all here
+static int l_gc(lua_State *L) { return l_module_serial_close(L); }
 
 /*----------- registration ------------------------------------------*/
 static const luaL_Reg port_mt[] = {{"__gc", l_gc}, {NULL, NULL}};

@@ -31,11 +31,17 @@ end)
 test_case("Reading from serial device", function()
 	print()
 	print()
-	local port, err = serial.open("/dev/cu.usbmodem149202")
+	local err
+	local port
+	port, err = serial.open("/dev/cu.usbmodem149202")
 	assert(not err)
 	assert(port)
-	local result, err2 = serial.read_until(port, "src.-CH8")
-	assert(not err2)
+	local result
+	result, err = serial.read_until(port, "src.-CH8", 4000)
+	if err then
+		print(err)
+		return false
+	end
 	assert(result)
 	print(result)
 
