@@ -1,5 +1,5 @@
 local taf = require("taf")
-local hs = require("herness-serial")
+local ts = require("taf-serial")
 
 local M = {}
 
@@ -99,7 +99,7 @@ M.open = function(port_or_path, opts)
 	local err
 
 	if type(port_or_path) == "string" then
-		port, err = hs:get_port(port_or_path)
+		port, err = ts:get_port(port_or_path)
 		if err then
 			return nil, err
 		end
@@ -121,32 +121,32 @@ M.open = function(port_or_path, opts)
 		opts.stopbits = opts.stopbits or default_opts.stopbits
 	end
 
-	err = hs:open(port, opts.mode)
+	err = ts:open(port, opts.mode)
 	if err then
 		return nil, err
 	end
 
-	err = hs:set_baudrate(port, opts.baudrate)
+	err = ts:set_baudrate(port, opts.baudrate)
 	if err then
-		hs:close(port)
+		ts:close(port)
 		return nil, err
 	end
 
-	err = hs:set_bits(port, opts.bits)
+	err = ts:set_bits(port, opts.bits)
 	if err then
-		hs:close(port)
+		ts:close(port)
 		return nil, err
 	end
 
-	err = hs:set_parity(port, opts.parity)
+	err = ts:set_parity(port, opts.parity)
 	if err then
-		hs:close(port)
+		ts:close(port)
 		return nil, err
 	end
 
-	err = hs:set_stopbits(port, opts.stopbits)
+	err = ts:set_stopbits(port, opts.stopbits)
 	if err then
-		hs:close(port)
+		ts:close(port)
 		return nil, err
 	end
 
@@ -159,7 +159,7 @@ end
 ---
 --- @return string? error
 M.close = function(port)
-	return hs:close(port)
+	return ts:close(port)
 end
 
 --- Set baudrate for opened port
@@ -169,7 +169,7 @@ end
 ---
 --- @return string? error
 M.set_baudrate = function(port, baudrate)
-	return hs:set_baudrate(port, baudrate)
+	return ts:set_baudrate(port, baudrate)
 end
 
 --- Set data bits for opened port
@@ -179,7 +179,7 @@ end
 ---
 --- @return string? error
 M.set_bits = function(port, bits)
-	return hs:set_bits(port, bits)
+	return ts:set_bits(port, bits)
 end
 
 --- Set parity for opened port
@@ -189,7 +189,7 @@ end
 ---
 --- @return string? error
 M.set_parity = function(port, parity)
-	return hs:set_parity(port, parity)
+	return ts:set_parity(port, parity)
 end
 
 --- Set stopbits for opened port
@@ -199,7 +199,7 @@ end
 ---
 --- @return string? error
 M.set_stopbits = function(port, stopbits)
-	return hs:set_stopbits(port, stopbits)
+	return ts:set_stopbits(port, stopbits)
 end
 
 --- Serial RS232 RTS option
@@ -216,7 +216,7 @@ end
 ---
 --- @return string? error
 M.set_rts = function(port, rts)
-	return hs:set_rts(port, rts)
+	return ts:set_rts(port, rts)
 end
 
 --- Serial RS232 CTS option
@@ -232,7 +232,7 @@ end
 ---
 --- @return string? error
 M.set_cts = function(port, cts)
-	return hs:set_cts(port, cts)
+	return ts:set_cts(port, cts)
 end
 
 --- Serial RS232 DTR option
@@ -249,7 +249,7 @@ end
 ---
 --- @return string? error
 M.set_dtr = function(port, dtr)
-	return hs:set_dtr(port, dtr)
+	return ts:set_dtr(port, dtr)
 end
 
 --- Serial RS232 DSR option
@@ -265,7 +265,7 @@ end
 ---
 --- @return string? error
 M.set_dsr = function(port, dsr)
-	return hs:set_dsr(port, dsr)
+	return ts:set_dsr(port, dsr)
 end
 
 --- Serial RS232 XON/XOFF option
@@ -283,7 +283,7 @@ end
 ---
 ---@return string? error
 M.set_xonxoff = function(port, xonxoff)
-	return hs:set_xonxoff(port, xonxoff)
+	return ts:set_xonxoff(port, xonxoff)
 end
 
 --- Serial RS232 flowcontrol option
@@ -301,14 +301,14 @@ end
 ---
 --- @return string? error
 M.set_flowcontrol = function(port, flowctrl)
-	return hs:set_flowcontrol(port, flowctrl)
+	return ts:set_flowcontrol(port, flowctrl)
 end
 
 --- List info about all connected serial devices in the system
 ---
 --- @return SerialPortInfo[]? result, string? error
 M.list_devices = function()
-	return hs:list_devices()
+	return ts:list_devices()
 end
 
 --- @param port_or_path SerialPort | string
@@ -318,13 +318,13 @@ M.get_port_info = function(port_or_path)
 	local port = port_or_path
 	if type(port_or_path) == "string" then
 		local err
-		port, err = hs:get_port(port_or_path)
+		port, err = ts:get_port(port_or_path)
 		if err then
 			return nil, err
 		end
 	end
 
-	return hs:get_port_info(port), nil
+	return ts:get_port_info(port), nil
 end
 
 --- Reads from serial port until it encounters the matching pattern
@@ -360,16 +360,16 @@ M.read_until = function(port, pattern, timeout, chunk_size)
 		local chunk, err
 		if timeout == nil then
 			-- block indefinitely
-			chunk, err = hs:read_blocking(port, chunk_size, 0) -- 0 = forever
+			chunk, err = ts:read_blocking(port, chunk_size, 0) -- 0 = forever
 		elseif timeout == 0 then
 			-- non-blocking; returns immediately if no data in buffer
-			chunk, err = hs:read_nonblocking(port, chunk_size)
+			chunk, err = ts:read_nonblocking(port, chunk_size)
 			if not chunk or #chunk == 0 then
 				return "", err or "would block"
 			end
 		else
 			-- finite timeout
-			chunk, err = hs:read_blocking(port, chunk_size, remaining)
+			chunk, err = ts:read_blocking(port, chunk_size, remaining)
 			if not chunk then
 				return "", err
 			end

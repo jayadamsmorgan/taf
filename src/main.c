@@ -1,7 +1,9 @@
-#include "modules/serial.h"
+#include "modules/taf-serial.h"
 #include "modules/taf.h"
 #include "test_case.h"
 #include "version.h"
+
+#include <notcurses/notcurses.h>
 
 #include <lauxlib.h>
 #include <lua.h>
@@ -61,11 +63,11 @@ static const char *get_lib_dir() {
 
     // TODO: check optional CMD arg first
 
-    // Check 'HERNESS_LIB_PATH' env variable
-    const char *env_path = getenv("HERNESS_LIB_PATH");
+    // Check 'TAF_LIB_PATH' env variable
+    const char *env_path = getenv("TAF_LIB_PATH");
     if (env_path && *env_path) {
-        fprintf(stdout, "HERNESS_LIB_PATH is set.\n");
-        fprintf(stdout, "Loading herness lua library at path '%s'\n", env_path);
+        fprintf(stdout, "TAF_LIB_PATH is set.\n");
+        fprintf(stdout, "Loading taf lua library at path '%s'\n", env_path);
 
         return env_path;
     }
@@ -73,16 +75,16 @@ static const char *get_lib_dir() {
     // Check default fallback
     const char *home_path = getenv("HOME");
     if (!home_path || !*home_path) {
-        fprintf(stderr, "Unable to load herness lua library: 'HOME' "
+        fprintf(stderr, "Unable to load taf lua library: 'HOME' "
                         "environment variable is not set.\n"
-                        "Use --libpath path_to_herness_lib_folder or set "
-                        "'HERNESS_LIB_PATH' environment variable.\n");
+                        "Use --libpath path_to_taf_lib_folder or set "
+                        "'taf_LIB_PATH' environment variable.\n");
         exit(EXIT_FAILURE);
     }
     char default_path[PATH_MAX];
-    snprintf(default_path, sizeof default_path,
-             "%s/.herness/" HERNESS_VERSION "/lib", home_path);
-    fprintf(stdout, "Loading herness lua library at path '%s'\n", default_path);
+    snprintf(default_path, sizeof default_path, "%s/.taf/" TAF_VERSION "/lib",
+             home_path);
+    fprintf(stdout, "Loading taf lua library at path '%s'\n", default_path);
 
     return strdup(default_path);
 }
@@ -113,7 +115,7 @@ void register_test_api(lua_State *L) {
     /* ---- make C serial module visible to require() -------------- */
     /* pushes the module table, sets package.loaded["serial"], and   */
     /* stores the C function in package.preload for future require() */
-    luaL_requiref(L, "herness-serial", l_module_serial_register_module, 1);
+    luaL_requiref(L, "taf-serial", l_module_serial_register_module, 1);
     lua_pop(L, 1); /* remove the module table we just required */
     luaL_requiref(L, "taf", l_module_taf_register_module, 1);
     lua_pop(L, 1); /* remove the module table we just required */

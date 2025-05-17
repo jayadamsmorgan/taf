@@ -1,8 +1,9 @@
-project('herness', 'c',
+project('taf', 'c',
   version: '0.0.1',
   default_options: [
     'c_std=gnu2x',
     'warning_level=3',
+    'default_library=static',
   ],
 )
 
@@ -22,15 +23,26 @@ json_dep = dependency(
   static: true
 )
 
+#--- notcurses ---------------------------------------------------------------
+notcurses_dep = dependency(
+  'notcurses',
+  method: 'pkg-config',
+  required: true,
+  static: true
+)
+libdeflate_dep = dependency(
+  'libdeflate',
+  method: 'pkg-config',
+  required: true,
+  static: true,
+)
+#----------------------------------------------------------------------
+
 #--- Lua ---------------------------------------------------------------
 # Lua’s pkg‑config file is annoyingly named differently on each distro.
 lua_pc_names = [
   'lua5.4',  # Debian/Ubuntu, Arch
   'lua-5.4', # Fedora/RHEL
-  'lua5.3',
-  'lua-5.3',
-  'lua',     # generic; often 5.1
-  'luajit'   # if you prefer LuaJIT
 ]
 
 lua_dep = dependency(
@@ -65,20 +77,22 @@ sources = [
 
   'src/util/time.c',
 
-  'src/modules/serial.c',
   'src/modules/taf.c',
+  'src/modules/taf-serial.c',
 ]
 
 include_dir = include_directories('include')
 
 executable(
-  'herness',
+  'taf',
   sources,
   dependencies: [
     thread_dep,
     json_dep,
     lua_dep,
     libsp_dep,
+    notcurses_dep,
+    libdeflate_dep,
   ] + apple_fw_deps,
   include_directories: [
     include_dir,
@@ -88,9 +102,9 @@ executable(
 
 #--- lua libraries ----------------------------------------------------
 fs = import('fs')
-herness_lib_path = fs.expanduser('~/.herness') / meson.project_version()
+taf_lib_path = fs.expanduser('~/.taf') / meson.project_version()
 
 install_subdir(
   'lib',
-  install_dir : herness_lib_path
+  install_dir : taf_lib_path
 )
