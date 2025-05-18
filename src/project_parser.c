@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <sys/syslimits.h>
 
 static project_parsed_t proj_parsed = {0};
 
@@ -97,13 +98,15 @@ void project_parser_save() {
                            json_object_new_int(proj_parsed.min_taf_ver_major));
     json_object_object_add(obj, "min_taf_version_minor",
                            json_object_new_int(proj_parsed.min_taf_ver_minor));
-    json_object_object_add(obj, "min_taf_version_major",
+    json_object_object_add(obj, "min_taf_version_patch",
                            json_object_new_int(proj_parsed.min_taf_ver_patch));
 
     json_object_object_add(obj, "multitarget",
                            json_object_new_boolean(proj_parsed.multitarget));
 
-    if (json_object_to_file(proj_parsed.project_path, obj)) {
+    char path[PATH_MAX];
+    snprintf(path, PATH_MAX, "%s/.taf.json", proj_parsed.project_path);
+    if (json_object_to_file(path, obj)) {
         fprintf(stderr,
                 "Unknown error occured, unable to save project file: %s\n",
                 json_util_get_last_err());
@@ -117,7 +120,7 @@ bool project_parser_parse() {
     if (!project_file) {
         fprintf(stderr,
                 "Unable to find project file. Make sure you are in project.\n");
-        return -1;
+        return true;
     }
 
     json_object *project_obj = json_object_from_file(project_file);
@@ -128,8 +131,8 @@ bool project_parser_parse() {
             stderr,
             "Unable to parse project file, it may be corrupt.\n "
             "Please delete it and regenerate the project with 'taf init'\n");
-        return -1;
+        return true;
     }
 
-    return 0;
+    return false;
 }

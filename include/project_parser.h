@@ -21,4 +21,6 @@ bool project_parser_parse();
 
 project_parsed_t *get_parsed_project();
 
+void project_parser_save();
+
 #endif // PROJECT_PARSER_H

@@ -1,9 +1,9 @@
 #include "util/files.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <sys/syslimits.h>
 #include <unistd.h>
 
 bool directory_exists(const char *dir) {
@@ -55,4 +55,44 @@ char *file_find_upwards(const char *filename) {
             *slash = '\0';
     }
     return NULL; /* not found */
+}
+
+int create_directory(const char *path, mode_t mode) {
+    if (!path || !*path)
+        return -1;
+
+    /* Make a writable copy because dirname/basename may modify it */
+    char tmp[PATH_MAX];
+    if (strlen(path) >= sizeof tmp) {
+        errno = ENAMETOOLONG;
+        return -1;
+    }
+    strcpy(tmp, path);
+
+    /* Skip leading slash(es) so we handle absolute and relative paths uniformly
+     */
+    char *p = tmp;
+    while (*p == '/')
+        ++p;
+
+    /* Iterate over path components, restoring one slash at a time */
+    for (; *p; ++p) {
+        if (*p != '/')
+            continue;
+        *p = '\0'; /* temporarily terminate component */
+
+        if (mkdir(tmp, mode) == -1 && errno != EEXIST)
+            return -1;
+
+        *p = '/';         /* restore slash */
+        while (*p == '/') /* collapse duplicate '/' */
+            ++p;
+        --p; /* compensate for loop’s ++p      */
+    }
+
+    /* Create final component */
+    if (mkdir(tmp, mode) == -1 && errno != EEXIST)
+        return -1;
+
+    return 0;
 }
