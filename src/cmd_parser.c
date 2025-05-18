@@ -205,9 +205,22 @@ static cmd_option all_test_options[] = {
 static cmd_category parse_test_options(int argc, char **argv) {
 
     test_opts.tags = NULL;
+    test_opts.target = NULL;
     test_opts.tags_amount = 0;
 
-    parse_additional_options(all_test_options, 2, argc, argv);
+    if (argc <= 2) {
+        return CMD_TEST;
+    }
+
+    int index;
+    if (argv[2][0] != '-') {
+        // Not an option, so must be a target
+        test_opts.target = argv[2];
+        index = 3;
+    } else {
+        index = 2;
+    }
+    parse_additional_options(all_test_options, index, argc, argv);
 
     return CMD_TEST;
 }

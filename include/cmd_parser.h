@@ -27,6 +27,8 @@ typedef struct {
 typedef struct {
     char **tags;
     int tags_amount;
+
+    char *target;
 } cmd_test_options;
 
 typedef enum {
