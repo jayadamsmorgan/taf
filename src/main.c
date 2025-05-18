@@ -1,3 +1,4 @@
+#include "cmd_parser.h"
 #include "modules/taf-serial.h"
 #include "modules/taf.h"
 #include "test_case.h"
@@ -123,20 +124,20 @@ void register_test_api(lua_State *L) {
     inject_modules_dir(L);
 }
 
-int main(int argc, char **argv) {
+int test() {
     lua_State *L = luaL_newstate();
     luaL_openlibs(L);
     register_test_api(L);
 
-    /* -------- load every file on CLI ---------------- */
-    for (int i = 1; i < argc; ++i) {
-        if (luaL_dofile(L, argv[i])) {
-            fprintf(stderr, "[ERROR] Lua error loading %s: %s\n", argv[i],
-                    lua_tostring(L, -1));
-            lua_pop(L, 1);
-            return EXIT_FAILURE;
-        }
-    }
+    // TODO: load tests from tests or tests/target folder
+    // for (int i = 1; i < argc; ++i) {
+    //     if (luaL_dofile(L, argv[i])) {
+    //         fprintf(stderr, "[ERROR] Lua error loading %s: %s\n", argv[i],
+    //                 lua_tostring(L, -1));
+    //         lua_pop(L, 1);
+    //         return EXIT_FAILURE;
+    //     }
+    // }
 
     /* -------- run the queued tests ------------------ */
     int exitcode = run_all_tests(L);
@@ -147,4 +148,30 @@ int main(int argc, char **argv) {
     lua_close(L);
 
     return exitcode;
+}
+
+int main(int argc, char **argv) {
+
+    // Parse cli options
+    cmd_category cmd = cmd_parser_parse(argc, argv);
+
+    switch (cmd) {
+    case CMD_CONFIG:
+        fprintf(stderr, "Not yet implemented.\n");
+        return 0;
+    case CMD_INIT:
+        fprintf(stderr, "Not yet implemented.\n");
+        return 0;
+    case CMD_TEST:
+        return test();
+    case CMD_LOGS:
+        fprintf(stderr, "Not yet implemented.\n");
+        return 0;
+    case CMD_HELP:
+        // Should be already handled in cmd_parser
+        return 0;
+    case CMD_UNKNOWN:
+        // Should be already handled in cmd_parser
+        return 1;
+    }
 }
