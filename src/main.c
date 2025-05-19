@@ -6,6 +6,7 @@
 #include "taf_test.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 
 int main(int argc, char **argv) {
 
@@ -23,9 +24,9 @@ int main(int argc, char **argv) {
         return taf_logs();
     case CMD_HELP:
         // Should be already handled in cmd_parser
-        return 0;
+        return EXIT_SUCCESS;
     case CMD_UNKNOWN:
         // Should be already handled in cmd_parser
-        return 1;
+        return EXIT_FAILURE;
     }
 }
