@@ -132,15 +132,11 @@ static cmd_option all_init_options[] = {
 };
 
 static cmd_category parse_init_options(int argc, char **argv) {
-    if (argc < 2) {
-        init_opts.interactive = true;
-        init_opts.project_name = NULL;
-        init_opts.multitarget = false;
-
-        return CMD_INIT;
+    if (argc <= 2) {
+        print_init_help(stderr);
+        return CMD_UNKNOWN;
     }
 
-    init_opts.interactive = false;
     init_opts.project_name = argv[2];
     init_opts.multitarget = false;
 

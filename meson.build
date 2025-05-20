@@ -11,6 +11,12 @@ project_root = meson.project_source_root()
 macro_prefix_map_flag = '-fmacro-prefix-map=' + project_root + '=.'
 add_project_arguments(macro_prefix_map_flag, language: 'c')
 
+is_macos = host_machine.system() == 'darwin'
+is_macos_arm64 = is_macos and host_machine.cpu_family() == 'aarch64'
+is_macos_x86_64 = is_macos and host_machine.cpu_family() == 'x86-64'
+
+opt_deps = []
+
 thread_dep = dependency(
   'threads',
   required: true,
@@ -25,7 +31,7 @@ json_dep = dependency(
 
 #--- notcurses ---------------------------------------------------------------
 notcurses_dep = dependency(
-  'notcurses',
+  'notcurses-core',
   method: 'pkg-config',
   required: true,
   static: true
@@ -36,6 +42,20 @@ libdeflate_dep = dependency(
   required: true,
   static: true,
 )
+if is_macos_arm64
+  libunistring_dep = declare_dependency(
+    link_args : ['/opt/homebrew/lib/libunistring.a'],
+    include_directories : include_directories('/opt/homebrew/opt/libunistring/include'),
+  )
+  libncurses_dep = declare_dependency(
+    link_args : ['/opt/homebrew/opt/ncurses/lib/libncurses.a'],
+    include_directories : include_directories('/opt/homebrew/opt/ncurses/include'),
+  )
+  opt_deps += [
+    libunistring_dep,
+    libncurses_dep,
+  ]
+endif
 #----------------------------------------------------------------------
 
 #--- Lua ---------------------------------------------------------------
@@ -60,11 +80,9 @@ libsp_dep = dependency(
   required : true,
   static : true
 )
-# libserialport requires apple frameworks when used statically
-# on x86-64 macOS
-apple_fw_deps = []
-if host_machine.system() == 'darwin'
-  apple_fw_deps += [
+# libserialport requires apple frameworks when used statically on macOS
+if is_macos
+  opt_deps += [
     dependency('CoreFoundation'),
     dependency('IOKit'),
   ]
@@ -96,14 +114,14 @@ include_dir = include_directories('include')
 executable(
   'taf',
   sources,
-  dependencies: [
+  dependencies: opt_deps + [
     thread_dep,
     json_dep,
     lua_dep,
     libsp_dep,
-    notcurses_dep,
     libdeflate_dep,
-  ] + apple_fw_deps,
+    notcurses_dep,
+  ],
   include_directories: [
     include_dir,
   ],

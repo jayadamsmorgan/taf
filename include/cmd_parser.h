@@ -11,10 +11,9 @@ typedef enum {
 } cmd_category;
 
 typedef struct {
-    const char *project_name;
+    char *project_name;
     bool multitarget;
 
-    bool interactive;
 } cmd_init_options;
 
 typedef struct {

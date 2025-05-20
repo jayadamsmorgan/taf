@@ -12,7 +12,7 @@
 
 #define MKDIR_MODE 0700
 
-int create_project(cmd_init_options *opts) {
+static int create_project(cmd_init_options *opts) {
     if (create_directory(opts->project_name, MKDIR_MODE))
         return -1;
 
@@ -20,16 +20,16 @@ int create_project(cmd_init_options *opts) {
 
     snprintf(path, PATH_MAX, "%s/lib", opts->project_name);
     if (create_directory(path, MKDIR_MODE))
-        return -1;
+        return -2;
 
     snprintf(path, PATH_MAX, "%s/tests", opts->project_name);
     if (create_directory(path, MKDIR_MODE))
-        return -1;
+        return -3;
 
     if (opts->multitarget) {
         snprintf(path, PATH_MAX, "%s/tests/common", opts->project_name);
         if (create_directory(path, MKDIR_MODE))
-            return -1;
+            return -4;
     }
 
     project_parsed_t *proj = get_parsed_project();
@@ -61,11 +61,12 @@ int taf_init() {
                 opts->project_name);
         return EXIT_FAILURE;
     }
-    if (!opts->interactive) {
-        create_project(opts);
-        return EXIT_SUCCESS;
+
+    int ret = create_project(opts);
+    if (ret) {
+        fprintf(stderr, "Unable to create project, error code: %d\n", ret);
+        return EXIT_FAILURE;
     }
 
-    //
-    return EXIT_FAILURE;
+    return EXIT_SUCCESS;
 }
