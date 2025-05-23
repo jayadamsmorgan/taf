@@ -121,6 +121,7 @@ void taf_tui_test_failed(int index, const char *name, const char *msg) {
     }
 
     size_t sz = sizeof(char) * (strlen(name) + strlen(msg) + 25);
+    ui.log_lines = malloc(sz);
 
     snprintf(ui.log_lines, sz, "[FAILED]: Test #%d: %s:\n%s\n", index, name,
              msg);

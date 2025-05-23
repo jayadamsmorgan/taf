@@ -110,8 +110,6 @@ static void line_hook(lua_State *L, lua_Debug *ar) {
         taf_tui_set_test_progress((int)percentage);
 
         taf_tui_update();
-
-        usleep(500000);
     }
 }
 
@@ -202,6 +200,8 @@ void register_test_api(lua_State *L) {
 
     lua_pushcfunction(L, l_register_test);
     lua_setglobal(L, "test_case");
+    lua_pushcfunction(L, l_module_taf_print);
+    lua_setglobal(L, "print");
 
     /* ---- make C serial module visible to require() -------------- */
     /* pushes the module table, sets package.loaded["serial"], and   */
