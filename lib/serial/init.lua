@@ -340,49 +340,56 @@ M.read_until = function(port, pattern, timeout, chunk_size)
 	local now_ms = function()
 		return taf:millis()
 	end
+
 	chunk_size = chunk_size or 1
-	pattern = pattern or "\n" -- default to newline
-	local buf = {} -- table buffer → concat later
-	local deadline = nil
+	pattern = pattern or "\n"
+
+	local buf = {} -- pieces collected so far
+	local deadline
 	if timeout and timeout > 0 then
-		deadline = now_ms() + timeout -- you need a millisecond helper
+		deadline = now_ms() + timeout
+	end
+
+	local function collected()
+		return table.concat(buf)
 	end
 
 	while true do
-		local remaining = 0
 		if deadline then
-			remaining = math.max(0, math.ceil(deadline - now_ms()))
+			local remaining = math.max(0, math.ceil(deadline - now_ms()))
 			if remaining == 0 then
-				return "", "timeout"
+				return collected(), "timeout"
 			end
 		end
 
 		local chunk, err
 		if timeout == nil then
-			-- block indefinitely
-			chunk, err = ts:read_blocking(port, chunk_size, 0) -- 0 = forever
+			-- block forever
+			chunk, err = ts:read_blocking(port, chunk_size, 0)
 		elseif timeout == 0 then
-			-- non-blocking; returns immediately if no data in buffer
+			-- non-blocking
 			chunk, err = ts:read_nonblocking(port, chunk_size)
 			if not chunk or #chunk == 0 then
-				return "", err or "would block"
+				return collected(), err or "would block"
 			end
 		else
 			-- finite timeout
+			local remaining = math.max(1, math.ceil(deadline - now_ms()))
 			chunk, err = ts:read_blocking(port, chunk_size, remaining)
 			if not chunk then
-				return "", err
+				return collected(), err -- I/O failure
 			end
 			if #chunk == 0 then
-				return "", "timeout"
+				return collected(), "timeout" -- timed out with no data
 			end
 		end
 
+		-- got data – stash it
 		buf[#buf + 1] = chunk
-		local current = table.concat(buf)
 
-		if current:find(pattern) then
-			return current, nil
+		-- stop when pattern seen
+		if collected():find(pattern) then
+			return collected(), nil
 		end
 	end
 end
