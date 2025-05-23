@@ -63,7 +63,7 @@ static inline void tui_log() {
     ui.log_lines = NULL;
 }
 
-void tui_update() {
+void taf_tui_update() {
 
     ncplane_erase_region(tui_plane, ncplane_dim_y(tui_plane) - 11, 0, 10,
                          ncplane_dim_x(tui_plane) - 1);
@@ -115,9 +115,32 @@ void taf_tui_set_current_line(const char *file, int line,
     ui.current_ex_line_str = line_str;
 }
 
-void taf_tui_test_failed(int index, const char *name, const char *msg) {}
+void taf_tui_test_failed(int index, const char *name, const char *msg) {
+    if (ui.log_lines && *ui.log_lines) {
+        free(ui.log_lines);
+    }
 
-void taf_tui_test_passed(int index, const char *name) {}
+    size_t sz = sizeof(char) * (strlen(name) + strlen(msg) + 25);
+
+    snprintf(ui.log_lines, sz, "[FAILED]: Test #%d: %s:\n%s\n", index, name,
+             msg);
+
+    taf_tui_update();
+}
+
+void taf_tui_test_passed(int index, const char *name) {
+    if (ui.log_lines && *ui.log_lines) {
+        free(ui.log_lines);
+    }
+
+    size_t sz = sizeof(char) * (strlen(name) + 25);
+
+    ui.log_lines = malloc(sz);
+
+    snprintf(ui.log_lines, sz, "[PASSED]: Test #%d: %s\n", index, name);
+
+    taf_tui_update();
+}
 
 void taf_tui_log(const char *file, int line, const char *str) {
 
@@ -130,7 +153,7 @@ void taf_tui_log(const char *file, int line, const char *str) {
 
     snprintf(ui.log_lines, sz, "[INFO]: [%s at %d]: %s\n", file, line, str);
 
-    tui_update();
+    taf_tui_update();
 }
 
 int taf_tui_init() {
@@ -163,7 +186,7 @@ int taf_tui_init() {
     tui_plane = ncplane_create(std_plane, &tui_plane_opts);
     ncplane_scrollup_child(std_plane, tui_plane);
 
-    tui_update();
+    taf_tui_update();
 
     return 0;
 }

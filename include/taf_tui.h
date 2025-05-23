@@ -4,7 +4,7 @@
 int taf_tui_init();
 void taf_tui_deinit();
 
-void tui_update();
+void taf_tui_update();
 
 void taf_tui_set_test_amount(int amount);
 

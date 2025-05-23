@@ -104,13 +104,12 @@ static void line_hook(lua_State *L, lua_Debug *ar) {
                                  text ? text : "(source unavailable)");
 
         int div = g_last - g_first;
-        if (!div)
-            div = 1;
-        float percentage = (float)(ar->currentline - g_first) / div * 100;
-
+        float percentage;
+        percentage =
+            div == 0 ? 0 : (float)(ar->currentline - g_first) / div * 100;
         taf_tui_set_test_progress((int)percentage);
 
-        tui_update();
+        taf_tui_update();
 
         usleep(500000);
     }
@@ -127,25 +126,25 @@ static int run_all_tests(lua_State *L) {
 
         taf_tui_set_current_test(i + 1, tests[i].name);
 
-        /* 1. push the test function */
-        lua_rawgeti(L, LUA_REGISTRYINDEX, tests[i].ref); /* stack: [... func] */
+        lua_rawgeti(L, LUA_REGISTRYINDEX, tests[i].ref);
 
-        /* 2. duplicate it for lua_getinfo */
-        lua_pushvalue(L, -1); /* [... func func]   */
+        lua_pushvalue(L, -1);
 
-        /* 3. query source info on the duplicate (and pop it) */
         lua_Debug ar;
-        if (lua_getinfo(L, ">S", &ar)) { /* [... func]        */
+        if (lua_getinfo(L, ">S", &ar)) {
             g_first = ar.linedefined;
             g_last = ar.lastlinedefined;
         }
 
-        /* 4. call the original copy */
-        int rc = lua_pcall(L, 0, 0, 0); /* pops func         */
+        int rc = lua_pcall(L, 0, 0, 0);
         if (rc == LUA_OK) {
+            taf_tui_test_passed(i + 1, tests[i].name);
             passed++;
         } else {
-            lua_pop(L, 1); /* pop error message */
+            const char *errmsg = lua_tostring(L, -1);
+            const char *safe_msg = errmsg ? errmsg : "unknown error";
+            taf_tui_test_failed(i + 1, tests[i].name, safe_msg);
+            lua_pop(L, 1);
         }
     }
 
