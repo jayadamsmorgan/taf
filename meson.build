@@ -96,6 +96,7 @@ sources = [
   'src/taf_init.c',
   'src/taf_logs.c',
   'src/taf_test.c',
+  'src/taf_tui.c',
 
   'src/cmd_parser.c',
   'src/project_parser.c',

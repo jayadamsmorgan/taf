@@ -1,5 +1,6 @@
 #include "util/files.h"
 
+#include <dirent.h>
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
@@ -95,4 +96,88 @@ int create_directory(const char *path, mode_t mode) {
         return -1;
 
     return 0;
+}
+
+static int ends_with_lua(const char *name) {
+    const char *dot = strrchr(name, '.');
+    return dot && strcmp(dot, ".lua") == 0;
+}
+
+static int push_string(str_array_t *a, const char *s) {
+    char **tmp = realloc(a->items, (a->count + 1) * sizeof *tmp);
+    if (!tmp)
+        return -1;
+    a->items = tmp;
+
+    a->items[a->count] = strdup(s);
+    if (!a->items[a->count])
+        return -1;
+
+    ++a->count;
+    return 0;
+}
+
+static int walk(const char *dirpath, str_array_t *out) {
+    DIR *dir = opendir(dirpath);
+    if (!dir)
+        return -1;
+
+    struct dirent *ent;
+    while ((ent = readdir(dir))) {
+        /* Skip "." and ".." */
+        if (ent->d_name[0] == '.' &&
+            (ent->d_name[1] == '\0' ||
+             (ent->d_name[1] == '.' && ent->d_name[2] == '\0')))
+            continue;
+
+        char *full = NULL;
+        if (asprintf(&full, "%s/%s", dirpath, ent->d_name) == -1) {
+            closedir(dir);
+            return -1;
+        }
+
+        struct stat st;
+        if (stat(full, &st) == -1) {
+            free(full);
+            closedir(dir);
+            return -1;
+        }
+
+        if (S_ISDIR(st.st_mode)) {
+            /* Recurse into sub-directory */
+            if (walk(full, out) == -1) {
+                free(full);
+                closedir(dir);
+                return -1;
+            }
+        } else if ((S_ISREG(st.st_mode) || (S_ISLNK(st.st_mode))) &&
+                   ends_with_lua(ent->d_name)) {
+            /* Regular *.lua file */
+            if (push_string(out, full) == -1) {
+                free(full);
+                closedir(dir);
+                return -1;
+            }
+        }
+
+        free(full);
+    }
+    closedir(dir);
+    return 0;
+}
+
+str_array_t list_lua_recursive(const char *root) {
+    str_array_t result = {NULL, 0};
+    walk(root, &result);
+    return result;
+}
+
+void free_str_array(str_array_t *a) {
+    if (!a)
+        return;
+    for (size_t i = 0; i < a->count; ++i)
+        free(a->items[i]);
+    free(a->items);
+    a->items = NULL;
+    a->count = 0;
 }

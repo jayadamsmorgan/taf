@@ -4,6 +4,7 @@
 
 #include <json.h>
 
+#include <libgen.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/syslimits.h>
@@ -125,7 +126,9 @@ bool project_parser_parse() {
 
     json_object *project_obj = json_object_from_file(project_file);
 
-    proj_parsed.project_path = project_file;
+    char *tmp = strdup(project_file);
+    proj_parsed.project_path = dirname(tmp);
+    free(tmp);
     if (project_parse_json(project_obj)) {
         fprintf(
             stderr,
