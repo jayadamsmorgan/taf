@@ -66,7 +66,7 @@ static inline void tui_log() {
 void taf_tui_update() {
 
     ncplane_erase_region(tui_plane, ncplane_dim_y(tui_plane) - 11, 0, 10,
-                         ncplane_dim_x(tui_plane) - 1);
+                         ncplane_dim_x(tui_plane));
     notcurses_render(nc);
 
     if (ui.log_lines && *ui.log_lines) {
