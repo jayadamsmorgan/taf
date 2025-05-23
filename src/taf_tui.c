@@ -193,6 +193,6 @@ int taf_tui_init() {
 }
 
 void taf_tui_deinit(void) {
+    //
     notcurses_stop(nc);
-    printf("\n");
 }
