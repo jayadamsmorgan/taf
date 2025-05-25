@@ -1,0 +1,13 @@
+local web = require("web")
+local taf = require("taf")
+
+test_case("testing web session start", function()
+	local session, err = web.session_start(9515)
+	assert(not err, err or "")
+	test.sleep(3000)
+	err = web.open_url(session, "https://google.com")
+	assert(not err, err or "")
+	test.sleep(5000)
+	err = web.session_end(session)
+	assert(not err, err or "")
+end)

@@ -1,4 +1,4 @@
-#include "modules/taf-serial.h"
+#include "modules/serial/taf-serial.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -651,7 +651,8 @@ static const luaL_Reg module_fns[] = {
 
     {"flush", l_module_serial_flush},
     {"drain", l_module_serial_drain},
-    {NULL, NULL}};
+    {NULL, NULL},
+};
 
 int l_module_serial_register_module(lua_State *L) {
     /* metatable for port userdata */

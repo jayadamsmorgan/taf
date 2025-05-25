@@ -1,8 +1,9 @@
 #include "taf_test.h"
 
 #include "cmd_parser.h"
-#include "modules/taf-serial.h"
-#include "modules/taf.h"
+#include "modules/serial/taf-serial.h"
+#include "modules/taf/taf.h"
+#include "modules/web/taf-webdriver.h"
 #include "project_parser.h"
 #include "taf_tui.h"
 #include "test_case.h"
@@ -192,7 +193,6 @@ static void inject_modules_dir(lua_State *L) {
 }
 
 void register_test_api(lua_State *L) {
-    /* ---- helpers, test_case, … --------------------------------- */
     lua_newtable(L);
     lua_pushcfunction(L, c_sleep_ms);
     lua_setfield(L, -2, "sleep");
@@ -203,13 +203,12 @@ void register_test_api(lua_State *L) {
     lua_pushcfunction(L, l_module_taf_print);
     lua_setglobal(L, "print");
 
-    /* ---- make C serial module visible to require() -------------- */
-    /* pushes the module table, sets package.loaded["serial"], and   */
-    /* stores the C function in package.preload for future require() */
     luaL_requiref(L, "taf-serial", l_module_serial_register_module, 1);
-    lua_pop(L, 1); /* remove the module table we just required */
+    lua_pop(L, 1);
     luaL_requiref(L, "taf", l_module_taf_register_module, 1);
-    lua_pop(L, 1); /* remove the module table we just required */
+    lua_pop(L, 1);
+    luaL_requiref(L, "taf-webdriver", l_module_web_register_module, 1);
+    lua_pop(L, 1);
 
     inject_modules_dir(L);
 }
