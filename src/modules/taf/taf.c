@@ -1,4 +1,4 @@
-#include "modules/taf.h"
+#include "modules/taf/taf.h"
 
 #include "taf_tui.h"
 #include "util/time.h"

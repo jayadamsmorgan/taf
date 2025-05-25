@@ -1,0 +1,10 @@
+local web = require("web")
+local taf = require("taf")
+
+test_case("testing web session start", function()
+	local session, err = web.session_start(9515)
+	assert(not err)
+	test.sleep(1000)
+	err = web.session_end(session)
+	assert(not err)
+end)

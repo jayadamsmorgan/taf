@@ -28,6 +28,12 @@ json_dep = dependency(
   required: true,
   static: true
 )
+libcurl_dep = dependency(
+  'libcurl',
+  method: 'pkg-config',
+  required: true,
+  static: true
+)
 
 #--- notcurses ---------------------------------------------------------------
 notcurses_dep = dependency(
@@ -106,8 +112,11 @@ sources = [
   'src/util/string.c',
   'src/util/time.c',
 
-  'src/modules/taf.c',
-  'src/modules/taf-serial.c',
+  'src/modules/taf/taf.c',
+  'src/modules/serial/taf-serial.c',
+  'src/modules/web/taf-webdriver.c',
+  'src/modules/web/webdriver.c',
+  'src/modules/web/requests.c',
 ]
 
 include_dir = include_directories('include')
@@ -118,6 +127,7 @@ executable(
   dependencies: opt_deps + [
     thread_dep,
     json_dep,
+    libcurl_dep,
     lua_dep,
     libsp_dep,
     libdeflate_dep,
