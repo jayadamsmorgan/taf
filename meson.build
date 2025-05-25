@@ -109,6 +109,7 @@ sources = [
   'src/test_case.c',
 
   'src/util/files.c',
+  'src/util/lua.c',
   'src/util/string.c',
   'src/util/time.c',
 

@@ -11,6 +11,8 @@ typedef DWORD wd_pid_t;
 typedef pid_t wd_pid_t;
 #endif
 
+#include <json.h>
+
 #define WD_ERRORSIZE 100
 
 typedef enum {
@@ -40,13 +42,26 @@ typedef struct {
     wd_pid_t driver_pid;
 } wd_session_t;
 
+typedef enum {
+    WD_METHOD_POST = 0,
+    WD_METHOD_PUT = 1,
+    WD_METHOD_DELETE = 2,
+    WD_METHOD_GET = 3,
+} wd_method;
+
 wd_status wd_session_start(int drv_port, wd_driver_backend backend,
                            wd_session_t *out);
+
+wd_status wd_session_cmd(wd_session_t *session, wd_method method,
+                         const char *endpoint, json_object *payload,
+                         json_object **out);
 
 wd_status wd_session_end(wd_session_t *session);
 
 wd_pid_t wd_spawn_driver(wd_driver_backend backend, const char *extra_args,
                          char errbuf[WD_ERRORSIZE]);
+
+void wd_kill_driver(wd_pid_t pid);
 
 const char *wd_status_to_str(wd_status status);
 

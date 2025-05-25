@@ -285,36 +285,65 @@ static int wd_kill_driver_posix(wd_pid_t pid) {
 }
 #endif
 
+void wd_kill_driver(wd_pid_t pid) {
+#if defined(_WIN32) || defined(_WIN64)
+    wd_kill_driver_windows(pid);
+#else
+    wd_kill_driver_posix(pid);
+#endif
+}
+
 wd_status wd_session_end(wd_session_t *session) {
-    /* ---------- 1. send DELETE /session/{id} ---------------------- */
     char url[256];
     snprintf(url, sizeof url, "%s/session/%s", session->base, session->id);
 
     char errbuf[CURL_ERROR_SIZE] = {0};
     struct json_object *resp = requests_http_delete_json(url, errbuf);
 
-    /* ignore JSON content – we only care whether the request went out */
-    if (!resp) {
-        /* swallow network/json errors; we’ll still kill the driver    */
-        /* but report the most relevant one to the caller              */
-        if (strcmp(errbuf, "JSON parse fail") == 0)
-            ; /* keep WD_ERR_JSON for later */
-        else
-            ; /* keep WD_ERR_NETWORK for later */
-    } else {
+    if (resp) {
         json_object_put(resp);
     }
 
-    /* ---------- 2. ensure the driver process is gone -------------- */
-#if defined(_WIN32) || defined(_WIN64)
-    wd_kill_driver_windows(session->driver_pid);
-#else
-    wd_kill_driver_posix(session->driver_pid);
-#endif
+    wd_kill_driver(session->driver_pid);
 
-    /* ---------- 3. free client-side resources --------------------- */
     free(session->base);
     free(session->id);
 
     return WD_OK; /* or propagate earlier curl/json error */
+}
+
+wd_status wd_session_cmd(wd_session_t *session, wd_method method,
+                         const char *endpoint, json_object *payload,
+                         json_object **out) {
+    char url[256];
+    snprintf(url, sizeof url, "%s/session/%s/%s", session->base, session->id,
+             endpoint);
+
+    char errbuf[CURL_ERROR_SIZE] = {0};
+
+    const char *payload_str = json_object_to_json_string(payload);
+
+    switch (method) {
+    case WD_METHOD_POST:
+        *out = requests_http_post_json(url, payload_str, errbuf);
+        break;
+    case WD_METHOD_PUT:
+        *out = requests_http_put_json(url, payload_str, errbuf);
+        break;
+    case WD_METHOD_DELETE:
+        *out = requests_http_delete_json(url, errbuf);
+        break;
+    case WD_METHOD_GET:
+        *out = requests_http_get_json(url, errbuf);
+        break;
+    }
+
+    if (!*out) {
+        if (strcmp(errbuf, "JSON parse fail") == 0)
+            return WD_ERR_JSON;
+        else
+            return WD_ERR_NETWORK;
+    }
+
+    return WD_OK;
 }

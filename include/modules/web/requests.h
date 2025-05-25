@@ -10,4 +10,10 @@ struct json_object *requests_http_post_json(const char *url, const char *body,
 struct json_object *requests_http_delete_json(const char *url,
                                               char errbuf[CURL_ERROR_SIZE]);
 
+struct json_object *requests_http_put_json(const char *url, const char *body,
+                                           char errbuf[CURL_ERROR_SIZE]);
+
+struct json_object *requests_http_get_json(const char *url,
+                                           char errbuf[CURL_ERROR_SIZE]);
+
 #endif // WEB_REQUESTS_H
