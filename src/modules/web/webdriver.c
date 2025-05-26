@@ -294,6 +294,9 @@ void wd_kill_driver(wd_pid_t pid) {
 }
 
 wd_status wd_session_end(wd_session_t *session) {
+    if (!session->id)
+        return WD_OK; // Already been closed
+
     char url[256];
     snprintf(url, sizeof url, "%s/session/%s", session->base, session->id);
 
@@ -308,6 +311,7 @@ wd_status wd_session_end(wd_session_t *session) {
 
     free(session->base);
     free(session->id);
+    session->id = NULL;
 
     return WD_OK; /* or propagate earlier curl/json error */
 }
