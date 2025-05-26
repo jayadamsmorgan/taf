@@ -13,6 +13,8 @@ typedef struct {
 
 int l_module_serial_register_module(lua_State *L);
 
+void module_serial_close_all_ports();
+
 int l_module_serial_get_port_by_name(lua_State *L);
 int l_module_serial_list_ports(lua_State *L);
 int l_module_serial_copy_port(lua_State *L);

@@ -145,6 +145,11 @@ static int run_all_tests(lua_State *L) {
             taf_tui_test_failed(i + 1, tests[i].name, safe_msg);
             lua_pop(L, 1);
         }
+        // Collect some garbage after modules
+        // This is mostly done if test has failed
+        // But also good if user forgot to close session(s)
+        module_web_close_all_sessions();
+        module_serial_close_all_ports();
     }
 
     return passed == amount ? EXIT_SUCCESS : EXIT_FAILURE;

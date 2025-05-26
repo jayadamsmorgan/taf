@@ -3,7 +3,55 @@
 #include <stdlib.h>
 #include <string.h>
 
-/*----------- helpers ------------------------------------------------*/
+typedef struct {
+    l_module_serial_t **ports;
+    size_t cap, len;
+} port_track_t;
+
+static port_track_t port_track = {
+    .ports = NULL,
+    .len = 0,
+    .cap = 0,
+};
+
+static void track_opened_port(l_module_serial_t *port) {
+
+    if (!port_track.ports) {
+        port_track.cap = 2;
+        port_track.ports = malloc(sizeof(l_module_serial_t) * port_track.cap);
+        port_track.ports[0] = port;
+        port_track.len = 1;
+        return;
+    }
+
+    if (port_track.cap <= port_track.len) {
+        port_track.cap *= 2;
+        port_track.ports = realloc(port_track.ports, port_track.cap);
+    }
+
+    port_track.ports[port_track.len++] = port;
+}
+
+void module_serial_close_all_ports() {
+    if (!port_track.ports) {
+        return;
+    }
+
+    for (size_t i = 0; i < port_track.len; i++) {
+        struct sp_port *port = port_track.ports[i]->port;
+        if (!port)
+            continue;
+
+        // We don't care about the errors here
+        sp_close(port_track.ports[i]->port);
+        sp_free_port(port_track.ports[i]->port);
+    }
+
+    free(port_track.ports);
+    port_track.ports = NULL;
+    port_track.len = 0;
+    port_track.cap = 0;
+}
 
 static inline int push_result_nil(lua_State *L, enum sp_return r) {
     if (r != SP_OK) {
@@ -38,6 +86,8 @@ int l_module_serial_get_port_by_name(lua_State *L) {
         lua_pushstring(L, sp_last_error_message());
         return 2;
     }
+
+    track_opened_port(u);
 
     luaL_getmetatable(L, "taf-serial");
     lua_setmetatable(L, -2);
@@ -593,7 +643,7 @@ int l_module_serial_drain(lua_State *L) {
     return push_result_nil(L, sp_drain(u->port));
 }
 
-/*----------- close / GC --------------------------------------------*/
+/*----------- close -----------------------------------------------*/
 /* taf-serial:close(port) -> nil|string */
 int l_module_serial_close(lua_State *L) /* optional explicit close */
 {
@@ -612,11 +662,10 @@ int l_module_serial_close(lua_State *L) /* optional explicit close */
     return 1;
 }
 
-// FIXME
-//
-// it would probably be a good idea to keep track of allocated ports
-// and then free and close them all here
-static int l_gc(lua_State *L) { return l_module_serial_close(L); }
+static int l_gc(lua_State *) {
+    module_serial_close_all_ports();
+    return 0;
+}
 
 /*----------- registration ------------------------------------------*/
 static const luaL_Reg port_mt[] = {{"__gc", l_gc}, {NULL, NULL}};
