@@ -53,10 +53,6 @@ void module_web_close_all_sessions() {
     session_track.cap = 0;
 }
 
-static inline int selfshift(lua_State *L) { /* 1 = dot‑call, 2 = colon‑call */
-    return lua_istable(L, 1) ? 2 : 1;
-}
-
 static wd_driver_backend str_to_wd_driver_backend(const char *str) {
     if (!strcmp(str, "chromedriver"))
         return WD_DRV_CHROMEDRIVER;

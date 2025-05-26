@@ -1,5 +1,7 @@
 #include "modules/serial/taf-serial.h"
 
+#include "util/lua.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -61,10 +63,6 @@ static inline int push_result_nil(lua_State *L, enum sp_return r) {
 
     lua_pushnil(L);
     return 1;
-}
-
-static inline int selfshift(lua_State *L) { /* 1 = dot‑call, 2 = colon‑call */
-    return lua_istable(L, 1) ? 2 : 1;
 }
 
 static inline l_module_serial_t *check_port(lua_State *L, int idx) {

@@ -11,4 +11,8 @@ json_object *lua_to_json(lua_State *L, int index);
 
 void json_to_lua(lua_State *L, struct json_object *obj);
 
+static inline int selfshift(lua_State *L) { /* 1 = dot‑call, 2 = colon‑call */
+    return lua_istable(L, 1) ? 2 : 1;
+}
+
 #endif // UTIL_LUA_H

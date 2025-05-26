@@ -1,7 +1,9 @@
 #include "modules/taf/taf.h"
 
 #include "taf_tui.h"
+#include "util/lua.h"
 #include "util/time.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -16,10 +18,12 @@ int l_module_taf_millis(lua_State *L) {
 int l_module_taf_print(lua_State *L) {
     int n = lua_gettop(L); /* #args */
 
+    int s = selfshift(L);
+
     luaL_Buffer buf;
     luaL_buffinit(L, &buf);
 
-    for (int i = 1; i <= n; ++i) {
+    for (int i = s; i <= n; ++i) {
         size_t len;
         const char *s = luaL_tolstring(L, i, &len);
         luaL_addlstring(&buf, s, len); /* copy into buffer */
