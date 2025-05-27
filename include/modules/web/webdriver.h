@@ -13,7 +13,7 @@ typedef pid_t wd_pid_t;
 
 #include <json.h>
 
-#define WD_ERRORSIZE 100
+#define WD_ERRORSIZE 1024
 
 typedef enum {
     WD_DRV_CHROMEDRIVER = 0,
@@ -50,7 +50,7 @@ typedef enum {
 } wd_method;
 
 wd_status wd_session_start(int drv_port, wd_driver_backend backend,
-                           wd_session_t *out);
+                           char errbuf[WD_ERRORSIZE], wd_session_t *out);
 
 wd_status wd_session_cmd(wd_session_t *session, wd_method method,
                          const char *endpoint, json_object *payload,
@@ -58,7 +58,7 @@ wd_status wd_session_cmd(wd_session_t *session, wd_method method,
 
 wd_status wd_session_end(wd_session_t *session);
 
-wd_pid_t wd_spawn_driver(wd_driver_backend backend, const char *extra_args,
+wd_pid_t wd_spawn_driver(wd_driver_backend backend, size_t argc, char **args,
                          char errbuf[WD_ERRORSIZE]);
 
 void wd_kill_driver(wd_pid_t pid);

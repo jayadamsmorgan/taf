@@ -85,16 +85,45 @@ int l_module_web_session_start(lua_State *L) {
         return 2;
     }
 
-    const char *extra_args = luaL_optstring(L, s + 2, NULL);
-    char argbuff[1024];
-    // TODO: Fix args (args should be an array of strings instead)
-    if (extra_args && *extra_args) {
-        snprintf(argbuff, 1024, "--port=%d %s", port, extra_args);
-    } else {
-        snprintf(argbuff, 1024, "--port=%d", port);
+    luaL_checktype(L, s + 2, LUA_TTABLE);
+    size_t len = lua_rawlen(L, s + 2);
+    char **args = malloc(sizeof(*args) * (len + 1));
+    if (!args) {
+        lua_pushnil(L);
+        lua_pushstring(L, "malloc: out of memory");
+        return 2;
     }
+
+    for (size_t i = 0; i < len; i++) {
+        lua_geti(L, s + 2, i + 1);
+        size_t str_len;
+        const char *arg = luaL_checklstring(L, -1, &str_len);
+        args[i] = malloc(sizeof(char) * (str_len + 1));
+        if (!args[i]) {
+            lua_pushnil(L);
+            lua_pushstring(L, "malloc: out of memory");
+            return 2;
+        }
+        memcpy(args[i], arg, str_len + 1);
+        lua_pop(L, 1);
+    }
+
+    args[len] = malloc(sizeof(char) * 30);
+    if (!args[len]) {
+        lua_pushnil(L);
+        lua_pushstring(L, "malloc: out of memory");
+        return 2;
+    }
+    snprintf(args[len], 30, "--port=%d", port);
+
     char errbuf[WD_ERRORSIZE];
-    wd_pid_t driver_pid = wd_spawn_driver(backend, argbuff, errbuf);
+    wd_pid_t driver_pid = wd_spawn_driver(backend, len + 1, args, errbuf);
+
+    for (size_t i = 0; i < len + 1; i++) {
+        free(args[i]);
+    }
+    free(args);
+
     if (driver_pid < 0) {
         lua_pushnil(L);
         lua_pushstring(L, errbuf);
@@ -103,11 +132,10 @@ int l_module_web_session_start(lua_State *L) {
 
     wd_session_t *session = lua_newuserdata(L, sizeof *session);
     session->driver_pid = driver_pid;
-    wd_status stat = wd_session_start(port, backend, session);
+    wd_status stat = wd_session_start(port, backend, errbuf, session);
     if (stat != WD_OK) {
-        const char *err = wd_status_to_str(stat);
         lua_pushnil(L);
-        lua_pushstring(L, err);
+        lua_pushstring(L, errbuf);
         return 2;
     }
 

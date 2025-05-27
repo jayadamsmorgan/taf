@@ -24,11 +24,12 @@ local M = {}
 ---
 --- @param driver_port integer port to open webdriver with
 --- @param backend driver?
---- @param extraflags string?
+--- @param extraflags [string]?
 ---
 --- @return session
 M.session_start = function(driver_port, backend, extraflags)
 	backend = backend or "chromedriver"
+	extraflags = extraflags or {}
 	return wd:session_start(driver_port, backend, extraflags)
 end
 
