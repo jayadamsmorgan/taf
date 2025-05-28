@@ -1,43 +1,45 @@
-local web = require("web")
+local taf = require("taf")
+local web = taf.web
 
-test_case("testing web session start", function()
+taf.test("testing web session start", function()
 	-- Open the session on port 9515
 	local session, err = web.session_start(9515)
 	assert(not err, err or "")
 
-	test.sleep(1000)
+	taf.sleep(1000)
 
 	-- Open google.com
 	err = web.open_url(session, "https://google.com/")
 	assert(not err, err or "")
 
-	test.sleep(1000)
+	taf.sleep(1000)
 
 	-- Open yahoo.com
 	err = web.open_url(session, "https://yahoo.com/")
 	assert(not err, err or "")
 
-	test.sleep(1000)
+	taf.sleep(1000)
 
 	-- Go back to google.com
 	err = web.go_back(session)
 
-	test.sleep(1000)
+	taf.sleep(1000)
 
 	-- Go forward to yahoo.com
 	err = web.go_forward(session)
 
-	test.sleep(1000)
+	taf.sleep(1000)
 
 	-- Refresh the site
 	err = web.refresh(session)
 
-	test.sleep(1000)
+	taf.sleep(1000)
 
 	-- Get the site url
 	local url
 	url, err = web.get_current_url(session)
 	assert(not err and url, err or "url is nil")
+	taf.print("Example")
 	assert(url == "https://www.yahoo.com/")
 
 	-- Get the site title
@@ -46,7 +48,7 @@ test_case("testing web session start", function()
 	assert(not err and title, err or "title is nil")
 	assert(title == "Yahoo | Mail, Weather, Search, Politics, News, Finance, Sports & Videos")
 
-	test.sleep(500)
+	taf.sleep(500)
 
 	-- Close webdriver session
 	err = web.session_end(session)

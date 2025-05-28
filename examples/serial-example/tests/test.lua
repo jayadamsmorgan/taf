@@ -1,8 +1,8 @@
-local serial = require("serial")
+local taf = require("taf")
+local serial = taf.serial
+local vars = require("variables")
 
-local port_name = "/dev/cu.usbmodem149202"
-
-test_case("List serial devices", function()
+taf.test("List serial devices", function()
 	local devices, err = serial.list_devices()
 	if err then
 		print(err)
@@ -17,17 +17,17 @@ test_case("List serial devices", function()
 	end
 end)
 
-test_case("Get port info", function()
-	local info, err = serial.get_port_info(port_name)
+taf.test("Get port info", function()
+	local info, err = serial.get_port_info(vars.port_name)
 	assert(not err)
 	assert(info)
 	print(info.type)
 end)
 
-test_case("Reading from serial device", function()
+taf.test("Reading from serial device", function()
 	local err
 	local port
-	port, err = serial.open(port_name)
+	port, err = serial.open(vars.port_name)
 	assert(not err)
 	assert(port)
 	local result

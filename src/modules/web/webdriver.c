@@ -1,7 +1,6 @@
 #include "modules/web/webdriver.h"
 
 #include "modules/web/requests.h"
-#include "taf_tui.h"
 
 #include <curl/curl.h>
 #include <curl/easy.h>
@@ -403,7 +402,7 @@ void wd_kill_driver(wd_pid_t pid) {
 }
 
 wd_status wd_session_end(wd_session_t *session) {
-    if (!session->id)
+    if (session->driver_pid == -1)
         return WD_OK; // Already been closed
 
     char url[256];
@@ -421,6 +420,7 @@ wd_status wd_session_end(wd_session_t *session) {
     free(session->base);
     free(session->id);
     session->id = NULL;
+    session->driver_pid = -1;
 
     return WD_OK; /* or propagate earlier curl/json error */
 }

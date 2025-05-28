@@ -85,6 +85,7 @@ end
 --- @param session session
 --- @param using string   e.g. "css selector", "xpath"
 --- @param value string
+---
 --- @return string? element_id, string? err
 M.find_element = function(session, using, value)
 	local res, err = M.session_cmd(session, "post", "element", {
@@ -98,6 +99,9 @@ M.find_element = function(session, using, value)
 end
 
 --- Find *all* elements matching a selector.
+--- @param session session
+--- @param using string   e.g. "css selector", "xpath"
+--- @param value string
 ---
 --- @return string[]? element_ids, string? err
 M.find_elements = function(session, using, value)
@@ -130,6 +134,7 @@ end
 --- @param session session
 --- @param element_id string
 --- @param text string
+---
 --- @return string? err
 M.send_keys = function(session, element_id, text)
 	-- W3C needs an array of characters:
@@ -144,6 +149,9 @@ end
 
 --- Retrieve the visible text of an element.
 ---
+--- @param session session
+--- @param element_id string
+---
 --- @return string? text, string? err
 M.get_text = function(session, element_id)
 	local res, err = M.session_cmd(session, "get", ("element/%s/text"):format(element_id), {})
@@ -153,8 +161,9 @@ end
 --- Execute synchronous JavaScript in the page.
 ---
 --- @param session session
---- @param script string    -- JS source
---- @param args table?      -- array of arguments
+--- @param script string JS source
+--- @param args table? array of arguments
+---
 --- @return any? result, string? err
 M.execute = function(session, script, args)
 	local res, err = M.session_cmd(session, "post", "execute/sync", { script = script, args = args or {} })
@@ -162,6 +171,8 @@ M.execute = function(session, script, args)
 end
 
 --- Take a full-page screenshot.
+---
+--- @param session session
 ---
 --- @return string? base64_png, string? err
 M.screenshot = function(session)

@@ -1,11 +1,38 @@
 #include "modules/taf/taf.h"
 
 #include "taf_tui.h"
+#include "test_case.h"
 #include "util/lua.h"
 #include "util/time.h"
 
 #include <stdlib.h>
 #include <string.h>
+
+/* taf:sleep(ms: number) */
+static int l_module_taf_sleep(lua_State *L) {
+    int s = selfshift(L);
+
+    int ms = luaL_checkinteger(L, s);
+    usleep(ms * 1000);
+
+    return 0; /* no Lua return values */
+}
+
+/* taf:test(name:string, body:function) */
+static int l_module_taf_register_test(lua_State *L) {
+    int s = selfshift(L);
+
+    const char *name = luaL_checkstring(L, s);
+    luaL_checktype(L, s + 1, LUA_TFUNCTION);
+
+    lua_pushvalue(L, s + 1);                  /* duplicate fn -> top */
+    int ref = luaL_ref(L, LUA_REGISTRYINDEX); /* pop & ref */
+
+    test_case_t test_case = {.name = name, .ref = ref};
+    test_case_enqueue(&test_case);
+
+    return 0; /* no Lua returns */
+}
 
 /* taf:millis() -> number */
 int l_module_taf_millis(lua_State *L) {
@@ -59,14 +86,16 @@ static const luaL_Reg port_mt[] = {
 };
 
 static const luaL_Reg module_fns[] = {
+    {"sleep", l_module_taf_sleep},
     {"millis", l_module_taf_millis},
     {"print", l_module_taf_print},
+    {"test", l_module_taf_register_test},
     {NULL, NULL},
 };
 
 int l_module_taf_register_module(lua_State *L) {
 
-    luaL_newmetatable(L, "taf");
+    luaL_newmetatable(L, "taf-main");
     luaL_setfuncs(L, port_mt, 0);
     lua_pop(L, 1);
     lua_newtable(L);

@@ -133,13 +133,13 @@ int l_module_web_session_start(lua_State *L) {
     wd_session_t *session = lua_newuserdata(L, sizeof *session);
     session->driver_pid = driver_pid;
     wd_status stat = wd_session_start(port, backend, errbuf, session);
+    track_opened_session(session);
+
     if (stat != WD_OK) {
         lua_pushnil(L);
         lua_pushstring(L, errbuf);
         return 2;
     }
-
-    track_opened_session(session);
 
     luaL_getmetatable(L, "taf-webdriver");
     lua_setmetatable(L, -2);
