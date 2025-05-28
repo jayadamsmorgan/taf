@@ -16,9 +16,10 @@ end
 --- Register new test
 ---
 --- @param test_name string name of the test
---- @param body function
-M.test = function(test_name, body)
-	tm:test(test_name, body)
+--- @param tags_or_body [string]|function either array of test tags or test body
+--- @param body function|nil body of the test if previous argument is tags
+M.test = function(test_name, tags_or_body, body)
+	tm:test(test_name, tags_or_body, body)
 end
 
 --- Print something to logs & TUI. Same as default Lua `print()`
