@@ -1,6 +1,6 @@
 #include "util/lua.h"
 
-static int table_is_array(lua_State *L, int index, lua_Integer *max_out) {
+int lua_table_is_array(lua_State *L, int index, lua_Integer *max_out) {
     lua_Integer max = 0;
     int array_like = 1;
 
@@ -38,7 +38,7 @@ json_object *lua_to_json(lua_State *L, int index) {
     case LUA_TTABLE: {
         /* Decide array vs object */
         lua_Integer max;
-        int is_array = table_is_array(L, index, &max);
+        int is_array = lua_table_is_array(L, index, &max);
 
         json_object *j =
             is_array ? json_object_new_array() : json_object_new_object();

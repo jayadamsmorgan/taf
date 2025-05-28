@@ -6,16 +6,16 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
-uint64_t millis_since_start(void) {
-    static LARGE_INTEGER first = {0};
-    static LARGE_INTEGER freq = {0};
-    LARGE_INTEGER now;
+static LARGE_INTEGER first = {0};
+static LARGE_INTEGER freq = {0};
 
-    if (first.QuadPart == 0) { // first call → init
-        QueryPerformanceFrequency(&freq);
-        QueryPerformanceCounter(&first);
-        return 0;
-    }
+void reset_millis(void) {
+    QueryPerformanceFrequency(&freq);
+    QueryPerformanceCounter(&first);
+}
+
+uint64_t millis_since_start(void) {
+    LARGE_INTEGER now;
 
     QueryPerformanceCounter(&now);
     return (uint64_t)((now.QuadPart - first.QuadPart) * 1000ULL /
@@ -26,17 +26,17 @@ uint64_t millis_since_start(void) {
 
 #include <time.h>
 
+static struct timespec first = {0};
+
+void reset_millis(void) {
+    //
+    clock_gettime(CLOCK_MONOTONIC, &first);
+}
+
 uint64_t millis_since_start(void) {
-    static struct timespec first = {0};
     struct timespec now;
 
     clock_gettime(CLOCK_MONOTONIC, &now);
-
-    /* initialise on very first call */
-    if (first.tv_sec == 0 && first.tv_nsec == 0) {
-        first = now;
-        return 0;
-    }
 
     /* signed differences to avoid wrap-around */
     int64_t ds = (int64_t)now.tv_sec - (int64_t)first.tv_sec;

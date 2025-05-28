@@ -182,7 +182,7 @@ static void set_test_tags(const char *arg) {
 
     test_opts.tags_amount = string_split_by_delim(copy, tags, ",", sz);
     test_opts.tags = malloc(sizeof(char *) * test_opts.tags_amount);
-    for (int i = 0; i < test_opts.tags_amount; i++) {
+    for (size_t i = 0; i < test_opts.tags_amount; i++) {
         test_opts.tags[i] = strdup(tags[i]);
     }
 }

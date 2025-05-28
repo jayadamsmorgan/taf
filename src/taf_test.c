@@ -8,6 +8,7 @@
 #include "taf_tui.h"
 #include "test_case.h"
 #include "util/files.h"
+#include "util/time.h"
 #include "version.h"
 
 #include <lauxlib.h>
@@ -24,25 +25,8 @@ static int g_last = 0;
 
 static const char *module_path;
 
-static int c_sleep_ms(lua_State *L) {
-    int ms = luaL_checkinteger(L, 1);
-    usleep(ms * 1000);
-
-    return 0; /* no Lua return values */
-}
-
-static int l_register_test(lua_State *L) {
-    const char *name = luaL_checkstring(L, 1);
-    luaL_checktype(L, 2, LUA_TFUNCTION);
-
-    lua_pushvalue(L, 2);                      /* duplicate fn -> top */
-    int ref = luaL_ref(L, LUA_REGISTRYINDEX); /* pop & ref */
-
-    test_case_t test_case = {.name = name, .ref = ref};
-    test_case_enqueue(&test_case);
-
-    return 0; /* no Lua returns */
-}
+static char test_folder_path[PATH_MAX];
+static char lib_folder_path[PATH_MAX];
 
 typedef struct line_cache {
     char *path;
@@ -135,6 +119,9 @@ static int run_all_tests(lua_State *L) {
             g_last = ar.lastlinedefined;
         }
 
+        // Reset starting time for millis() function
+        reset_millis();
+
         int rc = lua_pcall(L, 0, 0, 0);
         if (rc == LUA_OK) {
             taf_tui_test_passed(i + 1, tests[i].name);
@@ -145,6 +132,11 @@ static int run_all_tests(lua_State *L) {
             taf_tui_test_failed(i + 1, tests[i].name, safe_msg);
             lua_pop(L, 1);
         }
+        // Collect some garbage after modules
+        // This is mostly done if test has failed
+        // But also good if user forgot to close session(s)
+        module_web_close_all_sessions();
+        module_serial_close_all_ports();
     }
 
     return passed == amount ? EXIT_SUCCESS : EXIT_FAILURE;
@@ -169,7 +161,7 @@ static const char *get_lib_dir() {
         fprintf(stderr, "Unable to load taf lua library: 'HOME' "
                         "environment variable is not set.\n"
                         "Use --libpath path_to_taf_lib_folder or set "
-                        "'taf_LIB_PATH' environment variable.\n");
+                        "'TAF_LIB_PATH' environment variable.\n");
         exit(EXIT_FAILURE);
     }
     char default_path[PATH_MAX];
@@ -186,26 +178,25 @@ static void inject_modules_dir(lua_State *L) {
     lua_getglobal(L, "package");
     lua_getfield(L, -1, "path"); /* pkg.path string */
     const char *old_path = lua_tostring(L, -1);
-    lua_pushfstring(L, "%s;%s/?.lua;%s/?/init.lua", old_path, module_path,
-                    module_path);
+    lua_pushfstring(L,
+                    "%s;%s/?.lua;%s/?/init.lua;%s/?.lua;%s/?/init.lua;%s/"
+                    "?.lua;%s/?/init.lua",
+                    old_path, module_path, module_path, lib_folder_path,
+                    lib_folder_path, test_folder_path, test_folder_path);
     lua_setfield(L, -3, "path"); /* package.path = … */
     lua_pop(L, 2);               /* pop path + package */
 }
 
 void register_test_api(lua_State *L) {
-    lua_newtable(L);
-    lua_pushcfunction(L, c_sleep_ms);
-    lua_setfield(L, -2, "sleep");
-    lua_setglobal(L, "test");
 
-    lua_pushcfunction(L, l_register_test);
-    lua_setglobal(L, "test_case");
+    // Change default lua 'print' to our implementation:
     lua_pushcfunction(L, l_module_taf_print);
     lua_setglobal(L, "print");
 
+    // Register C lua modules:
     luaL_requiref(L, "taf-serial", l_module_serial_register_module, 1);
     lua_pop(L, 1);
-    luaL_requiref(L, "taf", l_module_taf_register_module, 1);
+    luaL_requiref(L, "taf-main", l_module_taf_register_module, 1);
     lua_pop(L, 1);
     luaL_requiref(L, "taf-webdriver", l_module_web_register_module, 1);
     lua_pop(L, 1);
@@ -250,7 +241,6 @@ int taf_test() {
     }
 
     // Load test paths
-    char test_folder_path[PATH_MAX];
     if (proj->multitarget) {
         snprintf(test_folder_path, PATH_MAX, "%s/tests/%s", proj->project_path,
                  opts->target);
@@ -265,6 +255,7 @@ int taf_test() {
             return EXIT_FAILURE;
         }
     }
+    snprintf(lib_folder_path, PATH_MAX, "%s/lib", proj->project_path);
 
     str_array_t lua_test_files = list_lua_recursive(test_folder_path);
     if (lua_test_files.count == 0) {

@@ -65,72 +65,145 @@ const char *wd_driver_executable(wd_driver_backend backend) {
 }
 
 #if defined(_WIN32) || defined(_WIN64)
+#include <stdio.h>
+#include <windows.h>
+
 static wd_pid_t wd_spawn_driver_win(const char *exe, const char *extra_args,
                                     char errbuf[WD_ERRORSIZE]) {
-    char cmdline[1024] = {0};
+    // Build command line
+    char cmdline[1024];
     snprintf(cmdline, sizeof(cmdline), "\"%s\"%s%s", exe,
              (extra_args && *extra_args) ? " " : "",
              (extra_args && *extra_args) ? extra_args : "");
 
-    STARTUPINFOA si = {.cb = sizeof(si)};
-    PROCESS_INFORMATION pi = {0};
-
-    BOOL ok =
-        CreateProcessA(NULL,    /* lpApplicationName (search on PATH) */
-                       cmdline, /* lpCommandLine                      */
-                       NULL, NULL, FALSE, /* default security / no inherit */
-                       CREATE_NO_WINDOW,  /* don’t pop a console  */
-                       NULL, NULL, /* inherit environment & cwd          */
-                       &si, &pi);
-
-    if (!ok) {
-        snprintf(errbuf, WD_ERRORSIZE, "CreateProcess failed (err=%lu)\n",
+    // Create an inheritable pipe for BOTH stdout & stderr
+    SECURITY_ATTRIBUTES sa = {sizeof(sa), NULL, TRUE};
+    HANDLE readPipe = NULL, writePipe = NULL;
+    if (!CreatePipe(&readPipe, &writePipe, &sa, 0)) {
+        snprintf(errbuf, WD_ERRORSIZE, "CreatePipe failed (err=%lu)",
                  GetLastError());
         return (wd_pid_t)-1;
     }
+    // Ensure the read handle isn't inherited
+    SetHandleInformation(readPipe, HANDLE_FLAG_INHERIT, 0);
 
+    // Setup STARTUPINFO to redirect stdout/stderr into our pipe
+    STARTUPINFOA si = {.cb = sizeof(si)};
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+    si.hStdOutput = writePipe;
+    si.hStdError = writePipe;
+
+    PROCESS_INFORMATION pi = {0};
+    BOOL ok = CreateProcessA(
+        NULL,                         // lpApplicationName
+        cmdline,                      // lpCommandLine
+        NULL, NULL,                   // lpProcessAttributes, lpThreadAttributes
+        TRUE,                         // bInheritHandles
+        CREATE_NO_WINDOW, NULL, NULL, // lpEnvironment, lpCurrentDirectory
+        &si, &pi);
+
+    // Parent no longer needs the write end
+    CloseHandle(writePipe);
+    if (!ok) {
+        DWORD err = GetLastError();
+        snprintf(errbuf, WD_ERRORSIZE, "CreateProcessA failed (err=%lu)", err);
+        CloseHandle(readPipe);
+        return (wd_pid_t)-1;
+    }
+    // We don't need the thread handle
     CloseHandle(pi.hThread);
-    DWORD ec = STILL_ACTIVE;
-    DWORD wait = WaitForSingleObject(pi.hProcess, DRIVER_STARTUP_TIMEOUT_CHECK);
 
+    // Wait up to DRIVER_STARTUP_TIMEOUT_CHECK ms for child to exit
+    DWORD wait = WaitForSingleObject(pi.hProcess, DRIVER_STARTUP_TIMEOUT_CHECK);
     if (wait == WAIT_OBJECT_0) {
+        // Child died immediately — grab its exit code
+        DWORD ec = STILL_ACTIVE;
         GetExitCodeProcess(pi.hProcess, &ec);
-        snprintf(errbuf, WD_ERRORSIZE, "driver exited immediately (code %lu)",
-                 ec);
+
+        // Read up to WD_ERRORSIZE-1 bytes from pipe
+        char buf[WD_ERRORSIZE];
+        DWORD total = 0, n = 0;
+        while (total < WD_ERRORSIZE - 1 &&
+               ReadFile(readPipe, buf + total, WD_ERRORSIZE - 1 - total, &n,
+                        NULL) &&
+               n > 0) {
+            total += n;
+        }
+        buf[total] = '\0';
+
+        // Format into errbuf
+        snprintf(errbuf, WD_ERRORSIZE,
+                 "driver exited immediately (code %lu): %s", ec,
+                 buf[0] ? buf : "(no output)");
+
         CloseHandle(pi.hProcess);
+        CloseHandle(readPipe);
         return (wd_pid_t)-1;
     }
 
+    // If wait == WAIT_TIMEOUT, child is still alive — success
     CloseHandle(pi.hProcess);
+    CloseHandle(readPipe);
     return (wd_pid_t)pi.dwProcessId;
 }
 #else
+
 #include <spawn.h>
 extern char **environ;
-// TODO: capture the output of the spawn process and put it in errbuf
-// if possible
-static wd_pid_t wd_spawn_driver_posix(const char *exe, const char *extra_args,
+
+static wd_pid_t wd_spawn_driver_posix(const char *exe, size_t argc, char **args,
                                       char errbuf[WD_ERRORSIZE]) {
+    int pipe_all[2];
+    if (pipe(pipe_all) == -1) {
+        snprintf(errbuf, WD_ERRORSIZE, "pipe: %s", strerror(errno));
+        return (wd_pid_t)-1;
+    }
+
     posix_spawn_file_actions_t fa;
     posix_spawn_file_actions_init(&fa);
 
-    // open /dev/null once and map it to stdout (fd 1) and stderr (fd 2)
-    posix_spawn_file_actions_addopen(&fa, 1, "/dev/null", O_WRONLY, 0);
-    posix_spawn_file_actions_adddup2(&fa, 1, 2); // 2>&1
+    // In child: close read-end, dup write-end onto stdout & stderr, then
+    // close write-end
+    posix_spawn_file_actions_addclose(&fa, pipe_all[0]);
+    posix_spawn_file_actions_adddup2(&fa, pipe_all[1], STDOUT_FILENO);
+    posix_spawn_file_actions_adddup2(&fa, pipe_all[1], STDERR_FILENO);
+    posix_spawn_file_actions_addclose(&fa, pipe_all[1]);
 
-    char *const argv[] = {
-        (char *)exe, (extra_args && *extra_args) ? (char *)extra_args : NULL,
-        NULL};
+    // build argv array (argv[0] = exe, then args[0..argc-1], then NULL)
+    char **argv = malloc((argc + 2) * sizeof(char *));
+    if (!argv) {
+        snprintf(errbuf, WD_ERRORSIZE, "malloc: out of memory");
+        posix_spawn_file_actions_destroy(&fa);
+        close(pipe_all[0]);
+        close(pipe_all[1]);
+        return (wd_pid_t)-1;
+    }
+    argv[0] = (char *)exe;
+    for (size_t i = 0; i < argc; i++) {
+        argv[i + 1] = args[i];
+    }
+    argv[argc + 1] = NULL;
 
+    // spawn the child
     pid_t pid;
     int rc = posix_spawnp(&pid, exe, &fa, NULL, argv, environ);
+
     posix_spawn_file_actions_destroy(&fa);
+    free(argv);
 
     if (rc != 0) {
-        snprintf(errbuf, WD_ERRORSIZE, "posix_spawnp: %s", strerror(rc));
-        return -1;
+        snprintf(errbuf, WD_ERRORSIZE, "posix_spawnp: %s (%s)", strerror(rc),
+                 exe);
+        close(pipe_all[0]);
+        close(pipe_all[1]);
+        return (wd_pid_t)-1;
     }
 
+    // parent: close write-end, keep read-end for possible error capture
+    close(pipe_all[1]);
+
+    // give the child a short grace period; if it dies, capture its output
     int waited = 0;
     while (waited < DRIVER_STARTUP_TIMEOUT_CHECK) {
         int st;
@@ -141,28 +214,46 @@ static wd_pid_t wd_spawn_driver_posix(const char *exe, const char *extra_args,
             continue;
         }
         if (r == pid) {
-            if (WIFEXITED(st))
-                snprintf(errbuf, WD_ERRORSIZE, "driver exited (status %d)",
-                         WEXITSTATUS(st));
-            else if (WIFSIGNALED(st))
-                snprintf(errbuf, WD_ERRORSIZE, "driver killed by signal %d",
-                         WTERMSIG(st));
-            else
+            // child died -> read up to WD_ERRORSIZE-1 bytes from the pipe
+            char buf[WD_ERRORSIZE];
+            ssize_t off = 0, n;
+            while ((n = read(pipe_all[0], buf + off, WD_ERRORSIZE - 1 - off)) >
+                   0) {
+                off += n;
+                if (off >= WD_ERRORSIZE - 1)
+                    break;
+            }
+            buf[off] = '\0';
+            close(pipe_all[0]);
+
+            // format the combined error
+            if (WIFEXITED(st)) {
+                snprintf(errbuf, WD_ERRORSIZE, "driver exited (status %d): %s",
+                         WEXITSTATUS(st), buf);
+            } else if (WIFSIGNALED(st)) {
+                snprintf(errbuf, WD_ERRORSIZE, "driver killed by signal %d: %s",
+                         WTERMSIG(st), buf);
+            } else {
                 snprintf(errbuf, WD_ERRORSIZE,
-                         "driver quit unexpectedly (raw %d)", st);
-            return -1;
+                         "driver quit unexpectedly (raw %d): %s", st, buf);
+            }
+            return (wd_pid_t)-1;
         }
-        if (r == -1 && errno == EINTR)
+        if (r == -1 && errno == EINTR) {
             continue;
+        }
         snprintf(errbuf, WD_ERRORSIZE, "waitpid: %s", strerror(errno));
-        return -1;
+        close(pipe_all[0]);
+        return (wd_pid_t)-1;
     }
+
     // child still alive after grace period -> success
+    close(pipe_all[0]);
     return (wd_pid_t)pid;
 }
 #endif
 
-wd_pid_t wd_spawn_driver(wd_driver_backend backend, const char *extra_args,
+wd_pid_t wd_spawn_driver(wd_driver_backend backend, size_t argc, char **args,
                          char errbuf[WD_ERRORSIZE]) {
     if (errbuf)
         errbuf[0] = '\0';
@@ -174,9 +265,9 @@ wd_pid_t wd_spawn_driver(wd_driver_backend backend, const char *extra_args,
     }
 
 #if defined(_WIN32) || defined(_WIN64)
-    return wd_spawn_driver_win(exe, extra_args, errbuf);
+    return wd_spawn_driver_win(exe, argc, args, errbuf);
 #else
-    return wd_spawn_driver_posix(exe, extra_args, errbuf);
+    return wd_spawn_driver_posix(exe, argc, args, errbuf);
 #endif
 }
 
@@ -185,31 +276,47 @@ const char *wd_status_to_str(wd_status status) {
 }
 
 static wd_status extract_session_id(struct json_object *root, char **sid_out) {
-    /* First try W3C style: {"value":{"sessionId": "..."} } */
-    struct json_object *value = NULL;
-    if (json_object_object_get_ex(root, "value", &value) &&
-        json_object_is_type(value, json_type_object)) {
+    struct json_object *value = NULL, *field = NULL;
 
-        struct json_object *sid = NULL;
-        if (json_object_object_get_ex(value, "sessionId", &sid) &&
-            json_object_is_type(sid, json_type_string)) {
-            *sid_out = strdup(json_object_get_string(sid));
-            return WD_OK;
-        }
+    // Try W3C success: { "value": { "sessionId": "…" } }
+    if (json_object_object_get_ex(root, "value", &value) &&
+        json_object_is_type(value, json_type_object) &&
+        json_object_object_get_ex(value, "sessionId", &field) &&
+        json_object_is_type(field, json_type_string)) {
+        *sid_out = strdup(json_object_get_string(field));
+        return WD_OK;
     }
 
-    /* Fallback to legacy style: {"sessionId":"...", ...} */
-    struct json_object *sid = NULL;
-    if (json_object_object_get_ex(root, "sessionId", &sid) &&
-        json_object_is_type(sid, json_type_string)) {
-        *sid_out = strdup(json_object_get_string(sid));
+    // Fallback legacy success: { "sessionId": "…" }
+    if (json_object_object_get_ex(root, "sessionId", &field) &&
+        json_object_is_type(field, json_type_string)) {
+        *sid_out = strdup(json_object_get_string(field));
         return WD_OK;
+    }
+
+    // If we get here, no sessionId — try to extract an error message.
+    //    W3C error: { "value": { "error": "...", "message": "..." } }
+    if (json_object_object_get_ex(root, "value", &value) &&
+        json_object_is_type(value, json_type_object) &&
+        json_object_object_get_ex(value, "message", &field) &&
+        json_object_is_type(field, json_type_string)) {
+        *sid_out = strdup(json_object_get_string(field));
+        return WD_ERR_JSON;
+    }
+
+    // Some legacy drivers might return top‐level error/message:
+    //    { "error": "...", "message": "..." }
+    if (json_object_object_get_ex(root, "message", &field) &&
+        json_object_is_type(field, json_type_string)) {
+        *sid_out = strdup(json_object_get_string(field));
+        return WD_ERR_JSON;
     }
 
     return WD_ERR_JSON;
 }
 
-wd_status wd_session_start(int drv_port, wd_driver_backend, wd_session_t *out) {
+wd_status wd_session_start(int drv_port, wd_driver_backend,
+                           char errbuf[WD_ERRORSIZE], wd_session_t *out) {
 
     char drv_url[256];
     snprintf(drv_url, sizeof drv_url, "http://localhost:%d", drv_port);
@@ -217,20 +324,20 @@ wd_status wd_session_start(int drv_port, wd_driver_backend, wd_session_t *out) {
     char url[256];
     snprintf(url, sizeof url, "%s/session", drv_url);
 
-    char errbuf[CURL_ERROR_SIZE] = {0};
+    char curl_errbuf[CURL_ERROR_SIZE] = {0};
 
     struct json_object *root =
         requests_http_post_json(url,
                                 "{ \"capabilities\": { \"firstMatch\": [ {} ] "
                                 "}, \"desiredCapabilities\": {} }",
-                                errbuf);
+                                curl_errbuf);
 
     if (!root) {
-        /* choose an error code based on curl vs json parse msg */
-        if (strcmp(errbuf, "JSON parse fail") == 0)
+        if (strcmp(curl_errbuf, "JSON parse fail") == 0)
             return WD_ERR_JSON;
-        else
-            return WD_ERR_NETWORK;
+
+        memcpy(errbuf, curl_errbuf, json_min(CURL_ERROR_SIZE, WD_ERRORSIZE));
+        return WD_ERR_NETWORK;
     }
 
     char *sid = NULL;
@@ -242,6 +349,7 @@ wd_status wd_session_start(int drv_port, wd_driver_backend, wd_session_t *out) {
             out->id = sid;
         }
     } else if (sid) {
+        memcpy(errbuf, sid, json_min(strlen(sid) + 1, WD_ERRORSIZE));
         free(sid);
     }
 
@@ -294,6 +402,9 @@ void wd_kill_driver(wd_pid_t pid) {
 }
 
 wd_status wd_session_end(wd_session_t *session) {
+    if (session->driver_pid == -1)
+        return WD_OK; // Already been closed
+
     char url[256];
     snprintf(url, sizeof url, "%s/session/%s", session->base, session->id);
 
@@ -308,6 +419,8 @@ wd_status wd_session_end(wd_session_t *session) {
 
     free(session->base);
     free(session->id);
+    session->id = NULL;
+    session->driver_pid = -1;
 
     return WD_OK; /* or propagate earlier curl/json error */
 }

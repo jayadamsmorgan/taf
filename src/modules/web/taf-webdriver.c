@@ -6,8 +6,51 @@
 
 #include <string.h>
 
-static inline int selfshift(lua_State *L) { /* 1 = dot‑call, 2 = colon‑call */
-    return lua_istable(L, 1) ? 2 : 1;
+typedef struct {
+    wd_session_t **sessions;
+    size_t len, cap;
+} session_track_t;
+
+static session_track_t session_track = {
+    .sessions = NULL,
+    .len = 0,
+    .cap = 0,
+};
+
+static void track_opened_session(wd_session_t *session) {
+
+    if (!session_track.sessions) {
+        session_track.cap = 2;
+        session_track.sessions =
+            malloc(sizeof(wd_session_t) * session_track.cap);
+        session_track.sessions[0] = session;
+        session_track.len = 1;
+        return;
+    }
+
+    if (session_track.cap <= session_track.len) {
+        session_track.cap *= 2;
+        session_track.sessions =
+            realloc(session_track.sessions, session_track.cap);
+    }
+
+    session_track.sessions[session_track.len++] = session;
+}
+
+void module_web_close_all_sessions() {
+
+    if (!session_track.sessions) {
+        return;
+    }
+
+    for (size_t i = 0; i < session_track.len; i++) {
+        wd_session_end(session_track.sessions[i]);
+    }
+
+    free(session_track.sessions);
+    session_track.sessions = NULL;
+    session_track.len = 0;
+    session_track.cap = 0;
 }
 
 static wd_driver_backend str_to_wd_driver_backend(const char *str) {
@@ -42,16 +85,45 @@ int l_module_web_session_start(lua_State *L) {
         return 2;
     }
 
-    const char *extra_args = luaL_optstring(L, s + 2, NULL);
-    char argbuff[1024];
-    // TODO: Fix args (args should be an array of strings instead)
-    if (extra_args && *extra_args) {
-        snprintf(argbuff, 1024, "--port=%d %s", port, extra_args);
-    } else {
-        snprintf(argbuff, 1024, "--port=%d", port);
+    luaL_checktype(L, s + 2, LUA_TTABLE);
+    size_t len = lua_rawlen(L, s + 2);
+    char **args = malloc(sizeof(*args) * (len + 1));
+    if (!args) {
+        lua_pushnil(L);
+        lua_pushstring(L, "malloc: out of memory");
+        return 2;
     }
+
+    for (size_t i = 0; i < len; i++) {
+        lua_geti(L, s + 2, i + 1);
+        size_t str_len;
+        const char *arg = luaL_checklstring(L, -1, &str_len);
+        args[i] = malloc(sizeof(char) * (str_len + 1));
+        if (!args[i]) {
+            lua_pushnil(L);
+            lua_pushstring(L, "malloc: out of memory");
+            return 2;
+        }
+        memcpy(args[i], arg, str_len + 1);
+        lua_pop(L, 1);
+    }
+
+    args[len] = malloc(sizeof(char) * 30);
+    if (!args[len]) {
+        lua_pushnil(L);
+        lua_pushstring(L, "malloc: out of memory");
+        return 2;
+    }
+    snprintf(args[len], 30, "--port=%d", port);
+
     char errbuf[WD_ERRORSIZE];
-    wd_pid_t driver_pid = wd_spawn_driver(backend, argbuff, errbuf);
+    wd_pid_t driver_pid = wd_spawn_driver(backend, len + 1, args, errbuf);
+
+    for (size_t i = 0; i < len + 1; i++) {
+        free(args[i]);
+    }
+    free(args);
+
     if (driver_pid < 0) {
         lua_pushnil(L);
         lua_pushstring(L, errbuf);
@@ -60,11 +132,12 @@ int l_module_web_session_start(lua_State *L) {
 
     wd_session_t *session = lua_newuserdata(L, sizeof *session);
     session->driver_pid = driver_pid;
-    wd_status stat = wd_session_start(port, backend, session);
+    wd_status stat = wd_session_start(port, backend, errbuf, session);
+    track_opened_session(session);
+
     if (stat != WD_OK) {
-        const char *err = wd_status_to_str(stat);
         lua_pushnil(L);
-        lua_pushstring(L, err);
+        lua_pushstring(L, errbuf);
         return 2;
     }
 
@@ -140,7 +213,10 @@ static const luaL_Reg module_fns[] = {
     {NULL, NULL},
 };
 
-static int l_gc(lua_State *) { return 0; }
+static int l_gc(lua_State *) {
+    module_web_close_all_sessions();
+    return 0;
+}
 
 /*----------- registration ------------------------------------------*/
 static const luaL_Reg port_mt[] = {{"__gc", l_gc}, {NULL, NULL}};

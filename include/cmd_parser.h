@@ -1,6 +1,8 @@
 #ifndef CMD_PARSER_H
 #define CMD_PARSER_H
 
+#include <stddef.h>
+
 typedef enum {
     CMD_CONFIG,
     CMD_INIT,
@@ -25,7 +27,7 @@ typedef struct {
 
 typedef struct {
     char **tags;
-    int tags_amount;
+    size_t tags_amount;
 
     char *target;
 } cmd_test_options;

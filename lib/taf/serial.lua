@@ -1,4 +1,4 @@
-local taf = require("taf")
+local taf = require("taf-main")
 local ts = require("taf-serial")
 
 local M = {}
