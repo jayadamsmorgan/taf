@@ -12,6 +12,13 @@
 
 #define MKDIR_MODE 0700
 
+static const char *gitignore_contents = //
+    "logs/\n"                           //
+    "\n"                                //
+    "\n"                                //
+    ".DS_Store"                         //
+    ;
+
 static int create_project(cmd_init_options *opts) {
     if (create_directory(opts->project_name, MKDIR_MODE))
         return -1;
@@ -42,6 +49,19 @@ static int create_project(cmd_init_options *opts) {
     proj->min_taf_ver_patch = TAF_VERSION_PATCH;
 
     project_parser_save();
+
+    char gitignore_path[PATH_MAX];
+    snprintf(gitignore_path, PATH_MAX, "%s/.gitignore", proj->project_path);
+    FILE *fp = fopen(gitignore_path, "w");
+    if (!fp) {
+        perror("fopen");
+        return -5;
+    }
+
+    fprintf(fp, "%s", gitignore_contents);
+    fflush(fp);
+    fclose(fp);
+
     return 0;
 }
 
