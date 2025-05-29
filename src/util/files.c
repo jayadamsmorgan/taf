@@ -182,3 +182,14 @@ void free_str_array(str_array_t *a) {
     a->items = NULL;
     a->count = 0;
 }
+
+void replace_symlink(const char *target, const char *linkname) {
+    struct stat sb;
+    if (lstat(linkname, &sb) == 0) {  /* something is there     */
+        if (unlink(linkname) == -1) { /* remove it (file/link)  */
+            return;                   /* give up – keep old one */
+        }
+    }
+
+    symlink(target, linkname);
+}

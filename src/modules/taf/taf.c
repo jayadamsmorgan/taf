@@ -1,8 +1,8 @@
 #include "modules/taf/taf.h"
 
 #include "cmd_parser.h"
-#include "taf_tui.h"
 #include "test_case.h"
+#include "test_logs.h"
 #include "util/lua.h"
 #include "util/time.h"
 
@@ -133,12 +133,16 @@ int l_module_taf_print(lua_State *L) {
 
     if (lua_getstack(L, 1, &ar) && lua_getinfo(L, "Sl", &ar) &&
         ar.currentline > 0) {
-        file = ar.short_src;
+        if (ar.source[0] == '@') {
+            file = &ar.source[1];
+        } else {
+            file = ar.source;
+        }
         line = ar.currentline;
     }
 
     const char *msg = lua_tostring(L, -1); /* still valid on stack */
-    taf_tui_log(file, line, msg);
+    taf_log_test(file, line, msg);
 
     lua_pop(L, 1); /* pop message string */
     return 0;

@@ -107,6 +107,7 @@ sources = [
   'src/cmd_parser.c',
   'src/project_parser.c',
   'src/test_case.c',
+  'src/test_logs.c',
 
   'src/util/files.c',
   'src/util/lua.c',

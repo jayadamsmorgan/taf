@@ -10,8 +10,6 @@
 #include <stdlib.h>
 #include <sys/syslimits.h>
 
-#define MKDIR_MODE 0700
-
 static const char *gitignore_contents = //
     "logs/\n"                           //
     "\n"                                //
