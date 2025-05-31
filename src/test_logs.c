@@ -14,6 +14,8 @@
 
 static test_case_t current = {0};
 
+static bool no_logs = false;
+
 static FILE *output_log_file;
 
 static char logs_dir[PATH_MAX];
@@ -102,7 +104,6 @@ static inline size_t jarray_len(struct json_object *arr) {
                : 0;
 }
 
-/* main parser ──────────────────────────────────────────────────────── */
 raw_log_t *taf_json_to_raw_log(struct json_object *root) {
     if (!root || !json_object_is_type(root, json_type_object))
         return NULL;
@@ -206,11 +207,16 @@ void taf_log_tests_create(int amount) {
 
     taf_tui_set_test_amount(amount);
 
+    cmd_test_options *opts = cmd_parser_get_test_options();
+    if (opts->no_logs) {
+        no_logs = true;
+        return;
+    }
+
     char time_str[TS_LEN];
     get_date_time_now(time_str);
 
     project_parsed_t *proj = get_parsed_project();
-    cmd_test_options *opts = cmd_parser_get_test_options();
 
     if (proj->multitarget) {
         snprintf(logs_dir, PATH_MAX, "%s/logs/%s", proj->project_path,
@@ -251,6 +257,10 @@ void taf_log_tests_create(int amount) {
 void taf_log_test(const char *file, int line, const char *buffer) {
     taf_tui_log(file, line, buffer);
 
+    if (no_logs) {
+        return;
+    }
+
     char time_str[TS_LEN];
     get_date_time_now(time_str);
 
@@ -271,9 +281,14 @@ void taf_log_test(const char *file, int line, const char *buffer) {
 }
 
 void taf_log_test_started(int index, test_case_t test_case) {
+    taf_tui_set_current_test(index, test_case.name);
+
+    if (no_logs) {
+        return;
+    }
+
     test_index = index - 1;
     current = test_case;
-    taf_tui_set_current_test(index, test_case.name);
 
     char time_str[TS_LEN];
     get_date_time_now(time_str);
@@ -301,6 +316,10 @@ void taf_log_test_passed(int index, test_case_t test_case) {
 
     taf_tui_test_passed(index, test_case.name);
 
+    if (no_logs) {
+        return;
+    }
+
     char time_str[TS_LEN];
     get_date_time_now(time_str);
     fprintf(output_log_file, "[%s][%s]: Test %d Passed.\n\n", time_str,
@@ -314,6 +333,10 @@ void taf_log_test_passed(int index, test_case_t test_case) {
 void taf_log_test_failed(int index, test_case_t test_case, const char *msg) {
 
     taf_tui_test_failed(index, test_case.name, msg);
+
+    if (no_logs) {
+        return;
+    }
 
     char time_str[TS_LEN];
     get_date_time_now(time_str);
@@ -367,6 +390,10 @@ void taf_raw_log_free(raw_log_t *log) {
 }
 
 void taf_log_tests_finalize() {
+
+    if (no_logs) {
+        return;
+    }
 
     char time_str[TS_LEN];
     get_date_time_now(time_str);

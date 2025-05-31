@@ -188,12 +188,15 @@ static void set_test_tags(const char *arg) {
     }
 }
 
+static void set_test_no_logs(const char *) { test_opts.no_logs = true; }
+
 static void get_test_help(const char *) {
     print_test_help(stdout);
     exit(EXIT_SUCCESS);
 }
 
 static cmd_option all_test_options[] = {
+    {"--no-logs", "-n", false, set_test_no_logs},
     {"--tags", "-t", true, set_test_tags},
     {"--help", "-h", false, get_test_help},
     {NULL, NULL, false, NULL},
@@ -204,6 +207,7 @@ static cmd_category parse_test_options(int argc, char **argv) {
     test_opts.tags = NULL;
     test_opts.target = NULL;
     test_opts.tags_amount = 0;
+    test_opts.no_logs = false;
 
     if (argc <= 2) {
         return CMD_TEST;

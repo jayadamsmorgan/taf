@@ -29,6 +29,8 @@ typedef struct {
     char **tags;
     size_t tags_amount;
 
+    bool no_logs;
+
     char *target;
 } cmd_test_options;
 
