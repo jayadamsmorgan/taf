@@ -33,11 +33,13 @@ typedef struct {
 } cmd_test_options;
 
 typedef enum {
-    LOGS_OPT_MERGE,
+    LOGS_OPT_INFO,
 } cmd_logs_category;
 
 typedef struct {
     cmd_logs_category category;
+
+    char *arg1;
 } cmd_logs_options;
 
 cmd_category cmd_parser_parse(int argc, char **argv);

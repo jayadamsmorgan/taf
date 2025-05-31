@@ -1,4 +1,5 @@
 #include "cmd_parser.h"
+
 #include "util/string.h"
 
 #include <stdio.h>
@@ -20,7 +21,7 @@ static void print_test_help(FILE *file) {
 }
 
 static void print_logs_help(FILE *file) {
-    fprintf(file, "Usage: taf logs [merge]\n");
+    fprintf(file, "Usage: taf logs [create]\n");
 }
 
 static void print_help(FILE *file) {
@@ -234,20 +235,27 @@ static cmd_option all_logs_options[] = {
 static cmd_category parse_logs_options(int argc, char **argv) {
 
     if (argc < 3) {
-        fprintf(stderr, "taf logs requires category (merge)\n");
+        fprintf(stderr, "'taf logs' requires category (create)\n");
         print_logs_help(stderr);
         return CMD_UNKNOWN;
     }
 
-    if (STR_EQ(argv[2], "merge")) {
-        logs_opts.category = LOGS_OPT_MERGE;
+    int index = 3;
+    if (STR_EQ(argv[2], "info")) {
+        if (argc != 4) {
+            fprintf(stderr, "'taf logs info' requires log file.\n");
+            return CMD_UNKNOWN;
+        }
+        logs_opts.category = LOGS_OPT_INFO;
+        logs_opts.arg1 = argv[3];
+        index = 4;
     } else {
         fprintf(stderr, "Unknown logs category %s\n", argv[2]);
         print_logs_help(stderr);
         return CMD_UNKNOWN;
     }
 
-    parse_additional_options(all_logs_options, 3, argc, argv);
+    parse_additional_options(all_logs_options, index, argc, argv);
 
     return CMD_LOGS;
 }

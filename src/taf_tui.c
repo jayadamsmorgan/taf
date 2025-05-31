@@ -1,4 +1,5 @@
 #include "taf_tui.h"
+
 #include "util/string.h"
 
 #include <notcurses/notcurses.h>

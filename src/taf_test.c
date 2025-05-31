@@ -1,16 +1,18 @@
 #include "taf_test.h"
 
 #include "cmd_parser.h"
-#include "modules/serial/taf-serial.h"
-#include "modules/taf/taf.h"
-#include "modules/web/taf-webdriver.h"
 #include "project_parser.h"
 #include "taf_tui.h"
 #include "test_case.h"
 #include "test_logs.h"
+#include "version.h"
+
+#include "modules/serial/taf-serial.h"
+#include "modules/taf/taf.h"
+#include "modules/web/taf-webdriver.h"
+
 #include "util/files.h"
 #include "util/time.h"
-#include "version.h"
 
 #include <lauxlib.h>
 #include <lua.h>

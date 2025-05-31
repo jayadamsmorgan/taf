@@ -111,6 +111,7 @@ sources = [
 
   'src/util/files.c',
   'src/util/lua.c',
+  'src/util/os.c',
   'src/util/string.c',
   'src/util/time.c',
 
