@@ -1,22 +1,25 @@
 #include "taf_test.h"
 
 #include "cmd_parser.h"
-#include "modules/serial/taf-serial.h"
-#include "modules/taf/taf.h"
-#include "modules/web/taf-webdriver.h"
 #include "project_parser.h"
 #include "taf_tui.h"
 #include "test_case.h"
+#include "test_logs.h"
+#include "version.h"
+
+#include "modules/serial/taf-serial.h"
+#include "modules/taf/taf.h"
+#include "modules/web/taf-webdriver.h"
+
 #include "util/files.h"
 #include "util/time.h"
-#include "version.h"
 
 #include <lauxlib.h>
 #include <lua.h>
 #include <lualib.h>
 
-#include <_string.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -103,11 +106,11 @@ static int run_all_tests(lua_State *L) {
 
     size_t amount;
     test_case_t *tests = test_case_get_all(&amount);
-    taf_tui_set_test_amount(amount);
+    taf_log_tests_create(amount);
 
     for (size_t i = 0; i < amount; ++i) {
 
-        taf_tui_set_current_test(i + 1, tests[i].name);
+        taf_log_test_started(i + 1, tests[i]);
 
         lua_rawgeti(L, LUA_REGISTRYINDEX, tests[i].ref);
 
@@ -124,12 +127,12 @@ static int run_all_tests(lua_State *L) {
 
         int rc = lua_pcall(L, 0, 0, 0);
         if (rc == LUA_OK) {
-            taf_tui_test_passed(i + 1, tests[i].name);
+            taf_log_test_passed(i + 1, tests[i]);
             passed++;
         } else {
             const char *errmsg = lua_tostring(L, -1);
             const char *safe_msg = errmsg ? errmsg : "unknown error";
-            taf_tui_test_failed(i + 1, tests[i].name, safe_msg);
+            taf_log_test_failed(i + 1, tests[i], safe_msg);
             lua_pop(L, 1);
         }
         // Collect some garbage after modules
@@ -138,6 +141,8 @@ static int run_all_tests(lua_State *L) {
         module_web_close_all_sessions();
         module_serial_close_all_ports();
     }
+
+    taf_log_tests_finalize();
 
     return passed == amount ? EXIT_SUCCESS : EXIT_FAILURE;
 }
@@ -187,7 +192,7 @@ static void inject_modules_dir(lua_State *L) {
     lua_pop(L, 2);               /* pop path + package */
 }
 
-void register_test_api(lua_State *L) {
+static void register_test_api(lua_State *L) {
 
     // Change default lua 'print' to our implementation:
     lua_pushcfunction(L, l_module_taf_print);

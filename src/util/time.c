@@ -52,3 +52,9 @@ uint64_t millis_since_start(void) {
     return (uint64_t)ds * 1000ULL + (uint64_t)(dns / 1000000L);
 }
 #endif
+
+void get_date_time_now(char buf[TS_LEN]) {
+    time_t raw = time(NULL);
+    struct tm *tmnow = localtime(&raw);
+    strftime(buf, TS_LEN, "%m.%d.%y-%H:%M:%S", tmnow);
+}

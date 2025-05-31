@@ -39,7 +39,6 @@ taf.test("testing web session start", function()
 	local url
 	url, err = web.get_current_url(session)
 	assert(not err and url, err or "url is nil")
-	taf.print("Example")
 	assert(url == "https://www.yahoo.com/")
 
 	-- Get the site title
