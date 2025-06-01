@@ -3,20 +3,22 @@ local ts = require("taf-serial")
 
 local M = {}
 
+M.low = ts
+
 --- C pointer to serial port handle
 ---
---- @alias SerialPort userdata
+--- @alias serial_port userdata
 
 --- Mode to open serial device with
 ---
---- @alias SerialMode
+--- @alias serial_mode
 --- | '"r"'  Read
 --- | '"w"'  Write
 --- | '"rw"' Read & Write
 
 --- Amount of data bits in serial communication
 ---
---- @alias SerialDataBits
+--- @alias serial_data_bits
 --- | 5
 --- | 6
 --- | 7
@@ -24,7 +26,7 @@ local M = {}
 
 --- Parity of serial communication
 ---
---- @alias SerialParity
+--- @alias serial_parity
 --- | '"none"'
 --- | '"odd"'
 --- | '"even"'
@@ -33,22 +35,22 @@ local M = {}
 
 --- Amount of stop bits in serial communication
 ---
---- @alias SerialStopBits
+--- @alias serial_stop_bits
 --- | 1
 --- | 2
 
 --- Options to open serial port with
 ---
---- @class SerialOpts
---- @field mode SerialMode?
+--- @class serial_opts
+--- @field mode serial_mode?
 --- @field baudrate number?
---- @field bits SerialDataBits?
---- @field parity SerialParity?
---- @field stopbits SerialStopBits?
+--- @field bits serial_data_bits?
+--- @field parity serial_parity?
+--- @field stopbits serial_stop_bits?
 
 --- Type of the serial device connected
 ---
---- @alias SerialPortType
+--- @alias serial_port_type
 --- | '"native"'
 --- | '"usb"'
 --- | '"bluetooth"'
@@ -56,9 +58,9 @@ local M = {}
 
 --- Full info about the serial port
 ---
---- @class SerialPortInfo
+--- @class serial_port_info
 --- @field path string path or name of the serial port
---- @field type SerialPortType type of serial port
+--- @field type serial_port_type type of serial port
 --- @field description string description of the serial device
 --- @field serial string? serial number of usb serial device
 --- @field product string? product string of usb serial device
@@ -69,7 +71,7 @@ local M = {}
 --- @field usb_bus number? usb bus number of usb serial device
 --- @field bluetooth_address string? bluetooth MAC address of bluetooth serial device
 
---- @type SerialOpts
+--- @type serial_opts
 local default_serial_opts = {
 	mode = "rw",
 	baudrate = 115200,
@@ -80,19 +82,19 @@ local default_serial_opts = {
 
 --- Default options for serial.open()
 ---
---- @return SerialOpts opts
+--- @return serial_opts opts
 M.default_serial_options = function()
 	return default_serial_opts
 end
 
 --- Open serial device port with options
 ---
---- @param port_or_path SerialPort | string path to serial device or serial port to open
---- @param opts SerialOpts? options to open serial device with
+--- @param port_or_path serial_port | string path to serial device or serial port to open
+--- @param opts serial_opts? options to open serial device with
 ---
---- @return SerialPort? result, string? error
+--- @return serial_port? result, string? error
 M.open = function(port_or_path, opts)
-	--- @type SerialPort?
+	--- @type serial_port?
 	local port
 
 	--- @type string?
@@ -103,7 +105,7 @@ M.open = function(port_or_path, opts)
 		if err then
 			return nil, err
 		end
-	elseif type(port_or_path) == "SerialPort" then
+	elseif type(port_or_path) == "userdata" then
 		port = port_or_path
 	else
 		return nil, "argument 'port_or_path' is of invalid type or nil"
@@ -155,7 +157,7 @@ end
 
 --- Close the opened port
 ---
---- @param port SerialPort port returned after serial.open()
+--- @param port serial_port port returned after serial.open()
 ---
 --- @return string? error
 M.close = function(port)
@@ -164,7 +166,7 @@ end
 
 --- Set baudrate for opened port
 ---
---- @param port SerialPort port returned after serial.open()
+--- @param port serial_port port returned after serial.open()
 --- @param baudrate number
 ---
 --- @return string? error
@@ -174,8 +176,8 @@ end
 
 --- Set data bits for opened port
 ---
---- @param port SerialPort port returned after serial.open()
---- @param bits SerialDataBits
+--- @param port serial_port port returned after serial.open()
+--- @param bits serial_data_bits
 ---
 --- @return string? error
 M.set_bits = function(port, bits)
@@ -184,8 +186,8 @@ end
 
 --- Set parity for opened port
 ---
---- @param port SerialPort port returned after serial.open()
---- @param parity SerialParity
+--- @param port serial_port port returned after serial.open()
+--- @param parity serial_parity
 ---
 --- @return string? error
 M.set_parity = function(port, parity)
@@ -194,8 +196,8 @@ end
 
 --- Set stopbits for opened port
 ---
---- @param port SerialPort port returned after serial.open()
---- @param stopbits SerialStopBits
+--- @param port serial_port port returned after serial.open()
+--- @param stopbits serial_stop_bits
 ---
 --- @return string? error
 M.set_stopbits = function(port, stopbits)
@@ -211,7 +213,7 @@ end
 
 --- Set RS232 RTS for opened port
 ---
---- @param port SerialPort
+--- @param port serial_port
 --- @param rts SerialRTS
 ---
 --- @return string? error
@@ -227,7 +229,7 @@ end
 
 --- Set RS232 CTS for opened port
 ---
---- @param port SerialPort
+--- @param port serial_port
 --- @param cts SerialCTS
 ---
 --- @return string? error
@@ -244,7 +246,7 @@ end
 
 --- Set RS232 DTR for opened port
 ---
---- @param port SerialPort
+--- @param port serial_port
 --- @param dtr SerialDTR
 ---
 --- @return string? error
@@ -260,7 +262,7 @@ end
 
 --- Set RS232 DSR for opened port
 ---
---- @param port SerialPort
+--- @param port serial_port
 --- @param dsr SerialDSR
 ---
 --- @return string? error
@@ -278,7 +280,7 @@ end
 
 --- Set RS232 XON/XOFF for opened port
 ---
----@param port SerialPort
+---@param port serial_port
 ---@param xonxoff SerialXONXOFF
 ---
 ---@return string? error
@@ -288,7 +290,7 @@ end
 
 --- Serial RS232 flowcontrol option
 ---
---- @alias SerialFlowCtrl
+--- @alias serial_flowctrl
 --- | '"dtrdsr"'
 --- | '"rtscts"'
 --- | '"xonxoff"'
@@ -296,8 +298,8 @@ end
 
 --- Set RS232 flowcontrol option for opened port
 ---
---- @param port SerialPort
---- @param flowctrl SerialFlowCtrl
+--- @param port serial_port
+--- @param flowctrl serial_flowctrl
 ---
 --- @return string? error
 M.set_flowcontrol = function(port, flowctrl)
@@ -306,14 +308,14 @@ end
 
 --- List info about all connected serial devices in the system
 ---
---- @return SerialPortInfo[]? result, string? error
+--- @return serial_port_info[]? result, string? error
 M.list_devices = function()
 	return ts:list_devices()
 end
 
---- @param port_or_path SerialPort | string
+--- @param port_or_path serial_port | string
 ---
---- @return SerialPortInfo? result, string? error
+--- @return serial_port_info? result, string? error
 M.get_port_info = function(port_or_path)
 	local port = port_or_path
 	if type(port_or_path) == "string" then
@@ -330,7 +332,7 @@ end
 --- Reads from serial port until it encounters the matching pattern
 --- Returns full string read if pattern occured, empty string otherwise
 ---
---- @param port SerialPort
+--- @param port serial_port
 --- @param pattern string? the pattern to look for, defaults to newline
 --- @param timeout number? optional timeout value. keep nil for blocking indefinetely, 0 for nonblocking reads
 --- @param chunk_size number? the size of the read chunks, defaults to 1
@@ -392,6 +394,65 @@ M.read_until = function(port, pattern, timeout, chunk_size)
 			return collected(), nil
 		end
 	end
+end
+
+--- Write string to serial port
+---
+--- @param port serial_port
+--- @param buffer string string to write to serial port
+--- @param timeout number? optional timeout for blocking writes. keep nil for blocking indefinetely, 0 for nonblocking writes
+---
+--- @return number? bytes_written, string? error
+M.write = function(port, buffer, timeout)
+	if timeout == nil then
+		return ts:write_blocking(port, buffer, 0)
+	elseif timeout == 0 then
+		return ts:write_nonblocking(port, buffer)
+	else
+		return ts:write_blocking(port, buffer, timeout)
+	end
+end
+
+--- Get the number of bytes waiting in the input buffer
+---
+--- @param port serial_port
+---
+--- @return number? bytes, string? error
+M.input_waiting = function(port)
+	return ts:input_waiting(port)
+end
+
+--- Get the number of bytes waiting in the output buffer
+---
+--- @param port serial_port
+---
+--- @return number? bytes, string? error
+M.output_waiting = function(port)
+	return ts:output_waiting(port)
+end
+
+--- @alias serial_flush_direction
+--- | '"i"' input
+--- | '"o"' output
+--- | '"io"' input/ouput
+
+--- Flush serial port buffers
+---
+--- @param port serial_port
+--- @param direction serial_flush_direction
+---
+--- @return string? error
+M.flush = function(port, direction)
+	return ts:flush(port, direction)
+end
+
+--- Wait for buffered data to be transmitted
+---
+--- @param port serial_port
+---
+--- @return string? error
+M.drain = function(port)
+	return ts:drain(port)
 end
 
 return M

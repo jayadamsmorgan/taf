@@ -2,7 +2,9 @@ local wd = require("taf-webdriver")
 
 local M = {}
 
---- @alias driver
+M.low = wd
+
+--- @alias webdriver
 --- | '"chromedriver"'
 --- | '"geckodriver"'
 --- | '"safaridriver"'
@@ -23,7 +25,7 @@ local M = {}
 --- Start webdriver session
 ---
 --- @param driver_port integer port to open webdriver with
---- @param backend driver?
+--- @param backend webdriver?
 --- @param extraflags [string]?
 ---
 --- @return session
