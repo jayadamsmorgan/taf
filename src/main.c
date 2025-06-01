@@ -1,11 +1,9 @@
 #include "cmd_parser.h"
 
-#include "taf_config.h"
 #include "taf_init.h"
 #include "taf_logs.h"
 #include "taf_test.h"
 
-#include <stdio.h>
 #include <stdlib.h>
 
 int main(int argc, char **argv) {
@@ -14,8 +12,6 @@ int main(int argc, char **argv) {
     cmd_category cmd = cmd_parser_parse(argc, argv);
 
     switch (cmd) {
-    case CMD_CONFIG:
-        return taf_config();
     case CMD_INIT:
         return taf_init();
     case CMD_TEST:

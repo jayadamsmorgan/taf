@@ -98,7 +98,6 @@ endif
 sources = [
   'src/main.c',
 
-  'src/taf_config.c',
   'src/taf_init.c',
   'src/taf_logs.c',
   'src/taf_test.c',

@@ -8,10 +8,6 @@
 
 #define STR_EQ(STR1, STR2) (!strcmp(STR1, STR2))
 
-static void print_config_help(FILE *file) {
-    fprintf(file, "Usage: taf config [--something]\n");
-}
-
 static void print_init_help(FILE *file) {
     fprintf(file, "Usage: taf init project-name [--multitarget]\n");
 }
@@ -25,7 +21,7 @@ static void print_logs_help(FILE *file) {
 }
 
 static void print_help(FILE *file) {
-    fprintf(file, "Usage: taf [config|init|test|logs]\n");
+    fprintf(file, "Usage: taf [init|test|logs]\n");
 }
 
 static cmd_init_options init_opts;
@@ -146,27 +142,6 @@ static cmd_category parse_init_options(int argc, char **argv) {
     return CMD_INIT;
 }
 
-static void get_config_help(const char *) {
-    print_config_help(stdout);
-    exit(EXIT_SUCCESS);
-}
-
-static cmd_option all_config_options[] = {
-    {"--help", "-h", false, get_config_help},
-    {NULL, NULL, false, NULL},
-};
-
-static cmd_category parse_config_options(int argc, char **argv) {
-    // TODO
-
-    config_opts.something = true;
-    config_opts.interactive = true;
-
-    parse_additional_options(all_config_options, 2, argc, argv);
-
-    return CMD_CONFIG;
-}
-
 static void set_test_tags(const char *arg) {
     // This one has memory leak but it's fine, we should only
     // call it once
@@ -270,8 +245,6 @@ cmd_category cmd_parser_parse(int argc, char **argv) {
         return CMD_UNKNOWN;
     }
 
-    if (STR_EQ(argv[1], "config"))
-        return parse_config_options(argc, argv);
     if (STR_EQ(argv[1], "init"))
         return parse_init_options(argc, argv);
     if (STR_EQ(argv[1], "test"))

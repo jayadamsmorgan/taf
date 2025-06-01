@@ -4,7 +4,6 @@
 #include <stddef.h>
 
 typedef enum {
-    CMD_CONFIG,
     CMD_INIT,
     CMD_TEST,
     CMD_LOGS,
