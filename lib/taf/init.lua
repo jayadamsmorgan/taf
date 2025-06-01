@@ -1,5 +1,27 @@
 local tm = require("taf-main")
 
+--- @alias log_level
+--- | '"e"' error
+--- | '"E"' error
+--- | '"error"'
+--- | '"ERROR"'
+--- | '"w"' warning
+--- | '"W"' warning
+--- | '"warning"'
+--- | '"WARNING'
+--- | '"i"' info
+--- | '"I"' info
+--- | '"info"'
+--- | '"INFO"'
+--- | '"d"' debug
+--- | '"D"' debug
+--- | '"debug"'
+--- | '"DEBUG"'
+--- | '"t"' trace
+--- | '"T"' trace
+--- | '"trace"'
+--- | '"TRACE"'
+
 local M = {}
 
 -- Expose submodules of 'taf'
@@ -28,10 +50,54 @@ M.defer = function(defer_func, ...)
 	tm:defer(defer_func, ...)
 end
 
---- Print something to logs & TUI. Same as default Lua `print()`
+--- Print something to logs & TUI. Same as default Lua `print()`. Both will use 'info' log level
 ---
+--- @param ... any
 M.print = function(...)
 	tm:print(...)
+end
+
+--- Print something to logs & TUI with specified log level.
+---
+--- @param log_level log_level
+--- @param ... any
+M.log = function(log_level, ...)
+	tm:log(log_level, ...)
+end
+
+--- Print something to logs & TUI with 'error' log level.
+---
+--- @param ... any
+M.log_error = function(...)
+	tm:log("e", ...)
+end
+
+--- Print something to logs & TUI with 'warning' log level.
+---
+--- @param ... any
+M.log_warning = function(...)
+	tm:log("w", ...)
+end
+
+--- Print something to logs & TUI with 'info' log level.
+---
+--- @param ... any
+M.log_info = function(...)
+	tm:log("i", ...)
+end
+
+--- Print something to logs & TUI with 'debug' log level.
+---
+--- @param ... any
+M.log_debug = function(...)
+	tm:log("d", ...)
+end
+
+--- Print something to logs & TUI with 'trace' log level.
+---
+--- @param ... any
+M.log_trace = function(...)
+	tm:log("t", ...)
 end
 
 --- Put test to sleep for `ms` amount of milliseconds
