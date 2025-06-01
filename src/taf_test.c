@@ -101,6 +101,42 @@ static void line_hook(lua_State *L, lua_Debug *ar) {
     }
 }
 
+static void run_deferred(lua_State *L, const char *status) {
+    lua_getfield(L, LUA_REGISTRYINDEX, DEFER_LIST_KEY);
+    if (lua_isnil(L, -1)) {
+        lua_pop(L, 1);
+        return;
+    }
+
+    int list = lua_gettop(L);
+    lua_Integer n = luaL_len(L, list);
+
+    for (lua_Integer i = n; i >= 1; --i) { // LIFO
+        lua_rawgeti(L, list, i);
+        int tbl = lua_gettop(L);
+
+        int argcount = (int)luaL_len(L, tbl) - 1;
+        lua_rawgeti(L, tbl, 1);
+        for (int a = 2; a <= argcount + 1; ++a)
+            lua_rawgeti(L, tbl, a);
+
+        // Push status *only* when user did not supply extra args
+        if (argcount == 0) {
+            lua_pushstring(L, status);
+            argcount += 1;
+        }
+
+        if (lua_pcall(L, argcount, 0, 0) != LUA_OK) {
+            lua_pop(L, 1);
+        }
+        lua_pop(L, 1);
+    }
+
+    /* clear list */
+    lua_pushnil(L);
+    lua_setfield(L, LUA_REGISTRYINDEX, DEFER_LIST_KEY);
+}
+
 static int run_all_tests(lua_State *L) {
     size_t passed = 0;
 
@@ -126,14 +162,22 @@ static int run_all_tests(lua_State *L) {
         reset_millis();
 
         int rc = lua_pcall(L, 0, 0, 0);
+
+        const char *safe_msg;
+
+        if (rc != LUA_OK) {
+            const char *errmsg = lua_tostring(L, -1);
+            safe_msg = errmsg ? errmsg : "unknown error";
+            lua_pop(L, 1);
+        }
+
+        run_deferred(L, (rc == LUA_OK) ? "passed" : "failed");
+
         if (rc == LUA_OK) {
             taf_log_test_passed(i + 1, tests[i]);
             passed++;
         } else {
-            const char *errmsg = lua_tostring(L, -1);
-            const char *safe_msg = errmsg ? errmsg : "unknown error";
             taf_log_test_failed(i + 1, tests[i], safe_msg);
-            lua_pop(L, 1);
         }
         // Collect some garbage after modules
         // This is mostly done if test has failed

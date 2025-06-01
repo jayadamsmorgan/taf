@@ -100,6 +100,33 @@ static int l_module_taf_register_test(lua_State *L) {
     return 0;
 }
 
+int l_module_taf_defer(lua_State *L) {
+    int s = selfshift(L);
+    int nargs = lua_gettop(L) - (s - 1);
+
+    luaL_checktype(L, s, LUA_TFUNCTION);
+
+    lua_getfield(L, LUA_REGISTRYINDEX, DEFER_LIST_KEY);
+    if (lua_isnil(L, -1)) {
+        lua_pop(L, 1);
+        lua_newtable(L);
+        lua_pushvalue(L, -1);
+        lua_setfield(L, LUA_REGISTRYINDEX, DEFER_LIST_KEY);
+    }
+    int list = lua_gettop(L);
+
+    lua_newtable(L);
+    for (int i = 0; i < nargs; ++i) {
+        lua_pushvalue(L, s + i);
+        lua_rawseti(L, -2, i + 1);
+    }
+
+    lua_Integer idx = luaL_len(L, list) + 1;
+    lua_rawseti(L, list, idx);
+
+    return 0;
+}
+
 /* taf:millis() -> number */
 int l_module_taf_millis(lua_State *L) {
     uint64_t uptime = millis_since_start();
@@ -156,11 +183,12 @@ static const luaL_Reg port_mt[] = {
 };
 
 static const luaL_Reg module_fns[] = {
-    {"sleep", l_module_taf_sleep},
-    {"millis", l_module_taf_millis},
-    {"print", l_module_taf_print},
-    {"test", l_module_taf_register_test},
-    {NULL, NULL},
+    {"defer", l_module_taf_defer},        //
+    {"sleep", l_module_taf_sleep},        //
+    {"millis", l_module_taf_millis},      //
+    {"print", l_module_taf_print},        //
+    {"test", l_module_taf_register_test}, //
+    {NULL, NULL},                         //
 };
 
 int l_module_taf_register_module(lua_State *L) {
