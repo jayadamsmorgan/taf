@@ -22,6 +22,12 @@ M.test = function(test_name, tags_or_body, body)
 	tm:test(test_name, tags_or_body, body)
 end
 
+--- @param defer_func function function executed on defer
+--- @param ... any arguments to pass to the function
+M.defer = function(defer_func, ...)
+	tm:defer(defer_func, ...)
+end
+
 --- Print something to logs & TUI. Same as default Lua `print()`
 ---
 M.print = function(...)
