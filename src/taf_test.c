@@ -342,7 +342,7 @@ int taf_test() {
         return EXIT_FAILURE;
     }
 
-    if (taf_tui_init())
+    if (taf_tui_init(opts->log_level))
         return EXIT_FAILURE;
 
     lua_sethook(L, line_hook, LUA_MASKLINE, 0); // Enable line hook

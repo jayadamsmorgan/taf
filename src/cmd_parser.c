@@ -163,7 +163,20 @@ static void set_test_tags(const char *arg) {
     }
 }
 
-static void set_test_no_logs(const char *) { test_opts.no_logs = true; }
+static void set_test_no_logs(const char *) {
+    //
+    test_opts.no_logs = true;
+}
+
+static void set_log_level(const char *arg) {
+    taf_log_level log_level = taf_log_level_from_str(arg);
+    if (log_level < 0) {
+        fprintf(stderr, "Unknown log level %s", arg);
+        exit(EXIT_FAILURE);
+    }
+
+    test_opts.log_level = log_level;
+}
 
 static void get_test_help(const char *) {
     print_test_help(stdout);
@@ -172,6 +185,7 @@ static void get_test_help(const char *) {
 
 static cmd_option all_test_options[] = {
     {"--no-logs", "-n", false, set_test_no_logs},
+    {"--log-level", "-l", true, set_log_level},
     {"--tags", "-t", true, set_test_tags},
     {"--help", "-h", false, get_test_help},
     {NULL, NULL, false, NULL},
@@ -183,6 +197,7 @@ static cmd_category parse_test_options(int argc, char **argv) {
     test_opts.target = NULL;
     test_opts.tags_amount = 0;
     test_opts.no_logs = false;
+    test_opts.log_level = TAF_LOG_LEVEL_INFO;
 
     if (argc <= 2) {
         return CMD_TEST;

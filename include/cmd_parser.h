@@ -1,6 +1,8 @@
 #ifndef CMD_PARSER_H
 #define CMD_PARSER_H
 
+#include "test_logs.h"
+
 #include <stddef.h>
 
 typedef enum {
@@ -29,6 +31,7 @@ typedef struct {
     size_t tags_amount;
 
     bool no_logs;
+    taf_log_level log_level;
 
     char *target;
 } cmd_test_options;

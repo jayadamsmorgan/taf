@@ -15,6 +15,7 @@
 static test_case_t current = {0};
 
 static bool no_logs = false;
+static taf_log_level log_level;
 
 static FILE *output_log_file;
 
@@ -34,6 +35,9 @@ static json_object *raw_log_test_output_to_json(raw_log_test_output_t *output) {
                            json_object_new_int(output->line));
     json_object_object_add(output_obj, "date_time",
                            json_object_new_string(output->date_time));
+    json_object_object_add(
+        output_obj, "level",
+        json_object_new_string(taf_log_level_to_str(output->level)));
     json_object_object_add(output_obj, "msg",
                            json_object_new_string(output->msg));
     return output_obj;
@@ -193,6 +197,9 @@ raw_log_t *taf_json_to_raw_log(struct json_object *root) {
                         out->date_time = jdup_string(jfield);
                     if (json_object_object_get_ex(jo, "msg", &jfield))
                         out->msg = jdup_string(jfield);
+                    if (json_object_object_get_ex(jo, "level", &jfield))
+                        out->level = taf_log_level_from_str(
+                            json_object_get_string(jfield));
                     if (json_object_object_get_ex(jo, "line", &jfield))
                         out->line = json_object_get_int(jfield);
                 }
@@ -212,6 +219,8 @@ void taf_log_tests_create(int amount) {
         no_logs = true;
         return;
     }
+
+    log_level = opts->log_level;
 
     char time_str[TS_LEN];
     get_date_time_now(time_str);
@@ -254,8 +263,9 @@ void taf_log_tests_create(int amount) {
     raw_log->os_version = get_os_string();
 }
 
-void taf_log_test(const char *file, int line, const char *buffer) {
-    taf_tui_log(file, line, buffer);
+void taf_log_test(taf_log_level level, const char *file, int line,
+                  const char *buffer) {
+    taf_tui_log(level, file, line, buffer);
 
     if (no_logs) {
         return;
@@ -264,8 +274,10 @@ void taf_log_test(const char *file, int line, const char *buffer) {
     char time_str[TS_LEN];
     get_date_time_now(time_str);
 
-    fprintf(output_log_file, "[%s][%s][%s:%d]: %s\n\n", time_str, current.name,
-            file, line, buffer);
+    if (level <= log_level) {
+        fprintf(output_log_file, "[%s][%s][%s][%s:%d]: %s\n\n", time_str,
+                taf_log_level_to_str(level), current.name, file, line, buffer);
+    }
 
     raw_log_test_t *test = &raw_log->tests[test_index];
     if (test->output_count >= raw_log_test_ouput_cap) {
@@ -275,6 +287,7 @@ void taf_log_test(const char *file, int line, const char *buffer) {
     }
     test->output[test->output_count].file = strdup(file);
     test->output[test->output_count].date_time = strdup(time_str);
+    test->output[test->output_count].level = level;
     test->output[test->output_count].msg = strdup(buffer);
     test->output[test->output_count].line = line;
     test->output_count++;
@@ -452,4 +465,26 @@ void taf_log_tests_finalize() {
 
     replace_symlink(output_log_file_path, latest_log);
     replace_symlink(raw_log_file_path, latest_raw);
+}
+
+static const char *taf_log_level_str_map[] = {"ERROR", "WARNING", "INFO",
+                                              "DEBUG", "TRACE"};
+
+const char *taf_log_level_to_str(taf_log_level level) {
+    return taf_log_level_str_map[level];
+}
+
+taf_log_level taf_log_level_from_str(const char *str) {
+    if (!strcasecmp(str, "e") || !strcasecmp(str, "error"))
+        return TAF_LOG_LEVEL_ERROR;
+    if (!strcasecmp(str, "w") || !strcasecmp(str, "warning"))
+        return TAF_LOG_LEVEL_WARNING;
+    if (!strcasecmp(str, "i") || !strcasecmp(str, "info"))
+        return TAF_LOG_LEVEL_INFO;
+    if (!strcasecmp(str, "d") || !strcasecmp(str, "debug"))
+        return TAF_LOG_LEVEL_DEBUG;
+    if (!strcasecmp(str, "t") || !strcasecmp(str, "trace"))
+        return TAF_LOG_LEVEL_TRACE;
+
+    return -1;
 }

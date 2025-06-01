@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+static taf_log_level log_level;
+
 static unsigned term_rows = 0, term_cols = 0;
 
 static struct notcurses *nc;
@@ -144,7 +146,12 @@ void taf_tui_test_passed(int index, const char *name) {
     taf_tui_update();
 }
 
-void taf_tui_log(const char *file, int line, const char *str) {
+void taf_tui_log(taf_log_level level, const char *file, int line,
+                 const char *str) {
+
+    if (level > log_level) {
+        return;
+    }
 
     if (ui.log_lines && *ui.log_lines) {
         free(ui.log_lines);
@@ -153,12 +160,15 @@ void taf_tui_log(const char *file, int line, const char *str) {
     size_t sz = sizeof(char) * (strlen(file) + strlen(str) + 25);
     ui.log_lines = malloc(sz);
 
-    snprintf(ui.log_lines, sz, "[INFO]: [%s at %d]: %s\n", file, line, str);
+    snprintf(ui.log_lines, sz, "[%s]: [%s at %d]: %s\n",
+             taf_log_level_to_str(level), file, line, str);
 
     taf_tui_update();
 }
 
-int taf_tui_init() {
+int taf_tui_init(taf_log_level level) {
+
+    log_level = level;
 
     notcurses_options ncopts = {
         .flags = NCOPTION_CLI_MODE | NCOPTION_SUPPRESS_BANNERS,
