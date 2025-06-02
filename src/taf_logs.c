@@ -1,6 +1,7 @@
 #include "taf_logs.h"
 
 #include "cmd_parser.h"
+#include "project_parser.h"
 #include "test_logs.h"
 
 #include "util/files.h"
@@ -14,12 +15,23 @@
 
 static int taf_log_info(cmd_logs_options *opts) {
 
-    if (!file_exists(opts->arg1)) {
+    char log_file_path[PATH_MAX];
+
+    if (!strcmp(opts->arg1, "latest")) {
+        if (project_parser_parse()) {
+            return EXIT_FAILURE;
+        }
+        project_parsed_t *proj = get_parsed_project();
+        snprintf(log_file_path, PATH_MAX, "%s/logs/test_run_latest_raw.json",
+                 proj->project_path);
+    } else if (file_exists(opts->arg1)) {
+        snprintf(log_file_path, PATH_MAX, "%s", opts->arg1);
+    } else {
         fprintf(stderr, "Log file %s not found.\n", opts->arg1);
         return EXIT_FAILURE;
     }
 
-    json_object *root = json_object_from_file(opts->arg1);
+    json_object *root = json_object_from_file(log_file_path);
     raw_log_t *raw_log = taf_json_to_raw_log(root);
     if (!raw_log || !raw_log->os || !raw_log->os_version) {
         fprintf(stderr, "Log file %s is either incorrect or corrupt.\n",
