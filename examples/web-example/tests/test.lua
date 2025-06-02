@@ -6,6 +6,9 @@ taf.test("testing web session start", function()
 	local session, err = web.session_start(9515)
 	assert(not err, err or "")
 
+	-- Close webdriver session when test finishes
+	taf.defer(web.session_end, session)
+
 	taf.sleep(1000)
 
 	-- Open google.com
@@ -48,8 +51,4 @@ taf.test("testing web session start", function()
 	assert(title == "Yahoo | Mail, Weather, Search, Politics, News, Finance, Sports & Videos")
 
 	taf.sleep(500)
-
-	-- Close webdriver session
-	err = web.session_end(session)
-	assert(not err, err or "")
 end)
