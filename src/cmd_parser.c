@@ -1,5 +1,7 @@
 #include "cmd_parser.h"
 
+#include "version.h"
+
 #include "util/string.h"
 
 #include <stdio.h>
@@ -9,19 +11,80 @@
 #define STR_EQ(STR1, STR2) (!strcmp(STR1, STR2))
 
 static void print_init_help(FILE *file) {
-    fprintf(file, "Usage: taf init project-name [--multitarget]\n");
+    fprintf(
+        file,
+        "Usage: taf init project-name [<options>]\n"
+        "\n"
+        "Initialize new TAF project.\n"
+        "\n"
+        "Options:\n"
+        "  -m, --multitarget        Initialize project for multiple targets\n"
+        "  -h, --help               Display help\n");
 }
 
 static void print_test_help(FILE *file) {
-    fprintf(file, "Usage: taf test [--tags tag1,tag2,tag3]\n");
+    fprintf(
+        file,
+        "Usage: taf test [<options>]\n"
+        "       taf test <target_name> [<options>]\n"
+        "\n"
+        "Perform project tests.\n"
+        "Must specify target name if project "
+        "is multitarget.\n"
+        "\n"
+        "Options:\n"
+        "  -l, --log-level <error|warning|info|debug|trace>   Log level "
+        "for TUI output\n"
+        "  -n, --no-logs                                      Do not output "
+        "log files after a "
+        "test run\n"
+        "  -t, --tags <tag1,tag2>                             Perform tests "
+        "with specified tags\n"
+        "  -h, --help                                         Display help\n");
 }
 
 static void print_logs_help(FILE *file) {
-    fprintf(file, "Usage: taf logs [create]\n");
+    fprintf(file, "Usage: taf logs [<info>] [<options>]\n"
+                  "\n"
+                  "Perform actions on TAF logs.\n"
+                  "\n"
+                  "Categories:\n"
+                  "  info               Get information about the test run\n"
+                  "  help               Display help\n"
+                  "\n"
+                  "Options:\n"
+                  "  -h, --help         Display help\n");
+}
+
+static void print_logs_info_help(FILE *file) {
+    fprintf(file, "Usage: taf logs info <latest>\n"
+                  "       taf logs info <test_run_raw_json_file>\n"
+                  "\n"
+                  "Display information about the test run.\n"
+                  "\n"
+                  "Options:\n"
+                  "  -h, --help         Display help\n");
 }
 
 static void print_help(FILE *file) {
-    fprintf(file, "Usage: taf [init|test|logs]\n");
+    fprintf(file, "Usage: taf [<init|logs|test|help|version>]\n"
+                  "\n"
+                  "TAF Testing Suite.\n"
+                  "\n"
+                  "Categories:\n"
+                  "  init               Initialize new TAF project\n"
+                  "  logs               Perform actions on TAF logs\n"
+                  "  test               Perform project tests\n"
+                  "  help               Display help\n"
+                  "  version            Display TAF version\n"
+                  "\n"
+                  "Options:\n"
+                  "  -h, --help         Display help\n"
+                  "  -v, --version      Display TAF version\n");
+}
+
+static void print_version() {
+    fprintf(stdout, "TAF Testing Suite version " TAF_VERSION "\n");
 }
 
 static cmd_init_options init_opts;
@@ -134,6 +197,11 @@ static cmd_category parse_init_options(int argc, char **argv) {
         return CMD_UNKNOWN;
     }
 
+    if (STR_EQ(argv[2], "--help") || STR_EQ(argv[2], "-h")) {
+        print_init_help(stdout);
+        return CMD_HELP;
+    }
+
     init_opts.project_name = argv[2];
     init_opts.multitarget = false;
 
@@ -184,8 +252,8 @@ static void get_test_help(const char *) {
 }
 
 static cmd_option all_test_options[] = {
-    {"--no-logs", "-n", false, set_test_no_logs},
     {"--log-level", "-l", true, set_log_level},
+    {"--no-logs", "-n", false, set_test_no_logs},
     {"--tags", "-t", true, set_test_tags},
     {"--help", "-h", false, get_test_help},
     {NULL, NULL, false, NULL},
@@ -216,13 +284,13 @@ static cmd_category parse_test_options(int argc, char **argv) {
     return CMD_TEST;
 }
 
-static void get_logs_help(const char *) {
-    print_logs_help(stdout);
+static void get_logs_info_help(const char *) {
+    print_logs_info_help(stdout);
     exit(EXIT_SUCCESS);
 }
 
-static cmd_option all_logs_options[] = {
-    {"--help", "-h", false, get_logs_help},
+static cmd_option all_logs_info_options[] = {
+    {"--help", "-h", false, get_logs_info_help},
     {NULL, NULL, false, NULL},
 };
 
@@ -234,22 +302,23 @@ static cmd_category parse_logs_options(int argc, char **argv) {
         return CMD_UNKNOWN;
     }
 
-    int index = 3;
     if (STR_EQ(argv[2], "info")) {
         if (argc != 4) {
-            fprintf(stderr, "'taf logs info' requires log file.\n");
+            print_logs_info_help(stderr);
             return CMD_UNKNOWN;
         }
         logs_opts.category = LOGS_OPT_INFO;
         logs_opts.arg1 = argv[3];
-        index = 4;
+        parse_additional_options(all_logs_info_options, 3, argc, argv);
+    } else if (STR_EQ(argv[2], "help") || STR_EQ(argv[2], "-h") ||
+               STR_EQ(argv[2], "--help")) {
+        print_logs_help(stdout);
+        return CMD_HELP;
     } else {
         fprintf(stderr, "Unknown logs category %s\n", argv[2]);
         print_logs_help(stderr);
         return CMD_UNKNOWN;
     }
-
-    parse_additional_options(all_logs_options, index, argc, argv);
 
     return CMD_LOGS;
 }
@@ -270,6 +339,12 @@ cmd_category cmd_parser_parse(int argc, char **argv) {
     if (STR_EQ(argv[1], "help") || STR_EQ(argv[1], "--help") ||
         STR_EQ(argv[1], "-h")) {
         print_help(stdout);
+        return CMD_HELP;
+    }
+
+    if (STR_EQ(argv[1], "version") || STR_EQ(argv[1], "--version") ||
+        STR_EQ(argv[1], "-v")) {
+        print_version();
         return CMD_HELP;
     }
 
