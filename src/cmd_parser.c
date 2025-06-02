@@ -164,7 +164,7 @@ static void parse_additional_options(cmd_option *options, int start_index,
             }
             opt++;
         }
-        if (!found) {
+        if (!found && argv[index][0] == '-') {
             fprintf(stderr, "Unknown option %s\n", argv[index]);
             exit(EXIT_FAILURE);
         }
