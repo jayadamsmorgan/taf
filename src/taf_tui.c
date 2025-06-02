@@ -15,6 +15,8 @@ static unsigned term_rows = 0, term_cols = 0;
 static struct notcurses *nc;
 static struct ncplane *tui_plane;
 
+static size_t passed = 0;
+
 typedef struct {
     int total_tests;
 
@@ -133,6 +135,9 @@ void taf_tui_test_failed(int index, const char *name, const char *msg) {
 }
 
 void taf_tui_test_passed(int index, const char *name) {
+
+    passed++;
+
     if (ui.log_lines && *ui.log_lines) {
         free(ui.log_lines);
     }
@@ -204,6 +209,25 @@ int taf_tui_init(taf_log_level level) {
 }
 
 void taf_tui_deinit(void) {
-    //
+
+    ncplane_erase_region(tui_plane, ncplane_dim_y(tui_plane) - 11, 0, 10,
+                         ncplane_dim_x(tui_plane));
+    notcurses_render(nc);
+
+    unsigned dimy = ncplane_dim_y(tui_plane);
+    ncplane_cursor_move_yx(tui_plane, dimy - 10, 0);
+    ncplane_rounded_box_sized(tui_plane, 0, 0, 9, ncplane_dim_x(tui_plane), 0);
+    ncplane_putstr_yx(tui_plane, dimy - 10, 3, "TAF Test Suite (Finished)");
+
+    ncplane_printf_yx(tui_plane, dimy - 8, 2, "Total Tests: %d",
+                      ui.total_tests);
+    ncplane_printf_yx(tui_plane, dimy - 6, 2, "Passed: %zu", passed);
+    ncplane_printf_yx(tui_plane, dimy - 4, 2, "Failed: %zu",
+                      ui.total_tests - passed);
+
+    notcurses_render(nc);
+
     notcurses_stop(nc);
+
+    printf("For more info run 'taf logs info latest'\n");
 }
