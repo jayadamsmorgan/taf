@@ -16,6 +16,7 @@ int taf_target_add() {
 
     if (!proj->multitarget) {
         fprintf(stderr, "Unable to add target: project is not multitarget.\n");
+        return EXIT_FAILURE;
     }
 
     cmd_target_add_options *opts = cmd_parser_get_target_add_options();
@@ -58,6 +59,7 @@ int taf_target_remove() {
 
     if (!proj->multitarget) {
         fprintf(stderr, "Unable to add target: project is not multitarget.\n");
+        return EXIT_FAILURE;
     }
 
     cmd_target_remove_options *opts = cmd_parser_get_target_remove_options();
