@@ -79,6 +79,23 @@ static int project_parse_json(json_object *project_obj) {
     if (json_get_bool(project_obj, "multitarget", &proj_parsed.multitarget))
         return -1;
 
+    if (proj_parsed.multitarget) {
+        json_object *target_arr;
+        if (!json_object_object_get_ex(project_obj, "targets", &target_arr))
+            return -1;
+        if (!json_object_is_type(target_arr, json_type_array))
+            return -1;
+        proj_parsed.targets_amount = json_object_array_length(target_arr);
+        if (proj_parsed.targets_amount != 0) {
+            proj_parsed.targets = malloc(sizeof(*proj_parsed.targets) *
+                                         proj_parsed.targets_amount);
+        }
+        for (size_t i = 0; i < proj_parsed.targets_amount; i++) {
+            json_object *target_obj = json_object_array_get_idx(target_arr, i);
+            proj_parsed.targets[i] = strdup(json_object_get_string(target_obj));
+        }
+    }
+
     return 0;
 }
 
@@ -105,9 +122,21 @@ void project_parser_save() {
     json_object_object_add(obj, "multitarget",
                            json_object_new_boolean(proj_parsed.multitarget));
 
+    if (proj_parsed.multitarget) {
+        json_object *target_arr = json_object_new_array();
+        for (size_t i = 0; i < proj_parsed.targets_amount; i++) {
+            json_object_array_add(
+                target_arr, json_object_new_string(proj_parsed.targets[i]));
+        }
+        json_object_object_add(obj, "targets", target_arr);
+    }
+
     char path[PATH_MAX];
     snprintf(path, PATH_MAX, "%s/.taf.json", proj_parsed.project_path);
-    if (json_object_to_file(path, obj)) {
+    if (json_object_to_file_ext(path, obj,
+                                JSON_C_TO_STRING_SPACED |
+                                    JSON_C_TO_STRING_PRETTY |
+                                    JSON_C_TO_STRING_NOSLASHESCAPE)) {
         fprintf(stderr,
                 "Unknown error occured, unable to save project file: %s\n",
                 json_util_get_last_err());

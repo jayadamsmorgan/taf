@@ -66,14 +66,46 @@ static void print_logs_info_help(FILE *file) {
                   "  -h, --help         Display help\n");
 }
 
+static void print_target_help(FILE *file) {
+    fprintf(file,
+            "Usage: taf target [<add|remove>]\n"
+            "\n"
+            "Categories:\n"
+            "  add                Add new target to multitarget project\n"
+            "  remove             Remove target from multitarget project\n"
+            "\n"
+            "Options:\n"
+            "  -h, --help         Display help\n");
+}
+
+static void print_target_add_help(FILE *file) {
+    fprintf(file, "Usage: taf target add <target_name>\n"
+                  "\n"
+                  "Add new target to multitarget project.\n"
+                  "\n"
+                  "Options:\n"
+                  "  -h, --help         Display help\n");
+}
+
+static void print_target_remove_help(FILE *file) {
+    fprintf(file, "Usage: taf target remove <target_name>\n"
+                  "\n"
+                  "Remove target from multitarget project.\n"
+                  "\n"
+                  "Options:\n"
+                  "  -h, --help         Display help\n");
+}
+
 static void print_help(FILE *file) {
-    fprintf(file, "Usage: taf [<init|logs|test|help|version>]\n"
+    fprintf(file, "Usage: taf [<init|logs|target|test|help|version>]\n"
                   "\n"
                   "TAF Testing Suite.\n"
                   "\n"
                   "Categories:\n"
                   "  init               Initialize new TAF project\n"
                   "  logs               Perform actions on TAF logs\n"
+                  "  target             Perform actions on project targets "
+                  "(multitarget)\n"
                   "  test               Perform project tests\n"
                   "  help               Display help\n"
                   "  version            Display TAF version\n"
@@ -105,8 +137,20 @@ cmd_test_options *cmd_parser_get_test_options() {
     return &test_opts;
 }
 
-static cmd_logs_options logs_opts;
-cmd_logs_options *cmd_parser_get_logs_options() {
+static cmd_target_add_options target_add_opts;
+cmd_target_add_options *cmd_parser_get_target_add_options() {
+    //
+    return &target_add_opts;
+}
+
+static cmd_target_remove_options target_remove_opts;
+cmd_target_remove_options *cmd_parser_get_target_remove_options() {
+    //
+    return &target_remove_opts;
+}
+
+static cmd_logs_info_options logs_opts;
+cmd_logs_info_options *cmd_parser_get_logs_info_options() {
     //
     return &logs_opts;
 }
@@ -153,6 +197,10 @@ static void parse_additional_options(cmd_option *options, int start_index,
     while (index < argc) {
         cmd_option *opt = options;
         bool found = false;
+        if (argv[index][0] != '-') {
+            index++;
+            continue;
+        }
         while (opt && (opt->long_opt || opt->short_opt)) {
             if (is_option_present(opt, opt->long_opt, index, argc, argv)) {
                 found = true;
@@ -164,7 +212,7 @@ static void parse_additional_options(cmd_option *options, int start_index,
             }
             opt++;
         }
-        if (!found && argv[index][0] == '-') {
+        if (!found) {
             fprintf(stderr, "Unknown option %s\n", argv[index]);
             exit(EXIT_FAILURE);
         }
@@ -297,7 +345,7 @@ static cmd_option all_logs_info_options[] = {
 static cmd_category parse_logs_options(int argc, char **argv) {
 
     if (argc < 3) {
-        fprintf(stderr, "'taf logs' requires category (create)\n");
+        fprintf(stderr, "'taf logs' requires category [info]\n");
         print_logs_help(stderr);
         return CMD_UNKNOWN;
     }
@@ -307,20 +355,74 @@ static cmd_category parse_logs_options(int argc, char **argv) {
             print_logs_info_help(stderr);
             return CMD_UNKNOWN;
         }
-        logs_opts.category = LOGS_OPT_INFO;
-        logs_opts.arg1 = argv[3];
+        logs_opts.arg = argv[3];
         parse_additional_options(all_logs_info_options, 3, argc, argv);
+        return CMD_LOGS_INFO;
     } else if (STR_EQ(argv[2], "help") || STR_EQ(argv[2], "-h") ||
                STR_EQ(argv[2], "--help")) {
         print_logs_help(stdout);
         return CMD_HELP;
-    } else {
-        fprintf(stderr, "Unknown logs category %s\n", argv[2]);
-        print_logs_help(stderr);
+    }
+
+    fprintf(stderr, "Unknown logs category %s\n", argv[2]);
+    print_logs_help(stderr);
+    return CMD_UNKNOWN;
+}
+
+static void get_target_add_help(const char *) {
+    print_target_add_help(stdout);
+    exit(EXIT_SUCCESS);
+}
+
+static cmd_option all_target_add_options[] = {
+    {"--help", "-h", false, get_target_add_help},
+    {NULL, NULL, false, NULL},
+};
+
+static void get_target_remove_help(const char *) {
+    print_target_remove_help(stdout);
+    exit(EXIT_SUCCESS);
+}
+
+static cmd_option all_target_remove_options[] = {
+    {"--help", "-h", false, get_target_remove_help},
+    {NULL, NULL, false, NULL},
+};
+
+static cmd_category parse_target_options(int argc, char **argv) {
+
+    if (argc < 3) {
+        fprintf(stderr, "'taf target' requires category [add|remove]\n");
+        print_target_help(stderr);
         return CMD_UNKNOWN;
     }
 
-    return CMD_LOGS;
+    if (STR_EQ(argv[2], "add")) {
+        if (argc < 4) {
+            fprintf(stderr, "'taf target add' requires target_name\n");
+            print_target_add_help(stderr);
+            return CMD_UNKNOWN;
+        }
+        target_add_opts.target = argv[3];
+        parse_additional_options(all_target_add_options, 3, argc, argv);
+        return CMD_TARGET_ADD;
+    } else if (STR_EQ(argv[2], "remove")) {
+        if (argc < 4) {
+            fprintf(stderr, "'taf target remove' requires target_name\n");
+            print_target_remove_help(stderr);
+            return CMD_UNKNOWN;
+        }
+        target_remove_opts.target = argv[3];
+        parse_additional_options(all_target_remove_options, 3, argc, argv);
+        return CMD_TARGET_REMOVE;
+    } else if (STR_EQ(argv[2], "--help") || STR_EQ(argv[2], "-h")) {
+        print_target_help(stdout);
+        return CMD_HELP;
+    }
+
+    fprintf(stderr, "Unknown targeet category %s\n", argv[2]);
+    print_target_help(stderr);
+    return CMD_UNKNOWN;
 }
 
 cmd_category cmd_parser_parse(int argc, char **argv) {
@@ -335,6 +437,8 @@ cmd_category cmd_parser_parse(int argc, char **argv) {
         return parse_test_options(argc, argv);
     if (STR_EQ(argv[1], "logs"))
         return parse_logs_options(argc, argv);
+    if (STR_EQ(argv[1], "target"))
+        return parse_target_options(argc, argv);
 
     if (STR_EQ(argv[1], "help") || STR_EQ(argv[1], "--help") ||
         STR_EQ(argv[1], "-h")) {

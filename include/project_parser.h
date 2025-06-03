@@ -2,6 +2,7 @@
 #define PROJECT_PARSER_H
 
 #include <stdbool.h>
+#include <stddef.h>
 
 typedef struct {
     char *project_name;
@@ -13,6 +14,9 @@ typedef struct {
     const char *project_path;
 
     bool multitarget;
+
+    char **targets;
+    size_t targets_amount;
     // TODO: more
 
 } project_parsed_t;

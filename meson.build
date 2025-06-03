@@ -100,6 +100,7 @@ sources = [
 
   'src/taf_init.c',
   'src/taf_logs.c',
+  'src/taf_target.c',
   'src/taf_test.c',
   'src/taf_tui.c',
 

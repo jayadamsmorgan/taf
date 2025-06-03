@@ -13,21 +13,23 @@
 #include <string.h>
 #include <sys/syslimits.h>
 
-static int taf_log_info(cmd_logs_options *opts) {
+int taf_logs_info() {
+
+    cmd_logs_info_options *opts = cmd_parser_get_logs_info_options();
 
     char log_file_path[PATH_MAX];
 
-    if (!strcmp(opts->arg1, "latest")) {
+    if (!strcmp(opts->arg, "latest")) {
         if (project_parser_parse()) {
             return EXIT_FAILURE;
         }
         project_parsed_t *proj = get_parsed_project();
         snprintf(log_file_path, PATH_MAX, "%s/logs/test_run_latest_raw.json",
                  proj->project_path);
-    } else if (file_exists(opts->arg1)) {
-        snprintf(log_file_path, PATH_MAX, "%s", opts->arg1);
+    } else if (file_exists(opts->arg)) {
+        snprintf(log_file_path, PATH_MAX, "%s", opts->arg);
     } else {
-        fprintf(stderr, "Log file %s not found.\n", opts->arg1);
+        fprintf(stderr, "Log file %s not found.\n", opts->arg);
         return EXIT_FAILURE;
     }
 
@@ -35,7 +37,7 @@ static int taf_log_info(cmd_logs_options *opts) {
     raw_log_t *raw_log = taf_json_to_raw_log(root);
     if (!raw_log || !raw_log->os || !raw_log->os_version) {
         fprintf(stderr, "Log file %s is either incorrect or corrupt.\n",
-                opts->arg1);
+                log_file_path);
         return EXIT_FAILURE;
     }
 
@@ -82,16 +84,4 @@ static int taf_log_info(cmd_logs_options *opts) {
     printf("Test run finished on %s\n", raw_log->finished);
 
     return EXIT_SUCCESS;
-}
-
-int taf_logs() {
-
-    cmd_logs_options *opts = cmd_parser_get_logs_options();
-
-    switch (opts->category) {
-    case LOGS_OPT_INFO:
-        return taf_log_info(opts);
-    }
-
-    return EXIT_FAILURE;
 }

@@ -86,5 +86,7 @@ int taf_init() {
         return EXIT_FAILURE;
     }
 
+    printf("Created new project '%s'\n", opts->project_name);
+
     return EXIT_SUCCESS;
 }
