@@ -5,14 +5,13 @@
 
 #include <json.h>
 
-#include <string.h>
-
 typedef enum {
-    TAF_LOG_LEVEL_ERROR = 0,
-    TAF_LOG_LEVEL_WARNING = 1,
-    TAF_LOG_LEVEL_INFO = 2,
-    TAF_LOG_LEVEL_DEBUG = 3,
-    TAF_LOG_LEVEL_TRACE = 4,
+    TAF_LOG_LEVEL_CRITICAL = 0,
+    TAF_LOG_LEVEL_ERROR = 1,
+    TAF_LOG_LEVEL_WARNING = 2,
+    TAF_LOG_LEVEL_INFO = 3,
+    TAF_LOG_LEVEL_DEBUG = 4,
+    TAF_LOG_LEVEL_TRACE = 5,
 } taf_log_level;
 
 typedef struct {
@@ -28,7 +27,9 @@ typedef struct {
     char *started;
     char *finished;
     char *status;
-    char *failure_reason;
+
+    raw_log_test_output_t *failure_reasons;
+    size_t failure_reasons_count;
 
     char **tags;
     size_t tags_count;
@@ -66,7 +67,8 @@ void taf_log_test_started(int index, test_case_t test_case);
 
 void taf_log_test_passed(int index, test_case_t test_case);
 
-void taf_log_test_failed(int index, test_case_t test_case, const char *msg);
+void taf_log_test_failed(int index, test_case_t test_case, const char *msg,
+                         const char *file, int line);
 
 void taf_log_tests_finalize();
 

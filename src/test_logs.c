@@ -24,7 +24,8 @@ static char output_log_file_path[PATH_MAX];
 static char raw_log_file_path[PATH_MAX];
 
 static raw_log_t *raw_log = NULL;
-static size_t raw_log_test_ouput_cap;
+static size_t raw_log_test_output_cap;
+static size_t raw_log_test_failure_cap;
 static int test_index;
 
 static json_object *raw_log_test_output_to_json(raw_log_test_output_t *output) {
@@ -53,9 +54,14 @@ static json_object *raw_log_test_to_json(raw_log_test_t *test) {
                            json_object_new_string(test->finished));
     json_object_object_add(test_obj, "status",
                            json_object_new_string(test->status));
-    if (test->failure_reason) {
-        json_object_object_add(test_obj, "failure_reason",
-                               json_object_new_string(test->failure_reason));
+    if (test->failure_reasons_count != 0) {
+        json_object *fail_reasons_arr = json_object_new_array();
+        for (size_t i = 0; i < test->failure_reasons_count; i++) {
+            json_object_array_add(
+                fail_reasons_arr,
+                raw_log_test_output_to_json(&test->failure_reasons[i]));
+        }
+        json_object_object_add(test_obj, "failure_reasons", fail_reasons_arr);
     }
     json_object *tag_arr = json_object_new_array();
     for (size_t i = 0; i < test->tags_count; i++) {
@@ -164,8 +170,31 @@ raw_log_t *taf_json_to_raw_log(struct json_object *root) {
                 t->finished = jdup_string(tmp);
             if (json_object_object_get_ex(jt, "status", &tmp))
                 t->status = jdup_string(tmp);
-            if (json_object_object_get_ex(jt, "failure_reason", &tmp))
-                t->failure_reason = jdup_string(tmp);
+            if (json_object_object_get_ex(jt, "failure_reasons", &tmp) &&
+                json_object_is_type(tmp, json_type_array)) {
+
+                t->failure_reasons_count = jarray_len(tmp);
+                t->failure_reasons = calloc(t->failure_reasons_count,
+                                            sizeof *t->failure_reasons);
+                for (size_t k = 0; k < t->failure_reasons_count; ++k) {
+                    struct json_object *jo =
+                        json_object_array_get_idx(tmp, (int)k);
+                    raw_log_test_output_t *out = &t->failure_reasons[k];
+
+                    struct json_object *jfield;
+                    if (json_object_object_get_ex(jo, "file", &jfield))
+                        out->file = jdup_string(jfield);
+                    if (json_object_object_get_ex(jo, "date_time", &jfield))
+                        out->date_time = jdup_string(jfield);
+                    if (json_object_object_get_ex(jo, "msg", &jfield))
+                        out->msg = jdup_string(jfield);
+                    if (json_object_object_get_ex(jo, "level", &jfield))
+                        out->level = taf_log_level_from_str(
+                            json_object_get_string(jfield));
+                    if (json_object_object_get_ex(jo, "line", &jfield))
+                        out->line = json_object_get_int(jfield);
+                }
+            }
 
             if (json_object_object_get_ex(jt, "tags", &tmp) &&
                 json_object_is_type(tmp, json_type_array)) {
@@ -280,11 +309,29 @@ void taf_log_test(taf_log_level level, const char *file, int line,
     }
 
     raw_log_test_t *test = &raw_log->tests[test_index];
-    if (test->output_count >= raw_log_test_ouput_cap) {
-        raw_log_test_ouput_cap *= 2;
+    if (test->output_count >= raw_log_test_output_cap) {
+        raw_log_test_output_cap *= 2;
         test->output = realloc(test->output, sizeof(raw_log_test_output_t) *
-                                                 raw_log_test_ouput_cap);
+                                                 raw_log_test_output_cap);
     }
+
+    if (level == TAF_LOG_LEVEL_ERROR) {
+        if (test->failure_reasons_count >= raw_log_test_failure_cap) {
+            raw_log_test_failure_cap *= 2;
+            test->failure_reasons =
+                realloc(test->failure_reasons, sizeof(*test->failure_reasons) *
+                                                   raw_log_test_failure_cap);
+        }
+        raw_log_test_output_t *failure =
+            &test->failure_reasons[test->failure_reasons_count];
+        failure->msg = strdup(buffer);
+        failure->file = strdup(file);
+        failure->line = line;
+        failure->date_time = strdup(time_str);
+        failure->level = TAF_LOG_LEVEL_ERROR;
+        test->failure_reasons_count++;
+    }
+
     test->output[test->output_count].file = strdup(file);
     test->output[test->output_count].date_time = strdup(time_str);
     test->output[test->output_count].level = level;
@@ -318,11 +365,15 @@ void taf_log_test_started(int index, test_case_t test_case) {
     test->tags_count = test_case.tags.amount;
 
     test->name = strdup(test_case.name);
-    raw_log_test_ouput_cap = 2;
+    raw_log_test_output_cap = 2;
     test->output =
-        malloc(sizeof(raw_log_test_output_t) * raw_log_test_ouput_cap);
+        malloc(sizeof(raw_log_test_output_t) * raw_log_test_output_cap);
     test->output_count = 0;
-    test->failure_reason = NULL;
+
+    raw_log_test_failure_cap = 2;
+    test->failure_reasons =
+        malloc(sizeof(*test->failure_reasons) * raw_log_test_failure_cap);
+    test->failure_reasons_count = 0;
 }
 
 void taf_log_test_passed(int index, test_case_t test_case) {
@@ -343,7 +394,8 @@ void taf_log_test_passed(int index, test_case_t test_case) {
     test->status = "passed";
 }
 
-void taf_log_test_failed(int index, test_case_t test_case, const char *msg) {
+void taf_log_test_failed(int index, test_case_t test_case, const char *msg,
+                         const char *file, int line) {
 
     taf_tui_test_failed(index, test_case.name, msg);
 
@@ -360,7 +412,22 @@ void taf_log_test_failed(int index, test_case_t test_case, const char *msg) {
     raw_log_test_t *test = &raw_log->tests[index - 1];
     test->finished = strdup(time_str);
     test->status = "failed";
-    test->failure_reason = strdup(msg);
+
+    if (test->failure_reasons_count >= raw_log_test_failure_cap) {
+        raw_log_test_failure_cap *= 2;
+        test->failure_reasons =
+            realloc(test->failure_reasons,
+                    sizeof(*test->failure_reasons) * raw_log_test_failure_cap);
+    }
+
+    raw_log_test_output_t *fail_reason =
+        &test->failure_reasons[test->failure_reasons_count];
+    fail_reason->date_time = strdup(time_str);
+    fail_reason->msg = strdup(msg);
+    fail_reason->level = TAF_LOG_LEVEL_CRITICAL;
+    fail_reason->line = line;
+    fail_reason->file = strdup(file);
+    test->failure_reasons_count++;
 }
 
 void taf_raw_log_free(raw_log_t *log) {
@@ -383,7 +450,12 @@ void taf_raw_log_free(raw_log_t *log) {
         free(t->started);
         free(t->finished);
         free(t->status);
-        free(t->failure_reason);
+        for (size_t k = 0; k < t->failure_reasons_count; ++k) {
+            free(t->failure_reasons[k].file);
+            free(t->failure_reasons[k].date_time);
+            free(t->failure_reasons[k].msg);
+        }
+        free(t->failure_reasons);
 
         for (size_t k = 0; k < t->tags_count; ++k)
             free(t->tags[k]);
@@ -436,7 +508,12 @@ void taf_log_tests_finalize() {
         raw_log_test_t *test = &raw_log->tests[i];
         free(test->started);
         free(test->finished);
-        free(test->failure_reason);
+        for (size_t j = 0; j < test->failure_reasons_count; j++) {
+            free(test->failure_reasons[j].msg);
+            free(test->failure_reasons[j].date_time);
+            free(test->failure_reasons[j].file);
+        }
+        free(test->failure_reasons);
         free(test->name);
         for (size_t j = 0; j < test->tags_count; j++) {
             free(test->tags[j]);
@@ -467,14 +544,20 @@ void taf_log_tests_finalize() {
     replace_symlink(raw_log_file_path, latest_raw);
 }
 
-static const char *taf_log_level_str_map[] = {"ERROR", "WARNING", "INFO",
-                                              "DEBUG", "TRACE"};
+static const char *taf_log_level_str_map[] = {"CRITICAL", "ERROR", "WARNING",
+                                              "INFO",     "DEBUG", "TRACE"};
 
 const char *taf_log_level_to_str(taf_log_level level) {
+    if (level < 0)
+        return NULL;
+    if (level > TAF_LOG_LEVEL_TRACE)
+        return NULL;
     return taf_log_level_str_map[level];
 }
 
 taf_log_level taf_log_level_from_str(const char *str) {
+    if (!strcasecmp(str, "c") || !strcasecmp(str, "critical"))
+        return TAF_LOG_LEVEL_CRITICAL;
     if (!strcasecmp(str, "e") || !strcasecmp(str, "error"))
         return TAF_LOG_LEVEL_ERROR;
     if (!strcasecmp(str, "w") || !strcasecmp(str, "warning"))

@@ -23,24 +23,27 @@ static void print_init_help(FILE *file) {
 }
 
 static void print_test_help(FILE *file) {
-    fprintf(
-        file,
-        "Usage: taf test [<options>]\n"
-        "       taf test <target_name> [<options>]\n"
-        "\n"
-        "Perform project tests.\n"
-        "Must specify target name if project "
-        "is multitarget.\n"
-        "\n"
-        "Options:\n"
-        "  -l, --log-level <error|warning|info|debug|trace>   Log level "
-        "for TUI output\n"
-        "  -n, --no-logs                                      Do not output "
-        "log files after a "
-        "test run\n"
-        "  -t, --tags <tag1,tag2>                             Perform tests "
-        "with specified tags\n"
-        "  -h, --help                                         Display help\n");
+    fprintf(file,
+            "Usage: taf test [<options>]\n"
+            "       taf test <target_name> [<options>]\n"
+            "\n"
+            "Perform project tests.\n"
+            "Must specify target name if project "
+            "is multitarget.\n"
+            "\n"
+            "Options:\n"
+            "  -l, --log-level <critical|error|warning|info|debug|trace>   Log "
+            "level "
+            "for TUI output\n"
+            "  -n, --no-logs                                               Do "
+            "not output "
+            "log files after a "
+            "test run\n"
+            "  -t, --tags <tag1,tag2>                                      "
+            "Perform tests "
+            "with specified tags\n"
+            "  -h, --help                                                  "
+            "Display help\n");
 }
 
 static void print_logs_help(FILE *file) {

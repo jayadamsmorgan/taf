@@ -137,6 +137,14 @@ static void run_deferred(lua_State *L, const char *status) {
     lua_setfield(L, LUA_REGISTRYINDEX, DEFER_LIST_KEY);
 }
 
+static int taf_errhandler(lua_State *L) {
+    const char *msg = lua_tostring(L, 1);
+    if (!msg)
+        msg = "(non-string error)";
+    luaL_traceback(L, L, msg, 1); // replaces TOS with traceback
+    return 1;                     // 1 return value for pcall
+}
+
 static int run_all_tests(lua_State *L) {
     size_t passed = 0;
 
@@ -148,40 +156,53 @@ static int run_all_tests(lua_State *L) {
 
         taf_log_test_started(i + 1, tests[i]);
 
+        /* push error handler */
+        lua_pushcfunction(L, taf_errhandler);
+        int erridx = lua_gettop(L);
+
+        /* push test body */
         lua_rawgeti(L, LUA_REGISTRYINDEX, tests[i].ref);
 
-        lua_pushvalue(L, -1);
-
-        lua_Debug ar;
-        if (lua_getinfo(L, ">S", &ar)) {
-            g_first = ar.linedefined;
-            g_last = ar.lastlinedefined;
-        }
-
-        // Reset starting time for millis() function
+        /* reset millis, etc. */
         reset_millis();
 
-        int rc = lua_pcall(L, 0, 0, 0);
+        int rc = lua_pcall(L, 0, 0, erridx); /* errfunc = erridx */
 
-        const char *safe_msg;
+        const char *file = NULL;
+        int line = 0;
+        const char *trace = NULL;
 
         if (rc != LUA_OK) {
-            const char *errmsg = lua_tostring(L, -1);
-            safe_msg = errmsg ? errmsg : "unknown error";
-            lua_pop(L, 1);
+            trace = lua_tostring(L, -1); /* traceback string */
+
+            /* first line looks like  "<file>:<line>: <message>" */
+            if (trace) {
+                const char *colon1 = strchr(trace, ':');
+                if (colon1) {
+                    const char *colon2 = strchr(colon1 + 1, ':');
+                    if (colon2) {
+                        file = strndup(trace, colon1 - trace);
+                        line = atoi(colon1 + 1);
+                    }
+                }
+            }
+            lua_pop(L, 1); /* pop traceback */
         }
 
-        run_deferred(L, (rc == LUA_OK) ? "passed" : "failed");
+        lua_remove(L, erridx); /* pop error handler */
+
+        run_deferred(L, rc == LUA_OK ? "passed" : "failed");
 
         if (rc == LUA_OK) {
             taf_log_test_passed(i + 1, tests[i]);
             passed++;
         } else {
-            taf_log_test_failed(i + 1, tests[i], safe_msg);
+            taf_log_test_failed(i + 1, tests[i],
+                                trace ? trace : "unknown error",
+                                file ? file : "(?)", line);
+            free((char *)file); /* if strndup above */
         }
-        // Collect some garbage after modules
-        // This is mostly done if test has failed
-        // But also good if user forgot to close session(s)
+
         module_web_close_all_sessions();
         module_serial_close_all_ports();
     }
