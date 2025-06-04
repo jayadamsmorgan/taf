@@ -1,6 +1,10 @@
 local tm = require("taf-main")
 
 --- @alias log_level
+--- | '"c"' critical
+--- | '"C"' critical
+--- | '"critical"'
+--- | '"CRITICAL"'
 --- | '"e"' error
 --- | '"E"' error
 --- | '"error"'
@@ -63,6 +67,13 @@ end
 --- @param ... any
 M.log = function(log_level, ...)
 	tm:log(log_level, ...)
+end
+
+--- Print something to logs & TUI with 'error' log level.
+---
+--- @param ... any
+M.log_critical = function(...)
+	tm:log("c", ...)
 end
 
 --- Print something to logs & TUI with 'error' log level.

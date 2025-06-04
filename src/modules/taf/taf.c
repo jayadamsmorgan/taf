@@ -128,8 +128,7 @@ int l_module_taf_defer(lua_State *L) {
     return 0;
 }
 
-static inline void print_helper(taf_log_level level, int n, int s,
-                                lua_State *L) {
+static inline void log_helper(taf_log_level level, int n, int s, lua_State *L) {
 
     luaL_Buffer buf;
     luaL_buffinit(L, &buf);
@@ -163,11 +162,17 @@ static inline void print_helper(taf_log_level level, int n, int s,
 
     const char *msg = lua_tostring(L, -1); // still valid on stack
 
+    if (level == TAF_LOG_LEVEL_CRITICAL) {
+        luaL_error(L, "%s", msg);
+        return;
+    }
+
     taf_log_test(level, file, line, msg);
 
     lua_pop(L, 1); // pop message string
 }
 
+/* taf:log(log_level: string, ...) */
 int l_module_taf_log(lua_State *L) {
     int n = lua_gettop(L);
 
@@ -181,18 +186,18 @@ int l_module_taf_log(lua_State *L) {
         return 0;
     }
 
-    print_helper(log_level, n, s + 1, L);
+    log_helper(log_level, n, s + 1, L);
 
     return 0;
 }
 
-/* taf:print() */
+/* taf:print(...) */
 int l_module_taf_print(lua_State *L) {
     int n = lua_gettop(L);
 
     int s = selfshift(L);
 
-    print_helper(TAF_LOG_LEVEL_INFO, n, s, L);
+    log_helper(TAF_LOG_LEVEL_INFO, n, s, L);
 
     return 0;
 }

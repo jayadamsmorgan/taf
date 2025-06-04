@@ -5,6 +5,7 @@
 #include "util/files.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 int taf_target_add() {
 

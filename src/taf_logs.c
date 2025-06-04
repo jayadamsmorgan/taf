@@ -56,7 +56,7 @@ int taf_logs_info() {
     } else {
         printf("Test run performed with no tags\n");
     }
-    printf("Total tests perfomed: %zu\n", raw_log->tests_count);
+    printf("Total tests perfomed: %zu\n\n", raw_log->tests_count);
     size_t passed = 0;
     for (size_t i = 0; i < raw_log->tests_count; i++) {
         raw_log_test_t *test = &raw_log->tests[i];
@@ -74,9 +74,15 @@ int taf_logs_info() {
         printf("    Status: %s\n", test->status);
         if (!strcmp("passed", test->status)) {
             passed++;
-        } else if (test->failure_reason) {
-            printf("    Failure reason: %s\n", test->failure_reason);
+        } else if (test->failure_reasons_count != 0) {
+            printf("    Failure reasons:\n");
+            for (size_t i = 0; i < test->failure_reasons_count; i++) {
+                raw_log_test_output_t *failure = &test->failure_reasons[i];
+                printf("        %zu: [%s]: %s\n", i + 1,
+                       taf_log_level_to_str(failure->level), failure->msg);
+            }
         }
+        printf("\n");
     }
 
     printf("Total tests passed: %zu\n", passed);
