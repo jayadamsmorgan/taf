@@ -660,10 +660,7 @@ int l_module_serial_close(lua_State *L) /* optional explicit close */
     return 1;
 }
 
-static int l_gc(lua_State *) {
-    module_serial_close_all_ports();
-    return 0;
-}
+static int l_gc(lua_State *L) { return l_module_serial_close(L); }
 
 /*----------- registration ------------------------------------------*/
 static const luaL_Reg port_mt[] = {{"__gc", l_gc}, {NULL, NULL}};

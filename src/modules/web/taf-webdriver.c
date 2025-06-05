@@ -213,10 +213,7 @@ static const luaL_Reg module_fns[] = {
     {NULL, NULL},
 };
 
-static int l_gc(lua_State *) {
-    module_web_close_all_sessions();
-    return 0;
-}
+static int l_gc(lua_State *L) { return l_module_web_session_end(L); }
 
 /*----------- registration ------------------------------------------*/
 static const luaL_Reg port_mt[] = {{"__gc", l_gc}, {NULL, NULL}};
