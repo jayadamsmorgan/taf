@@ -62,6 +62,9 @@ M.print = function(...)
 end
 
 --- Print something to logs & TUI with specified log level.
+--- If `log_level` is "critical" - fails test immedeately
+--- If `log_level` is "error" - fails test but continues to execute
+--- Other `log_level` will just log
 ---
 --- @param log_level log_level
 --- @param ... any
@@ -69,7 +72,8 @@ M.log = function(log_level, ...)
 	tm:log(log_level, ...)
 end
 
---- Print something to logs & TUI with 'error' log level.
+--- Print something to logs & TUI with 'critical' log level.
+--- Will fail test immedeately
 ---
 --- @param ... any
 M.log_critical = function(...)
@@ -77,6 +81,7 @@ M.log_critical = function(...)
 end
 
 --- Print something to logs & TUI with 'error' log level.
+--- Will mark test as failed but test will continue
 ---
 --- @param ... any
 M.log_error = function(...)
