@@ -455,4 +455,13 @@ M.drain = function(port)
 	return ts:drain(port)
 end
 
+--- Get port by it's path or name (but not open it)
+---
+--- @param path string
+---
+--- @return serial_port
+M.get_port = function(path)
+	return ts:get_port(path)
+end
+
 return M
