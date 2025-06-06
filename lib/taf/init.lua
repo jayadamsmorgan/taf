@@ -1,5 +1,7 @@
 local tm = require("taf-main")
 
+local M = {}
+
 --- @alias log_level
 --- | '"c"' critical
 --- | '"C"' critical
@@ -25,8 +27,6 @@ local tm = require("taf-main")
 --- | '"T"' trace
 --- | '"trace"'
 --- | '"TRACE"'
-
-local M = {}
 
 -- Expose submodules of 'taf'
 M.serial = require("taf.serial")
@@ -62,9 +62,9 @@ M.print = function(...)
 end
 
 --- Print something to logs & TUI with specified log level.
---- If `log_level` is "critical" - fails test immedeately
---- If `log_level` is "error" - fails test but continues to execute
---- Other `log_level` will just log
+--- If `log_level` is "critical" - fails test immedeately.
+--- If `log_level` is "error" - fails test but continues to execute.
+--- Other `log_level` will just log.
 ---
 --- @param log_level log_level
 --- @param ... any
@@ -73,7 +73,7 @@ M.log = function(log_level, ...)
 end
 
 --- Print something to logs & TUI with 'critical' log level.
---- Will fail test immedeately
+--- Will fail test immedeately.
 ---
 --- @param ... any
 M.log_critical = function(...)
@@ -81,7 +81,7 @@ M.log_critical = function(...)
 end
 
 --- Print something to logs & TUI with 'error' log level.
---- Will mark test as failed but test will continue
+--- Will mark test as failed but test will continue.
 ---
 --- @param ... any
 M.log_error = function(...)
@@ -116,7 +116,7 @@ M.log_trace = function(...)
 	tm:log("t", ...)
 end
 
---- Put test to sleep for `ms` amount of milliseconds
+--- Put test to sleep for `ms` amount of milliseconds.
 ---
 --- @param ms number
 M.sleep = function(ms)

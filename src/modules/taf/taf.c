@@ -9,8 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* taf:sleep(ms: number) */
-static int l_module_taf_sleep(lua_State *L) {
+int l_module_taf_sleep(lua_State *L) {
     int s = selfshift(L);
 
     int ms = luaL_checkinteger(L, s);
@@ -19,8 +18,7 @@ static int l_module_taf_sleep(lua_State *L) {
     return 0; /* no Lua return values */
 }
 
-/* taf:test(name:string, body:function) */
-static int l_module_taf_register_test(lua_State *L) {
+int l_module_taf_register_test(lua_State *L) {
     int s = selfshift(L);
 
     const char *name = luaL_checkstring(L, s);
@@ -100,7 +98,6 @@ static int l_module_taf_register_test(lua_State *L) {
     return 0;
 }
 
-/* taf:defer(function, ...) */
 int l_module_taf_defer(lua_State *L) {
     int s = selfshift(L);
     int nargs = lua_gettop(L) - (s - 1);
@@ -172,7 +169,6 @@ static inline void log_helper(taf_log_level level, int n, int s, lua_State *L) {
     lua_pop(L, 1); // pop message string
 }
 
-/* taf:log(log_level: string, ...) */
 int l_module_taf_log(lua_State *L) {
     int n = lua_gettop(L);
 
@@ -191,7 +187,6 @@ int l_module_taf_log(lua_State *L) {
     return 0;
 }
 
-/* taf:print(...) */
 int l_module_taf_print(lua_State *L) {
     int n = lua_gettop(L);
 
@@ -202,20 +197,13 @@ int l_module_taf_print(lua_State *L) {
     return 0;
 }
 
-/* taf:millis() -> number */
 int l_module_taf_millis(lua_State *L) {
     uint64_t uptime = millis_since_start();
     lua_pushnumber(L, uptime);
     return 1;
 }
 
-static int l_gc(lua_State *) { return 0; }
-
-static const luaL_Reg port_mt[] = {
-    {"__gc", l_gc}, //
-    {NULL, NULL},   //
-};
-
+/*----------- registration ------------------------------------------*/
 static const luaL_Reg module_fns[] = {
     {"defer", l_module_taf_defer},        //
     {"sleep", l_module_taf_sleep},        //
@@ -227,10 +215,6 @@ static const luaL_Reg module_fns[] = {
 };
 
 int l_module_taf_register_module(lua_State *L) {
-
-    luaL_newmetatable(L, "taf-main");
-    luaL_setfuncs(L, port_mt, 0);
-    lua_pop(L, 1);
     lua_newtable(L);
     luaL_setfuncs(L, module_fns, 0);
     return 1;

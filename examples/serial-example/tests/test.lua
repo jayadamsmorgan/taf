@@ -25,6 +25,9 @@ taf.test("Get port info", { "tag2", "tag3" }, function()
 end)
 
 taf.test("Reading from serial device", { "tag2" }, function()
+	taf.log_error("This is first failure reason")
+	taf.log_critical("This is second failure reason")
+
 	local err
 	local port
 	port, err = serial.open(vars.port_name)
@@ -33,8 +36,8 @@ taf.test("Reading from serial device", { "tag2" }, function()
 
 	taf.defer(serial.close, port) -- Runs last
 
-	taf.defer(function(status)
-		taf.log("E", "Tearing down test with status '" .. status .. "'")
+	taf.defer(function()
+		taf.log("E", "Tearing down test with status '" .. "'")
 	end)
 
 	taf.defer(print, "This defer should run first")

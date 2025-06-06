@@ -1,8 +1,8 @@
-local wd = require("taf-webdriver")
+local tw = require("taf-webdriver")
 
 local M = {}
 
-M.low = wd
+M.low = tw
 
 --- @alias webdriver
 --- | '"chromedriver"'
@@ -28,11 +28,11 @@ M.low = wd
 --- @param backend webdriver?
 --- @param extraflags [string]?
 ---
---- @return session
+--- @return session?, string? error
 M.session_start = function(driver_port, backend, extraflags)
 	backend = backend or "chromedriver"
 	extraflags = extraflags or {}
-	return wd:session_start(driver_port, backend, extraflags)
+	return tw:session_start(driver_port, backend, extraflags)
 end
 
 --- @param session session
@@ -191,7 +191,7 @@ end
 ---
 --- @return table? response, string? error
 M.session_cmd = function(session, method, endpoint, payload)
-	return wd:session_cmd(session, method, endpoint, payload)
+	return tw:session_cmd(session, method, endpoint, payload)
 end
 
 --- End webdriver session
@@ -200,7 +200,7 @@ end
 ---
 --- @return string? error
 M.session_end = function(session)
-	return wd:session_end(session)
+	return tw:session_end(session)
 end
 
 return M

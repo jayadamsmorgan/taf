@@ -206,16 +206,16 @@ int l_module_web_session_end(lua_State *L) {
     return 1;
 }
 
+/*----------- registration ------------------------------------------*/
 static const luaL_Reg module_fns[] = {
-    {"session_start", l_module_web_session_start},
-    {"session_end", l_module_web_session_end},
     {"session_cmd", l_module_web_session_cmd},
+    {"session_end", l_module_web_session_end},
+    {"session_start", l_module_web_session_start},
     {NULL, NULL},
 };
 
 static int l_gc(lua_State *L) { return l_module_web_session_end(L); }
 
-/*----------- registration ------------------------------------------*/
 static const luaL_Reg port_mt[] = {{"__gc", l_gc}, {NULL, NULL}};
 
 int l_module_web_register_module(lua_State *L) {

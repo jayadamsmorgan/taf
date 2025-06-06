@@ -5,6 +5,7 @@ taf.test("testing web session start", function()
 	-- Open the session on port 9515
 	local session, err = web.session_start(9515)
 	assert(not err, err or "")
+	assert(session)
 
 	-- Close webdriver session when test finishes
 	taf.defer(web.session_end, session)
