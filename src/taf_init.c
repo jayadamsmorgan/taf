@@ -8,7 +8,11 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#ifdef __APPLE__
 #include <sys/syslimits.h>
+#else
+#include <limits.h>
+#endif // __APPLE__
 
 static const char *gitignore_contents = //
     "logs/\n"                           //

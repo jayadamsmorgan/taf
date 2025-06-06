@@ -11,7 +11,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef __APPLE__
 #include <sys/syslimits.h>
+#else
+#include <limits.h>
+#endif // __APPLE__
 
 int taf_logs_info() {
 

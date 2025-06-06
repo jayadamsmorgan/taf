@@ -32,7 +32,7 @@ libcurl_dep = dependency(
   'libcurl',
   method: 'pkg-config',
   required: true,
-  static: true
+  static: false
 )
 
 #--- notcurses ---------------------------------------------------------------

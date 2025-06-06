@@ -7,7 +7,11 @@
 #include <libgen.h>
 #include <stdio.h>
 #include <string.h>
+#ifdef __APPLE__
 #include <sys/syslimits.h>
+#else
+#include <limits.h>
+#endif // __APPLE__
 
 static project_parsed_t proj_parsed = {0};
 
@@ -156,7 +160,7 @@ bool project_parser_parse() {
     json_object *project_obj = json_object_from_file(project_file);
 
     char *tmp = strdup(project_file);
-    proj_parsed.project_path = dirname(tmp);
+    proj_parsed.project_path = strdup(dirname(tmp));
     free(tmp);
     if (project_parse_json(project_obj)) {
         fprintf(
