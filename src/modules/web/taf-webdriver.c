@@ -6,53 +6,6 @@
 
 #include <string.h>
 
-typedef struct {
-    wd_session_t **sessions;
-    size_t len, cap;
-} session_track_t;
-
-static session_track_t session_track = {
-    .sessions = NULL,
-    .len = 0,
-    .cap = 0,
-};
-
-static void track_opened_session(wd_session_t *session) {
-
-    if (!session_track.sessions) {
-        session_track.cap = 2;
-        session_track.sessions =
-            malloc(sizeof(wd_session_t) * session_track.cap);
-        session_track.sessions[0] = session;
-        session_track.len = 1;
-        return;
-    }
-
-    if (session_track.cap <= session_track.len) {
-        session_track.cap *= 2;
-        session_track.sessions =
-            realloc(session_track.sessions, session_track.cap);
-    }
-
-    session_track.sessions[session_track.len++] = session;
-}
-
-void module_web_close_all_sessions() {
-
-    if (!session_track.sessions) {
-        return;
-    }
-
-    for (size_t i = 0; i < session_track.len; i++) {
-        wd_session_end(session_track.sessions[i]);
-    }
-
-    free(session_track.sessions);
-    session_track.sessions = NULL;
-    session_track.len = 0;
-    session_track.cap = 0;
-}
-
 static wd_driver_backend str_to_wd_driver_backend(const char *str) {
     if (!strcmp(str, "chromedriver"))
         return WD_DRV_CHROMEDRIVER;
@@ -133,7 +86,6 @@ int l_module_web_session_start(lua_State *L) {
     wd_session_t *session = lua_newuserdata(L, sizeof *session);
     session->driver_pid = driver_pid;
     wd_status stat = wd_session_start(port, backend, errbuf, session);
-    track_opened_session(session);
 
     if (stat != WD_OK) {
         lua_pushnil(L);

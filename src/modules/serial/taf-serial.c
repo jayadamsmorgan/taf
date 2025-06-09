@@ -5,56 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct {
-    l_module_serial_t **ports;
-    size_t cap, len;
-} port_track_t;
-
-static port_track_t port_track = {
-    .ports = NULL,
-    .len = 0,
-    .cap = 0,
-};
-
-static void track_opened_port(l_module_serial_t *port) {
-
-    if (!port_track.ports) {
-        port_track.cap = 2;
-        port_track.ports = malloc(sizeof(l_module_serial_t) * port_track.cap);
-        port_track.ports[0] = port;
-        port_track.len = 1;
-        return;
-    }
-
-    if (port_track.cap <= port_track.len) {
-        port_track.cap *= 2;
-        port_track.ports = realloc(port_track.ports, port_track.cap);
-    }
-
-    port_track.ports[port_track.len++] = port;
-}
-
-void module_serial_close_all_ports() {
-    if (!port_track.ports) {
-        return;
-    }
-
-    for (size_t i = 0; i < port_track.len; i++) {
-        struct sp_port *port = port_track.ports[i]->port;
-        if (!port)
-            continue;
-
-        // We don't care about the errors here
-        sp_close(port_track.ports[i]->port);
-        sp_free_port(port_track.ports[i]->port);
-    }
-
-    free(port_track.ports);
-    port_track.ports = NULL;
-    port_track.len = 0;
-    port_track.cap = 0;
-}
-
 static inline int push_result_nil(lua_State *L, enum sp_return r) {
     if (r != SP_OK) {
         lua_pushstring(L, sp_last_error_message());
@@ -83,8 +33,6 @@ int l_module_serial_get_port_by_name(lua_State *L) {
         lua_pushstring(L, sp_last_error_message());
         return 2;
     }
-
-    track_opened_port(u);
 
     luaL_getmetatable(L, "taf-serial");
     lua_setmetatable(L, -2);

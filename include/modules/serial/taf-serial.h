@@ -111,9 +111,6 @@ int l_module_serial_write_nonblocking(lua_State *L);
 
 /******************* API END *************************/
 
-// Close every port opened by serialport library
-void module_serial_close_all_ports();
-
 // Register "taf-serial" module
 int l_module_serial_register_module(lua_State *L);
 

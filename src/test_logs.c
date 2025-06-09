@@ -438,6 +438,7 @@ void taf_log_test_failed(int index, test_case_t test_case, const char *msg,
         &test->failure_reasons[test->failure_reasons_count];
     fail_reason->date_time = strdup(time_str);
     fail_reason->msg = strdup(msg);
+    fail_reason->msg_len = strlen(msg);
     fail_reason->level = TAF_LOG_LEVEL_CRITICAL;
     fail_reason->line = line;
     fail_reason->file = strdup(file);

@@ -202,9 +202,6 @@ static int run_all_tests(lua_State *L) {
                                 file ? file : "(?)", line);
             free((char *)file); /* if strndup above */
         }
-
-        module_web_close_all_sessions();
-        module_serial_close_all_ports();
     }
 
     taf_log_tests_finalize();

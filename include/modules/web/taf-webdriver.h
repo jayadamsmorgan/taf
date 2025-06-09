@@ -27,9 +27,6 @@ int l_module_web_session_start(lua_State *L);
 
 /******************* API END *************************/
 
-// Close every WebDriver session opened
-void module_web_close_all_sessions();
-
 // Register "taf-webdriver" module
 int l_module_web_register_module(lua_State *L);
 
