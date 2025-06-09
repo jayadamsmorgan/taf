@@ -335,15 +335,17 @@ end
 --- @param port serial_port
 --- @param pattern string? the pattern to look for, defaults to newline
 --- @param timeout number? optional timeout value. keep nil for blocking indefinetely, 0 for nonblocking reads
---- @param chunk_size number? the size of the read chunks, defaults to 1
+--- @param chunk_size number? the size of the read chunks, defaults to 64
 ---
 --- @return string result, string? error
 M.read_until = function(port, pattern, timeout, chunk_size)
+	M.flush(port, "io")
+
 	local now_ms = function()
 		return taf:millis()
 	end
 
-	chunk_size = chunk_size or 1
+	chunk_size = chunk_size or 64
 	pattern = pattern or "\n"
 
 	local buf = {} -- pieces collected so far

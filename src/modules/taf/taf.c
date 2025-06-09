@@ -92,7 +92,7 @@ int l_module_taf_register_test(lua_State *L) {
     lua_pushvalue(L, s + body_index);         /* duplicate fn -> top */
     int ref = luaL_ref(L, LUA_REGISTRYINDEX); /* pop & ref */
 
-    test_case_t test_case = {.name = name, .tags = tags, .ref = ref};
+    test_case_t test_case = {.name = strdup(name), .tags = tags, .ref = ref};
     test_case_enqueue(&test_case);
 
     return 0;
@@ -141,6 +141,11 @@ static inline void log_helper(taf_log_level level, int n, int s, lua_State *L) {
     }
     luaL_pushresult(&buf);
 
+    size_t mlen;
+    const char *msg = lua_tolstring(L, -1, &mlen); // still valid on stack
+    char *copy = malloc(mlen + 1);                 /* your own buffer   */
+    memcpy(copy, msg, mlen + 1);
+
     const char *file = "(?)";
     int line = 0;
     lua_Debug ar;
@@ -157,14 +162,14 @@ static inline void log_helper(taf_log_level level, int n, int s, lua_State *L) {
         line = ar.currentline;
     }
 
-    const char *msg = lua_tostring(L, -1); // still valid on stack
-
     if (level == TAF_LOG_LEVEL_CRITICAL) {
-        luaL_error(L, "%s", msg);
+        luaL_error(L, "%s", copy);
         return;
     }
 
-    taf_log_test(level, file, line, msg);
+    taf_log_test(level, file, line, copy, mlen);
+
+    free(copy);
 
     lua_pop(L, 1); // pop message string
 }

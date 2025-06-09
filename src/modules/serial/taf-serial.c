@@ -496,17 +496,19 @@ static inline int read_helper(lua_State *L, int blocking) {
     int n = luaL_checkinteger(L, s + 1);
     int to_ms = luaL_optinteger(L, s + 2, 0);
 
-    char *buf = lua_newuserdata(L, n);
+    char *buf = malloc((size_t)n + 1);
     int got = blocking ? sp_blocking_read(u->port, buf, n, to_ms)
                        : sp_nonblocking_read(u->port, buf, n);
 
     if (got < 0) {
+        free(buf);
         lua_pushnil(L);
         lua_pushstring(L, sp_last_error_message());
         return 2;
     }
 
     lua_pushlstring(L, buf, got);
+    free(buf);
     lua_pushnil(L);
     return 2;
 }

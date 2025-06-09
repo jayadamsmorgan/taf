@@ -39,8 +39,9 @@ static json_object *raw_log_test_output_to_json(raw_log_test_output_t *output) {
     json_object_object_add(
         output_obj, "level",
         json_object_new_string(taf_log_level_to_str(output->level)));
-    json_object_object_add(output_obj, "msg",
-                           json_object_new_string(output->msg));
+    json_object_object_add(
+        output_obj, "msg",
+        json_object_new_string_len(output->msg, output->msg_len));
     return output_obj;
 }
 
@@ -292,52 +293,65 @@ void taf_log_tests_create(int amount) {
     raw_log->os_version = get_os_string();
 }
 
+static char *memdup0(const void *src, size_t len) {
+    char *p = malloc(len + 1);
+    if (!p)
+        return NULL;
+    memcpy(p, src, len);
+    p[len] = '\0';
+    return p;
+}
+
 void taf_log_test(taf_log_level level, const char *file, int line,
-                  const char *buffer) {
+                  const char *buffer, size_t buffer_len) {
+
     taf_tui_log(level, file, line, buffer);
 
-    if (no_logs) {
-        return;
+    if (!no_logs && level <= log_level) {
+        char ts[TS_LEN];
+        get_date_time_now(ts);
+
+        fprintf(output_log_file, "[%s][%s][%s][%s:%d]: ", ts,
+                taf_log_level_to_str(level), current.name, file, line);
+
+        fwrite(buffer, 1, buffer_len, output_log_file);
+        fputc('\n', output_log_file);
+        fputc('\n', output_log_file);
     }
 
-    char time_str[TS_LEN];
-    get_date_time_now(time_str);
+    raw_log_test_t *t = &raw_log->tests[test_index];
 
-    if (level <= log_level) {
-        fprintf(output_log_file, "[%s][%s][%s][%s:%d]: %s\n\n", time_str,
-                taf_log_level_to_str(level), current.name, file, line, buffer);
-    }
-
-    raw_log_test_t *test = &raw_log->tests[test_index];
-    if (test->output_count >= raw_log_test_output_cap) {
+    if (t->output_count >= raw_log_test_output_cap) {
         raw_log_test_output_cap *= 2;
-        test->output = realloc(test->output, sizeof(raw_log_test_output_t) *
-                                                 raw_log_test_output_cap);
+        t->output =
+            realloc(t->output, raw_log_test_output_cap * sizeof *t->output);
     }
+
+    raw_log_test_output_t *out = &t->output[t->output_count++];
+    out->level = level;
+    out->msg = memdup0(buffer, buffer_len);
+    out->msg_len = buffer_len;
+    out->file = strdup(file);
+    out->line = line;
+    char ts2[TS_LEN];
+    get_date_time_now(ts2);
+    out->date_time = strdup(ts2);
 
     if (level == TAF_LOG_LEVEL_ERROR) {
-        if (test->failure_reasons_count >= raw_log_test_failure_cap) {
+        if (t->failure_reasons_count >= raw_log_test_failure_cap) {
             raw_log_test_failure_cap *= 2;
-            test->failure_reasons =
-                realloc(test->failure_reasons, sizeof(*test->failure_reasons) *
-                                                   raw_log_test_failure_cap);
+            t->failure_reasons =
+                realloc(t->failure_reasons,
+                        raw_log_test_failure_cap * sizeof *t->failure_reasons);
         }
-        raw_log_test_output_t *failure =
-            &test->failure_reasons[test->failure_reasons_count];
-        failure->msg = strdup(buffer);
-        failure->file = strdup(file);
-        failure->line = line;
-        failure->date_time = strdup(time_str);
-        failure->level = TAF_LOG_LEVEL_ERROR;
-        test->failure_reasons_count++;
-    }
 
-    test->output[test->output_count].file = strdup(file);
-    test->output[test->output_count].date_time = strdup(time_str);
-    test->output[test->output_count].level = level;
-    test->output[test->output_count].msg = strdup(buffer);
-    test->output[test->output_count].line = line;
-    test->output_count++;
+        raw_log_test_output_t *fail =
+            &t->failure_reasons[t->failure_reasons_count++];
+        *fail = *out;
+        fail->msg = memdup0(buffer, buffer_len);
+        fail->file = strdup(file);
+        fail->date_time = strdup(ts2);
+    }
 }
 
 void taf_log_test_started(int index, test_case_t test_case) {

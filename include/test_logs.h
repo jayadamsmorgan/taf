@@ -20,6 +20,7 @@ typedef struct {
     char *date_time;
     taf_log_level level;
     char *msg;
+    size_t msg_len;
 } raw_log_test_output_t;
 
 typedef struct {
@@ -61,7 +62,7 @@ raw_log_t *taf_json_to_raw_log(json_object *obj);
 void taf_log_tests_create(int amount);
 
 void taf_log_test(taf_log_level log_level, const char *file, int line,
-                  const char *buffer);
+                  const char *buffer, size_t buffer_len);
 
 void taf_log_test_started(int index, test_case_t test_case);
 
