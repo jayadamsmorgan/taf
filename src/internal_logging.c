@@ -42,7 +42,8 @@ int internal_logging_init() {
     return 0;
 }
 
-void internal_log(const char *file, int line, const char *fmt, ...) {
+void internal_log(const char *file, int line, const char *func, const char *fmt,
+                  ...) {
     if (!internal_log_file)
         return;
 
@@ -50,8 +51,8 @@ void internal_log(const char *file, int line, const char *fmt, ...) {
     get_date_time_now(date_time_now);
 
     // &file[7] - stripping "../src/" part of file path
-    fprintf(internal_log_file, "[%s]: [%s : %d]: ", date_time_now, &file[7],
-            line);
+    fprintf(internal_log_file, "[%s]: [%s/%s : %d]: ", date_time_now, &file[7],
+            func, line);
 
     va_list arg;
     va_start(arg, ...);
