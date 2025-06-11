@@ -3,8 +3,6 @@
 
 #include "test_logs.h"
 
-#include <stddef.h>
-
 typedef enum {
     CMD_INIT,
     CMD_TEST,
@@ -19,6 +17,7 @@ typedef struct {
     char *project_name;
     bool multitarget;
 
+    bool internal_logging;
 } cmd_init_options;
 
 typedef struct {
@@ -36,18 +35,23 @@ typedef struct {
     taf_log_level log_level;
 
     char *target;
+
+    bool internal_logging;
 } cmd_test_options;
 
 typedef struct {
     char *arg;
+    bool internal_logging;
 } cmd_logs_info_options;
 
 typedef struct {
     char *target;
+    bool internal_logging;
 } cmd_target_add_options;
 
 typedef struct {
     char *target;
+    bool internal_logging;
 } cmd_target_remove_options;
 
 cmd_category cmd_parser_parse(int argc, char **argv);

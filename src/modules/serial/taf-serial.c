@@ -1,5 +1,6 @@
 #include "modules/serial/taf-serial.h"
 
+#include "internal_logging.h"
 #include "util/lua.h"
 
 #include <stdlib.h>
@@ -601,13 +602,21 @@ static const luaL_Reg module_fns[] = {
 };
 
 int l_module_serial_register_module(lua_State *L) {
+    LOG("Registering taf-serial module...");
+
     /* metatable for port userdata */
+    LOG("Registering GC functions...");
     luaL_newmetatable(L, "taf-serial");
     luaL_setfuncs(L, port_mt, 0);
     lua_pop(L, 1);
+    LOG("GC functions registered.");
 
     /* module table */
+    LOG("Registering module functions...");
     lua_newtable(L);
     luaL_setfuncs(L, module_fns, 0);
+    LOG("Module functions registered.");
+
+    LOG("Successfully registered taf-serial module.");
     return 1;
 }

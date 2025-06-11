@@ -19,6 +19,7 @@ static void print_init_help(FILE *file) {
         "\n"
         "Options:\n"
         "  -m, --multitarget        Initialize project for multiple targets\n"
+        "  -i, --internal-log       Dump internal logging file\n"
         "  -h, --help               Display help\n");
 }
 
@@ -42,6 +43,8 @@ static void print_test_help(FILE *file) {
             "  -t, --tags <tag1,tag2>                                      "
             "Perform tests "
             "with specified tags\n"
+            "  -i, --internal-log                                          "
+            "Dump internal logging file\n"
             "  -h, --help                                                  "
             "Display help\n");
 }
@@ -66,7 +69,8 @@ static void print_logs_info_help(FILE *file) {
                   "Display information about the test run.\n"
                   "\n"
                   "Options:\n"
-                  "  -h, --help         Display help\n");
+                  "  -i, --internal-log       Dump internal logging file\n"
+                  "  -h, --help               Display help\n");
 }
 
 static void print_target_help(FILE *file) {
@@ -87,7 +91,8 @@ static void print_target_add_help(FILE *file) {
                   "Add new target to multitarget project.\n"
                   "\n"
                   "Options:\n"
-                  "  -h, --help         Display help\n");
+                  "  -i, --internal-log       Dump internal logging file\n"
+                  "  -h, --help               Display help\n");
 }
 
 static void print_target_remove_help(FILE *file) {
@@ -96,7 +101,8 @@ static void print_target_remove_help(FILE *file) {
                   "Remove target from multitarget project.\n"
                   "\n"
                   "Options:\n"
-                  "  -h, --help         Display help\n");
+                  "  -i, --internal-log       Dump internal logging file\n"
+                  "  -h, --help               Display help\n");
 }
 
 static void print_help(FILE *file) {
@@ -152,10 +158,10 @@ cmd_target_remove_options *cmd_parser_get_target_remove_options() {
     return &target_remove_opts;
 }
 
-static cmd_logs_info_options logs_opts;
+static cmd_logs_info_options logs_info_opts;
 cmd_logs_info_options *cmd_parser_get_logs_info_options() {
     //
-    return &logs_opts;
+    return &logs_info_opts;
 }
 
 typedef struct {
@@ -236,8 +242,17 @@ static void get_init_help(const char *) {
     exit(EXIT_SUCCESS);
 }
 
+static void set_internal_logging(const char *) {
+    init_opts.internal_logging = true;
+    target_add_opts.internal_logging = true;
+    target_remove_opts.internal_logging = true;
+    test_opts.internal_logging = true;
+    logs_info_opts.internal_logging = true;
+}
+
 static cmd_option all_init_options[] = {
     {"--multitarget", "-m", false, set_init_multitarget},
+    {"--internal-log", "-i", false, set_internal_logging},
     {"--help", "-h", false, get_init_help},
     {NULL, NULL, false, NULL},
 };
@@ -255,6 +270,7 @@ static cmd_category parse_init_options(int argc, char **argv) {
 
     init_opts.project_name = argv[2];
     init_opts.multitarget = false;
+    init_opts.internal_logging = false;
 
     parse_additional_options(all_init_options, 3, argc, argv);
 
@@ -306,6 +322,7 @@ static cmd_option all_test_options[] = {
     {"--log-level", "-l", true, set_log_level},
     {"--no-logs", "-n", false, set_test_no_logs},
     {"--tags", "-t", true, set_test_tags},
+    {"--internal-log", "-i", false, set_internal_logging},
     {"--help", "-h", false, get_test_help},
     {NULL, NULL, false, NULL},
 };
@@ -317,6 +334,7 @@ static cmd_category parse_test_options(int argc, char **argv) {
     test_opts.tags_amount = 0;
     test_opts.no_logs = false;
     test_opts.log_level = TAF_LOG_LEVEL_INFO;
+    test_opts.internal_logging = false;
 
     if (argc <= 2) {
         return CMD_TEST;
@@ -341,6 +359,7 @@ static void get_logs_info_help(const char *) {
 }
 
 static cmd_option all_logs_info_options[] = {
+    {"--internal-log", "-i", false, set_internal_logging},
     {"--help", "-h", false, get_logs_info_help},
     {NULL, NULL, false, NULL},
 };
@@ -358,7 +377,8 @@ static cmd_category parse_logs_options(int argc, char **argv) {
             print_logs_info_help(stderr);
             return CMD_UNKNOWN;
         }
-        logs_opts.arg = argv[3];
+        logs_info_opts.arg = argv[3];
+        logs_info_opts.internal_logging = false;
         parse_additional_options(all_logs_info_options, 3, argc, argv);
         return CMD_LOGS_INFO;
     } else if (STR_EQ(argv[2], "help") || STR_EQ(argv[2], "-h") ||
@@ -378,6 +398,7 @@ static void get_target_add_help(const char *) {
 }
 
 static cmd_option all_target_add_options[] = {
+    {"--internal-log", "-i", false, set_internal_logging},
     {"--help", "-h", false, get_target_add_help},
     {NULL, NULL, false, NULL},
 };
@@ -388,6 +409,7 @@ static void get_target_remove_help(const char *) {
 }
 
 static cmd_option all_target_remove_options[] = {
+    {"--internal-log", "-i", false, set_internal_logging},
     {"--help", "-h", false, get_target_remove_help},
     {NULL, NULL, false, NULL},
 };
@@ -407,6 +429,7 @@ static cmd_category parse_target_options(int argc, char **argv) {
             return CMD_UNKNOWN;
         }
         target_add_opts.target = argv[3];
+        target_add_opts.internal_logging = false;
         parse_additional_options(all_target_add_options, 3, argc, argv);
         return CMD_TARGET_ADD;
     } else if (STR_EQ(argv[2], "remove")) {
@@ -416,6 +439,7 @@ static cmd_category parse_target_options(int argc, char **argv) {
             return CMD_UNKNOWN;
         }
         target_remove_opts.target = argv[3];
+        target_remove_opts.internal_logging = false;
         parse_additional_options(all_target_remove_options, 3, argc, argv);
         return CMD_TARGET_REMOVE;
     } else if (STR_EQ(argv[2], "--help") || STR_EQ(argv[2], "-h")) {
@@ -423,7 +447,7 @@ static cmd_category parse_target_options(int argc, char **argv) {
         return CMD_HELP;
     }
 
-    fprintf(stderr, "Unknown targeet category %s\n", argv[2]);
+    fprintf(stderr, "Unknown target category %s\n", argv[2]);
     print_target_help(stderr);
     return CMD_UNKNOWN;
 }

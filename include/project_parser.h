@@ -11,7 +11,7 @@ typedef struct {
     int min_taf_ver_minor;
     int min_taf_ver_patch;
 
-    const char *project_path;
+    char *project_path;
 
     bool multitarget;
 
@@ -26,5 +26,7 @@ bool project_parser_parse();
 project_parsed_t *get_parsed_project();
 
 void project_parser_save();
+
+void project_parser_free();
 
 #endif // PROJECT_PARSER_H

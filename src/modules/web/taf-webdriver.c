@@ -1,5 +1,6 @@
 #include "modules/web/taf-webdriver.h"
 
+#include "internal_logging.h"
 #include "modules/web/webdriver.h"
 
 #include "util/lua.h"
@@ -171,13 +172,21 @@ static int l_gc(lua_State *L) { return l_module_web_session_end(L); }
 static const luaL_Reg port_mt[] = {{"__gc", l_gc}, {NULL, NULL}};
 
 int l_module_web_register_module(lua_State *L) {
+    LOG("Registering taf-webdriver module...");
+
     /* metatable for port userdata */
+    LOG("Registering GC functions...");
     luaL_newmetatable(L, "taf-webdriver");
     luaL_setfuncs(L, port_mt, 0);
     lua_pop(L, 1);
+    LOG("GC functions registered.");
 
     /* module table */
+    LOG("Registering module functions...");
     lua_newtable(L);
     luaL_setfuncs(L, module_fns, 0);
+    LOG("Module functions registered.");
+
+    LOG("Successfully registered taf-webdriver module.");
     return 1;
 }
