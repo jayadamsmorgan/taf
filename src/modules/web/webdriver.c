@@ -1,5 +1,6 @@
 #include "modules/web/webdriver.h"
 
+#include "internal_logging.h"
 #include "modules/web/requests.h"
 
 #include <curl/curl.h>
@@ -8,7 +9,7 @@
 #include <fcntl.h>
 #include <string.h>
 
-#define DRIVER_STARTUP_TIMEOUT_CHECK 200 // ms
+#define DRIVER_STARTUP_TIMEOUT_CHECK 1000 // ms
 
 static const char *wd_status_str_map[] = {
     "WD_OK",           //
@@ -154,12 +155,16 @@ extern char **environ;
 
 static wd_pid_t wd_spawn_driver_posix(const char *exe, size_t argc, char **args,
                                       char errbuf[WD_ERRORSIZE]) {
+    LOG("Spawning driver with POSIX...");
     int pipe_all[2];
     if (pipe(pipe_all) == -1) {
-        snprintf(errbuf, WD_ERRORSIZE, "pipe: %s", strerror(errno));
+        const char *err = strerror(errno);
+        LOG("Unable to create pipe: %s", err);
+        snprintf(errbuf, WD_ERRORSIZE, "pipe: %s", err);
         return (wd_pid_t)-1;
     }
 
+    LOG("Spawning file actions...");
     posix_spawn_file_actions_t fa;
     posix_spawn_file_actions_init(&fa);
 
@@ -171,8 +176,10 @@ static wd_pid_t wd_spawn_driver_posix(const char *exe, size_t argc, char **args,
     posix_spawn_file_actions_addclose(&fa, pipe_all[1]);
 
     // build argv array (argv[0] = exe, then args[0..argc-1], then NULL)
+    LOG("Building argv array...");
     char **argv = malloc((argc + 2) * sizeof(char *));
     if (!argv) {
+        LOG("Out of memory.");
         snprintf(errbuf, WD_ERRORSIZE, "malloc: out of memory");
         posix_spawn_file_actions_destroy(&fa);
         close(pipe_all[0]);
@@ -186,35 +193,44 @@ static wd_pid_t wd_spawn_driver_posix(const char *exe, size_t argc, char **args,
     argv[argc + 1] = NULL;
 
     // spawn the child
+    LOG("Spawning driver...");
     pid_t pid;
     int rc = posix_spawnp(&pid, exe, &fa, NULL, argv, environ);
+    LOG("rc: %d, pid: %d", rc, pid);
 
+    LOG("Cleaning up...");
     posix_spawn_file_actions_destroy(&fa);
     free(argv);
 
     if (rc != 0) {
-        snprintf(errbuf, WD_ERRORSIZE, "posix_spawnp: %s (%s)", strerror(rc),
-                 exe);
+        const char *err = strerror(rc);
+        LOG("Unable to spawn: %s", err);
+        snprintf(errbuf, WD_ERRORSIZE, "posix_spawnp: %s (%s)", err, exe);
         close(pipe_all[0]);
         close(pipe_all[1]);
         return (wd_pid_t)-1;
     }
 
     // parent: close write-end, keep read-end for possible error capture
+    LOG("Closing write-end...");
     close(pipe_all[1]);
 
     // give the child a short grace period; if it dies, capture its output
+    LOG("Waiting on driver...");
     int waited = 0;
     while (waited < DRIVER_STARTUP_TIMEOUT_CHECK) {
         int st;
         pid_t r = waitpid(pid, &st, WNOHANG);
+        LOG("r = %d", r);
         if (r == 0) {
+            LOG("Waiting 10 ms...");
             usleep(10 * 1000);
             waited += 10;
             continue;
         }
         if (r == pid) {
             // child died -> read up to WD_ERRORSIZE-1 bytes from the pipe
+            LOG("Child died.");
             char buf[WD_ERRORSIZE];
             ssize_t off = 0, n;
             while ((n = read(pipe_all[0], buf + off, WD_ERRORSIZE - 1 - off)) >
@@ -228,12 +244,15 @@ static wd_pid_t wd_spawn_driver_posix(const char *exe, size_t argc, char **args,
 
             // format the combined error
             if (WIFEXITED(st)) {
+                LOG("Driver exited with status %d: %s", WEXITSTATUS(st), buf);
                 snprintf(errbuf, WD_ERRORSIZE, "driver exited (status %d): %s",
                          WEXITSTATUS(st), buf);
             } else if (WIFSIGNALED(st)) {
+                LOG("Driver was killed by signal %d: %s", WTERMSIG(st), buf);
                 snprintf(errbuf, WD_ERRORSIZE, "driver killed by signal %d: %s",
                          WTERMSIG(st), buf);
             } else {
+                LOG("Driver quit unexpectedly (raw %d): %s", st, buf);
                 snprintf(errbuf, WD_ERRORSIZE,
                          "driver quit unexpectedly (raw %d): %s", st, buf);
             }
@@ -242,26 +261,37 @@ static wd_pid_t wd_spawn_driver_posix(const char *exe, size_t argc, char **args,
         if (r == -1 && errno == EINTR) {
             continue;
         }
-        snprintf(errbuf, WD_ERRORSIZE, "waitpid: %s", strerror(errno));
+        const char *err = strerror(errno);
+        LOG("waitpid: %s", err);
+        snprintf(errbuf, WD_ERRORSIZE, "waitpid: %s", err);
         close(pipe_all[0]);
         return (wd_pid_t)-1;
     }
 
     // child still alive after grace period -> success
+    LOG("Closing read-end...");
     close(pipe_all[0]);
+
+    LOG("Successfully spawned driver.");
     return (wd_pid_t)pid;
 }
 #endif
 
 wd_pid_t wd_spawn_driver(wd_driver_backend backend, size_t argc, char **args,
                          char errbuf[WD_ERRORSIZE]) {
+    LOG("Spawning driver...");
     if (errbuf)
         errbuf[0] = '\0';
 
     const char *exe = wd_driver_executable(backend);
     if (!exe) {
+        LOG("Selected web-driver is not available on current OS.");
         snprintf(errbuf, WD_ERRORSIZE, "driver is unavailable on your system");
         return -1;
+    }
+    LOG("Executable: %s", exe);
+    for (size_t i = 0; i < argc; i++) {
+        LOG("args[%zu]: %s", i, args[i]);
     }
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -317,12 +347,15 @@ static wd_status extract_session_id(struct json_object *root, char **sid_out) {
 
 wd_status wd_session_start(int drv_port, wd_driver_backend,
                            char errbuf[WD_ERRORSIZE], wd_session_t *out) {
+    LOG("Starting Web-Driver session...");
 
     char drv_url[256];
     snprintf(drv_url, sizeof drv_url, "http://localhost:%d", drv_port);
+    LOG("Driver URL: %s", drv_url);
 
     char url[256];
     snprintf(url, sizeof url, "%s/session", drv_url);
+    LOG("URL: %s", url);
 
     char curl_errbuf[CURL_ERROR_SIZE] = {0};
 
@@ -333,6 +366,7 @@ wd_status wd_session_start(int drv_port, wd_driver_backend,
                                 curl_errbuf);
 
     if (!root) {
+        LOG("CURL error: %s", curl_errbuf);
         if (strcmp(curl_errbuf, "JSON parse fail") == 0)
             return WD_ERR_JSON;
 

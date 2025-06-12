@@ -6,12 +6,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-static inline int push_result_nil(lua_State *L, enum sp_return r) {
+static inline int push_result_nil(lua_State *L, enum sp_return r,
+                                  const char *log) {
     if (r != SP_OK) {
-        lua_pushstring(L, sp_last_error_message());
+        const char *err = sp_last_error_message();
+        LOG("Unable to %s: %s", log, err);
+        lua_pushstring(L, err);
         return 1;
     }
 
+    LOG("Successfully finished taf-serial %s.", log);
     lua_pushnil(L);
     return 1;
 }
@@ -21,6 +25,7 @@ static inline l_module_serial_t *check_port(lua_State *L, int idx) {
 }
 
 int l_module_serial_get_port_by_name(lua_State *L) {
+    LOG("Invoked taf-serial get_port...");
     int s = selfshift(L);
     const char *p = luaL_checkstring(L, s);
 
@@ -30,14 +35,18 @@ int l_module_serial_get_port_by_name(lua_State *L) {
     enum sp_return r = sp_get_port_by_name(p, &u->port);
 
     if (r != SP_OK) {
+        const char *err = sp_last_error_message();
+        LOG("SP error: %s", err);
         lua_pushnil(L);
-        lua_pushstring(L, sp_last_error_message());
+        lua_pushstring(L, err);
         return 2;
     }
 
     luaL_getmetatable(L, "taf-serial");
     lua_setmetatable(L, -2);
     lua_pushnil(L);
+
+    LOG("Successfully finished taf-serial get_port.");
     return 2;
 }
 
@@ -59,12 +68,19 @@ static port_info_helper_t port_info_helper_from_port(struct sp_port *port) {
     port_info_helper_t pi = {0};
 
     char *desc = sp_get_port_description(port);
-    pi.description = strdup(desc);
+    if (desc) {
+        LOG("Got port description %s", desc);
+        pi.description = strdup(desc);
+    }
 
     char *path = sp_get_port_name(port);
-    pi.path = strdup(path);
+    if (path) {
+        LOG("Got port path %s", path);
+        pi.path = strdup(path);
+    }
 
     enum sp_transport type = sp_get_port_transport(port);
+    LOG("Port transport type: %d", type);
     pi.type = type;
 
     if (type == SP_TRANSPORT_USB) {
@@ -72,28 +88,33 @@ static port_info_helper_t port_info_helper_from_port(struct sp_port *port) {
         enum sp_return r =
             sp_get_port_usb_bus_address(port, &usb_bus, &usb_addr);
         if (r == SP_OK) {
+            LOG("Got port USB Bus %d, Address %d", usb_bus, usb_addr);
             pi.usb_bus = usb_bus;
             pi.usb_addr = usb_addr;
         }
 
         char *manufacturer = sp_get_port_usb_manufacturer(port);
-        if (manufacturer && *manufacturer) {
+        if (manufacturer) {
+            LOG("Got port manufacturer: %s", manufacturer);
             pi.manufacturer = strdup(manufacturer);
         }
 
         char *product = sp_get_port_usb_product(port);
-        if (product && *product) {
+        if (product) {
+            LOG("Got port product: %s", product);
             pi.product = strdup(product);
         }
 
         char *serial = sp_get_port_usb_serial(port);
-        if (serial && *serial) {
+        if (serial) {
+            LOG("Got port serial: %s", serial);
             pi.serial = strdup(serial);
         }
 
         int vid, pid;
         r = sp_get_port_usb_vid_pid(port, &vid, &pid);
         if (r == SP_OK) {
+            LOG("Got port VendorID %d, ProductID %d", vid, pid);
             pi.vid = vid;
             pi.pid = pid;
         }
@@ -101,7 +122,8 @@ static port_info_helper_t port_info_helper_from_port(struct sp_port *port) {
 
     if (type == SP_TRANSPORT_BLUETOOTH) {
         char *bt_addr = sp_get_port_bluetooth_address(port);
-        if (bt_addr && *bt_addr) {
+        if (bt_addr) {
+            LOG("Got port Bluetooth Address %s", bt_addr);
             pi.bt_addr = strdup(bt_addr);
         }
     }
@@ -110,6 +132,7 @@ static port_info_helper_t port_info_helper_from_port(struct sp_port *port) {
 }
 
 static void free_port_info_helper(port_info_helper_t *pi) {
+    LOG("Freeing port info helper...");
     if (!pi) {
         return;
     }
@@ -119,6 +142,7 @@ static void free_port_info_helper(port_info_helper_t *pi) {
     free(pi->bt_addr);
     free(pi->path);
     free(pi->description);
+    LOG("Port info helper freed.");
 }
 
 static const char *transport_str(enum sp_transport t) {
@@ -136,22 +160,26 @@ static const char *transport_str(enum sp_transport t) {
 
 static void l_port_info_helper(lua_State *L, struct sp_port *port) {
 
+    LOG("Getting port info helper for port (pointer %p)", (void *)port);
+
     port_info_helper_t pi = port_info_helper_from_port(port);
 
     /* create one port_info table */
     lua_newtable(L);
 
-    /* mandatory fields */
-    lua_pushstring(L, pi.path);
-    lua_setfield(L, -2, "path");
+    LOG("Pushing port info fields into Lua table...");
+
     lua_pushstring(L, transport_str(pi.type));
     lua_setfield(L, -2, "type");
+    if (pi.path) {
+        lua_pushstring(L, pi.path);
+        lua_setfield(L, -2, "path");
+    }
     if (pi.description) {
         lua_pushstring(L, pi.description);
         lua_setfield(L, -2, "description");
     }
 
-    /* optional USB-specific */
     if (pi.serial) {
         lua_pushstring(L, pi.serial);
         lua_setfield(L, -2, "serial");
@@ -181,33 +209,46 @@ static void l_port_info_helper(lua_State *L, struct sp_port *port) {
         lua_setfield(L, -2, "usb_bus");
     }
 
-    /* optional Bluetooth */
     if (pi.bt_addr) {
         lua_pushstring(L, pi.bt_addr);
         lua_setfield(L, -2, "bluetooth_address");
     }
 
     free_port_info_helper(&pi);
+
+    LOG("Successfully got port info.");
 }
 
 int l_module_serial_get_port_info(lua_State *L) {
+
+    LOG("Invoked taf-serial get_port_info...");
+
     int s = selfshift(L);
     l_module_serial_t *u = check_port(L, s);
+    LOG("Got port pointer %p", (void *)u);
 
     l_port_info_helper(L, u->port);
+
+    LOG("Successfully finished taf-serial get_port_info.");
 
     return 1;
 }
 
 int l_module_serial_list_ports(lua_State *L) {
+
+    LOG("Invoked taf-serial list_ports...");
+
     struct sp_port **ports;
     enum sp_return r = sp_list_ports(&ports);
     if (r != SP_OK) {
+        const char *err = sp_last_error_message();
+        LOG("Could not get serial ports: %s", err);
         lua_pushnil(L);
-        lua_pushstring(L, sp_last_error_message());
+        lua_pushstring(L, err);
         return 2;
     }
 
+    LOG("Creating result list...");
     lua_newtable(L); /* result list (idx = 1..) */
     int idx = 1;
 
@@ -218,10 +259,13 @@ int l_module_serial_list_ports(lua_State *L) {
         lua_rawseti(L, -2, idx++);
     }
 
+    LOG("Freeing serial port list...");
     sp_free_port_list(ports);
 
     lua_pushnil(L); /* no error */
-    return 2;       /* (result-table, nil) */
+
+    LOG("Successfully finished taf-serial list_ports");
+    return 2; /* (result-table, nil) */
 }
 
 static inline enum sp_mode mode_from_str(const char *str) {
@@ -235,6 +279,9 @@ static inline enum sp_mode mode_from_str(const char *str) {
 }
 
 int l_module_serial_open(lua_State *L) {
+
+    LOG("Invoked taf-serial open...");
+
     int s = selfshift(L);
     l_module_serial_t *u = check_port(L, s);
 
@@ -245,25 +292,27 @@ int l_module_serial_open(lua_State *L) {
         return 1;
     }
 
-    return push_result_nil(L, sp_open(u->port, mode));
+    return push_result_nil(L, sp_open(u->port, mode), "open");
 }
 
 int l_module_serial_set_baudrate(lua_State *L) {
+    LOG("Invoked taf-serial set_baudrate...");
     int s = selfshift(L);
     l_module_serial_t *u = check_port(L, s);
 
     enum sp_return r = (sp_set_baudrate(u->port, luaL_checkinteger(L, s + 1)));
 
-    return push_result_nil(L, r);
+    return push_result_nil(L, r, "set_baudrate");
 }
 
 int l_module_serial_set_bits(lua_State *L) {
+    LOG("Invoked taf-serial set_bits...");
     int s = selfshift(L);
     l_module_serial_t *u = check_port(L, s);
 
     enum sp_return r = (sp_set_bits(u->port, luaL_checkinteger(L, s + 1)));
 
-    return push_result_nil(L, r);
+    return push_result_nil(L, r, "set_bits");
 }
 
 static inline enum sp_parity parity_from_str(const char *str) {
@@ -281,6 +330,7 @@ static inline enum sp_parity parity_from_str(const char *str) {
 }
 
 int l_module_serial_set_parity(lua_State *L) {
+    LOG("Invoked taf-serial set_parity...");
     int s = selfshift(L);
     l_module_serial_t *u = check_port(L, s);
     const char *str = luaL_checkstring(L, s + 1);
@@ -291,16 +341,17 @@ int l_module_serial_set_parity(lua_State *L) {
         return 1;
     }
 
-    return push_result_nil(L, sp_set_parity(u->port, par));
+    return push_result_nil(L, sp_set_parity(u->port, par), "set_parity");
 }
 
 int l_module_serial_set_stopbits(lua_State *L) {
+    LOG("Invoked taf-serial set_stopbits...");
     int s = selfshift(L);
     l_module_serial_t *u = check_port(L, s);
 
     enum sp_return r = (sp_set_stopbits(u->port, luaL_checkinteger(L, s + 1)));
 
-    return push_result_nil(L, r);
+    return push_result_nil(L, r, "set_stopbits");
 }
 
 static inline enum sp_rts sp_rts_from_str(const char *str) {
@@ -314,6 +365,7 @@ static inline enum sp_rts sp_rts_from_str(const char *str) {
 }
 
 int l_module_serial_set_rts(lua_State *L) {
+    LOG("Invoked taf-serial set_rts...");
     int s = selfshift(L);
     l_module_serial_t *u = check_port(L, s);
     enum sp_rts rts = sp_rts_from_str(luaL_checkstring(L, s + 1));
@@ -322,7 +374,7 @@ int l_module_serial_set_rts(lua_State *L) {
         return 1;
     }
 
-    return push_result_nil(L, sp_set_rts(u->port, rts));
+    return push_result_nil(L, sp_set_rts(u->port, rts), "set_rts");
 }
 
 static inline enum sp_cts sp_cts_from_str(const char *str) {
@@ -334,6 +386,7 @@ static inline enum sp_cts sp_cts_from_str(const char *str) {
 }
 
 int l_module_serial_set_cts(lua_State *L) {
+    LOG("Invoked taf-serial set_cts...");
     int s = selfshift(L);
     l_module_serial_t *u = check_port(L, s);
     enum sp_cts cts = sp_cts_from_str(luaL_checkstring(L, s + 1));
@@ -342,7 +395,7 @@ int l_module_serial_set_cts(lua_State *L) {
         return 1;
     }
 
-    return push_result_nil(L, sp_set_cts(u->port, cts));
+    return push_result_nil(L, sp_set_cts(u->port, cts), "set_cts");
 }
 
 static inline enum sp_dtr sp_dtr_from_str(const char *str) {
@@ -356,6 +409,7 @@ static inline enum sp_dtr sp_dtr_from_str(const char *str) {
 }
 
 int l_module_serial_set_dtr(lua_State *L) {
+    LOG("Invoked taf-serial set_dtr...");
     int s = selfshift(L);
     l_module_serial_t *u = check_port(L, s);
     enum sp_dtr dtr = sp_dtr_from_str(luaL_checkstring(L, s + 1));
@@ -364,7 +418,7 @@ int l_module_serial_set_dtr(lua_State *L) {
         return 1;
     }
 
-    return push_result_nil(L, sp_set_dtr(u->port, dtr));
+    return push_result_nil(L, sp_set_dtr(u->port, dtr), "set_dtr");
 }
 
 static inline enum sp_dsr sp_dsr_from_str(const char *str) {
@@ -376,6 +430,7 @@ static inline enum sp_dsr sp_dsr_from_str(const char *str) {
 }
 
 int l_module_serial_set_dsr(lua_State *L) {
+    LOG("Invoked taf-serial set_dsr...");
     int s = selfshift(L);
     l_module_serial_t *u = check_port(L, s);
     enum sp_dsr dsr = sp_dsr_from_str(luaL_checkstring(L, s + 1));
@@ -384,7 +439,7 @@ int l_module_serial_set_dsr(lua_State *L) {
         return 1;
     }
 
-    return push_result_nil(L, sp_set_dsr(u->port, dsr));
+    return push_result_nil(L, sp_set_dsr(u->port, dsr), "set_dsr");
 }
 
 static inline enum sp_xonxoff sp_xonxoff_from_str(const char *str) {
@@ -400,6 +455,7 @@ static inline enum sp_xonxoff sp_xonxoff_from_str(const char *str) {
 }
 
 int l_module_serial_set_xon_xoff(lua_State *L) {
+    LOG("Invoked taf-serial set_xon_xoff...");
     int s = selfshift(L);
     l_module_serial_t *u = check_port(L, s);
     enum sp_xonxoff xonxoff = sp_xonxoff_from_str(luaL_checkstring(L, s + 1));
@@ -409,7 +465,8 @@ int l_module_serial_set_xon_xoff(lua_State *L) {
         return 1;
     }
 
-    return push_result_nil(L, sp_set_xon_xoff(u->port, xonxoff));
+    return push_result_nil(L, sp_set_xon_xoff(u->port, xonxoff),
+                           "set_xon_xoff");
 }
 
 static inline enum sp_flowcontrol sp_flowcontrol_from_str(const char *str) {
@@ -425,6 +482,7 @@ static inline enum sp_flowcontrol sp_flowcontrol_from_str(const char *str) {
 }
 
 int l_module_serial_set_flowcontrol(lua_State *L) {
+    LOG("Invoked taf-serial set_flowcontrol...");
     int s = selfshift(L);
     l_module_serial_t *u = check_port(L, s);
     enum sp_flowcontrol fc =
@@ -435,30 +493,38 @@ int l_module_serial_set_flowcontrol(lua_State *L) {
         return 1;
     }
 
-    return push_result_nil(L, sp_set_flowcontrol(u->port, fc));
+    return push_result_nil(L, sp_set_flowcontrol(u->port, fc),
+                           "set_flowcontrol");
 }
 
 /*----------- reading ------------------------------------------------*/
 static inline int read_helper(lua_State *L, int blocking) {
+    LOG("Invoked taf-serial read. Blocking: %d", blocking);
     int s = selfshift(L);
     l_module_serial_t *u = check_port(L, s);
     int n = luaL_checkinteger(L, s + 1);
     int to_ms = luaL_optinteger(L, s + 2, 0);
+    LOG("Amount of bytes to read: %d, timeout: %d", n, to_ms);
 
     char *buf = malloc((size_t)n + 1);
     int got = blocking ? sp_blocking_read(u->port, buf, n, to_ms)
                        : sp_nonblocking_read(u->port, buf, n);
 
     if (got < 0) {
+        const char *err = sp_last_error_message();
+        LOG("Unable to read: %s", err);
         free(buf);
         lua_pushnil(L);
-        lua_pushstring(L, sp_last_error_message());
+        lua_pushstring(L, err);
         return 2;
     }
 
+    LOG("Read %d bytes: %.*s", got, got, buf);
     lua_pushlstring(L, buf, got);
     free(buf);
     lua_pushnil(L);
+
+    LOG("Successfully finished taf-serial read.");
     return 2;
 }
 
@@ -468,24 +534,31 @@ int l_module_serial_read_nonblocking(lua_State *L) { return read_helper(L, 0); }
 
 /*----------- writing ------------------------------------------------*/
 static inline int write_helper(lua_State *L, int blocking) {
+    LOG("Invoked taf-serial write. Blocking: %d", blocking);
     int s = selfshift(L);
     l_module_serial_t *u = check_port(L, s);
 
     size_t len;
     const char *buf = luaL_checklstring(L, s + 1, &len);
     int to_ms = luaL_optinteger(L, s + 2, 0);
+    LOG("Length: %zu, Buffer: '%.*s', timeout: %d", len, (int)len, buf, to_ms);
 
     int wrote = blocking ? sp_blocking_write(u->port, buf, len, to_ms)
                          : sp_nonblocking_write(u->port, buf, len);
 
     if (wrote < 0) {
+        const char *err = sp_last_error_message();
+        LOG("Unable to write: %s", err);
         lua_pushnil(L);
-        lua_pushstring(L, sp_last_error_message());
+        lua_pushstring(L, err);
         return 2;
     }
+    LOG("Wrote %d bytes.", wrote);
 
     lua_pushinteger(L, wrote);
     lua_pushnil(L);
+
+    LOG("Successfully finished taf-serial write.");
     return 2;
 }
 
@@ -497,17 +570,23 @@ int l_module_serial_write_nonblocking(lua_State *L) {
 
 /*----------- status -------------------------------------------------*/
 static inline int status_helper(lua_State *L, int direction) {
+    LOG("Invoked taf-serial get_waiting, direction: %d...", direction);
     int s = selfshift(L);
     l_module_serial_t *u = check_port(L, s);
     enum sp_return r =
         direction ? sp_input_waiting(u->port) : sp_output_waiting(u->port);
     if (r < SP_OK) {
+        const char *err = sp_last_error_message();
+        LOG("Unable to get_waiting: %s", err);
         lua_pushnil(L);
-        lua_pushstring(L, sp_last_error_message());
+        lua_pushstring(L, err);
         return 2;
     }
+    LOG("Waiting: %d", r);
     lua_pushinteger(L, r);
     lua_pushnil(L);
+
+    LOG("Successfully finished taf-serial get_waiting.");
 
     return 2;
 }
@@ -533,43 +612,55 @@ static inline enum sp_buffer sp_buffer_from_str(const char *str) {
 }
 
 int l_module_serial_flush(lua_State *L) {
+    LOG("Invoked taf-serial flush...");
     int s = selfshift(L);
     l_module_serial_t *u = check_port(L, s);
     const char *mode = luaL_checkstring(L, s + 1);
     enum sp_buffer dir = sp_buffer_from_str(mode);
+    LOG("Direction: %d", dir);
     if (dir < 0) {
         lua_pushstring(L, "invalid direction, use 'i', 'o' or 'io'");
         return 1;
     }
 
-    return push_result_nil(L, sp_flush(u->port, dir));
+    return push_result_nil(L, sp_flush(u->port, dir), "flush");
 }
 
 int l_module_serial_drain(lua_State *L) {
+    LOG("Invoked taf-serial drain...");
     int s = selfshift(L);
     l_module_serial_t *u = check_port(L, s);
 
-    return push_result_nil(L, sp_drain(u->port));
+    return push_result_nil(L, sp_drain(u->port), "drain");
 }
 
-int l_module_serial_close(lua_State *L) /* optional explicit close */
-{
+int l_module_serial_close(lua_State *L) {
+    LOG("Invoked taf-serial close...");
     int s = selfshift(L);
     l_module_serial_t *u = check_port(L, s);
     if (u->port) {
         enum sp_return r = sp_close(u->port);
         if (r != SP_OK) {
-            lua_pushstring(L, sp_last_error_message());
+            const char *err = sp_last_error_message();
+            LOG("Unable to close: %s", err);
+            lua_pushstring(L, err);
             return 1;
         }
+        LOG("Freeing port...");
         sp_free_port(u->port);
         u->port = NULL;
+    } else {
+        LOG("Port is NULL.");
     }
+    LOG("Successfully finished taf-serial close.");
     lua_pushnil(L);
     return 1;
 }
 
-static int l_gc(lua_State *L) { return l_module_serial_close(L); }
+static int l_gc(lua_State *L) {
+    LOG("Invoked taf-serial port GC...");
+    return l_module_serial_close(L);
+}
 
 /*----------- registration ------------------------------------------*/
 static const luaL_Reg port_mt[] = {{"__gc", l_gc}, {NULL, NULL}};

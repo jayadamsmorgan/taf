@@ -28,12 +28,15 @@ static wd_driver_backend str_to_wd_driver_backend(const char *str) {
 }
 
 int l_module_web_session_start(lua_State *L) {
+    LOG("Invoked taf-webdriver session_start...");
     int s = selfshift(L);
 
     int port = luaL_checkinteger(L, s);
     const char *driver = luaL_checkstring(L, s + 1);
+    LOG("Port: %d, driver: %s", port, driver);
     wd_driver_backend backend = str_to_wd_driver_backend(driver);
     if (backend < 0) {
+        LOG("Wrong backend %s", driver);
         lua_pushnil(L);
         lua_pushstring(L, "Specified driver was not found.");
         return 2;
@@ -41,8 +44,10 @@ int l_module_web_session_start(lua_State *L) {
 
     luaL_checktype(L, s + 2, LUA_TTABLE);
     size_t len = lua_rawlen(L, s + 2);
+    LOG("WebDriver cmd argument count: %zu", len);
     char **args = malloc(sizeof(*args) * (len + 1));
     if (!args) {
+        LOG("Out of memory.");
         lua_pushnil(L);
         lua_pushstring(L, "malloc: out of memory");
         return 2;
@@ -52,8 +57,10 @@ int l_module_web_session_start(lua_State *L) {
         lua_geti(L, s + 2, i + 1);
         size_t str_len;
         const char *arg = luaL_checklstring(L, -1, &str_len);
+        LOG("CMD arg %zu: %s", i, arg);
         args[i] = malloc(sizeof(char) * (str_len + 1));
         if (!args[i]) {
+            LOG("Out of memory.");
             lua_pushnil(L);
             lua_pushstring(L, "malloc: out of memory");
             return 2;
@@ -64,21 +71,25 @@ int l_module_web_session_start(lua_State *L) {
 
     args[len] = malloc(sizeof(char) * 30);
     if (!args[len]) {
+        LOG("Out of memory.");
         lua_pushnil(L);
         lua_pushstring(L, "malloc: out of memory");
         return 2;
     }
     snprintf(args[len], 30, "--port=%d", port);
+    LOG("Last CMD 'port' argument: %s", args[len]);
 
     char errbuf[WD_ERRORSIZE];
     wd_pid_t driver_pid = wd_spawn_driver(backend, len + 1, args, errbuf);
 
+    LOG("Freeing arguments...");
     for (size_t i = 0; i < len + 1; i++) {
         free(args[i]);
     }
     free(args);
 
     if (driver_pid < 0) {
+        LOG("Unable to spawn the driver, returning...");
         lua_pushnil(L);
         lua_pushstring(L, errbuf);
         return 2;
