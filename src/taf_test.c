@@ -9,6 +9,7 @@
 #include "test_logs.h"
 #include "version.h"
 
+#include "modules/proc/taf-proc.h"
 #include "modules/serial/taf-serial.h"
 #include "modules/taf/taf.h"
 #include "modules/web/taf-webdriver.h"
@@ -295,6 +296,8 @@ static void register_test_api(lua_State *L) {
     luaL_requiref(L, "taf-main", l_module_taf_register_module, 1);
     lua_pop(L, 1);
     luaL_requiref(L, "taf-webdriver", l_module_web_register_module, 1);
+    lua_pop(L, 1);
+    luaL_requiref(L, "taf-proc", l_module_proc_register_module, 1);
     lua_pop(L, 1);
 
     inject_modules_dir(L);
