@@ -3,12 +3,14 @@
 #include "internal_logging.h"
 
 #include "cmd_parser.h"
+#include "modules/http/taf-http.h"
 #include "project_parser.h"
 #include "taf_tui.h"
 #include "test_case.h"
 #include "test_logs.h"
 #include "version.h"
 
+#include "modules/json/taf-json.h"
 #include "modules/proc/taf-proc.h"
 #include "modules/serial/taf-serial.h"
 #include "modules/taf/taf.h"
@@ -282,6 +284,12 @@ static void inject_modules_dir(lua_State *L) {
     LOG("Successfully injected TAF library directory.");
 }
 
+static void register_clua_module(lua_State *L, const char *name,
+                                 lua_CFunction openf) {
+    luaL_requiref(L, name, openf, 1);
+    lua_pop(L, 1);
+}
+
 static void register_test_api(lua_State *L) {
 
     LOG("Registering test API...");
@@ -291,14 +299,12 @@ static void register_test_api(lua_State *L) {
     lua_setglobal(L, "print");
 
     // Register C lua modules:
-    luaL_requiref(L, "taf-serial", l_module_serial_register_module, 1);
-    lua_pop(L, 1);
-    luaL_requiref(L, "taf-main", l_module_taf_register_module, 1);
-    lua_pop(L, 1);
-    luaL_requiref(L, "taf-webdriver", l_module_web_register_module, 1);
-    lua_pop(L, 1);
-    luaL_requiref(L, "taf-proc", l_module_proc_register_module, 1);
-    lua_pop(L, 1);
+    register_clua_module(L, "taf-http", l_module_http_register_module);
+    register_clua_module(L, "taf-json", l_module_json_register_module);
+    register_clua_module(L, "taf-main", l_module_taf_register_module);
+    register_clua_module(L, "taf-proc", l_module_proc_register_module);
+    register_clua_module(L, "taf-serial", l_module_serial_register_module);
+    register_clua_module(L, "taf-webdriver", l_module_web_register_module);
 
     inject_modules_dir(L);
 

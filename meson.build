@@ -116,6 +116,8 @@ sources = [
   'src/util/string.c',
   'src/util/time.c',
 
+  'src/modules/http/taf-http.c',
+  'src/modules/json/taf-json.c',
   'src/modules/proc/taf-proc.c',
   'src/modules/serial/taf-serial.c',
   'src/modules/taf/taf.c',

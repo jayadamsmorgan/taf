@@ -30,7 +30,18 @@ json_object *lua_to_json(lua_State *L, int index) {
         return json_object_new_boolean(lua_toboolean(L, index));
 
     case LUA_TNUMBER:
-        return json_object_new_double(lua_tonumber(L, index));
+        if (lua_isinteger(L, index)) {
+            lua_Integer vi = lua_tointeger(L, index);
+
+            /* choose 32- or 64-bit helper depending on range */
+            if (vi >= INT32_MIN && vi <= INT32_MAX)
+                return json_object_new_int((int)vi);
+            else
+                return json_object_new_int64((int64_t)vi);
+        } else {
+            lua_Number vd = lua_tonumber(L, index);
+            return json_object_new_double((double)vd);
+        }
 
     case LUA_TSTRING:
         return json_object_new_string(lua_tostring(L, index));
