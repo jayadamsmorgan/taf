@@ -1,6 +1,7 @@
 #include "modules/taf/taf.h"
 
 #include "cmd_parser.h"
+#include "internal_logging.h"
 #include "test_case.h"
 #include "test_logs.h"
 #include "util/lua.h"
@@ -10,18 +11,30 @@
 #include <string.h>
 
 int l_module_taf_sleep(lua_State *L) {
+    LOG("Invoked taf-main sleep...");
+
     int s = selfshift(L);
 
     int ms = luaL_checkinteger(L, s);
+    if (ms <= 0) {
+        LOG("taf-main sleep ms %d <= 0", ms);
+        return 0;
+    }
+    LOG("Sleeping for %d ms...", ms);
     usleep(ms * 1000);
+
+    LOG("Successfully finished taf-main sleep");
 
     return 0; /* no Lua return values */
 }
 
 int l_module_taf_register_test(lua_State *L) {
+    LOG("Registering new test...");
+
     int s = selfshift(L);
 
     const char *name = luaL_checkstring(L, s);
+    LOG("Test name: '%s'", name);
     int body_index;
 
     cmd_test_options *opts = cmd_parser_get_test_options();
@@ -34,7 +47,7 @@ int l_module_taf_register_test(lua_State *L) {
 
     switch (lua_type(L, s + 1)) {
     case LUA_TFUNCTION: {
-        // Second arg is test body, test has no tags, skipping third arg
+        LOG("Second argument is test body, skipping third argument...");
         body_index = 1;
         break;
     }
@@ -43,6 +56,7 @@ int l_module_taf_register_test(lua_State *L) {
         lua_Integer max;
         int is_array = lua_table_is_array(L, s + 1, &max);
         if (!is_array) {
+            LOG("Second argument is table but not an array, throwing error...");
             luaL_error(L, "Tags are supposed to be an array of strings, e.g.: "
                           "{\"tag1\", \"tag2\"}");
             return 0;
@@ -55,15 +69,19 @@ int l_module_taf_register_test(lua_State *L) {
             lua_rawgeti(L, s + 1, i); // push tags[i]
 
             if (!lua_isstring(L, -1)) {
-                return luaL_error(L, "Tag #%lld is not a string (got %s)",
-                                  (long long)i, luaL_typename(L, -1));
+                LOG("One of the tags is not a string, throwing error...");
+                luaL_error(L, "Tag #%lld is not a string (got %s)",
+                           (long long)i, luaL_typename(L, -1));
+                return 0;
             }
 
             const char *tag = lua_tostring(L, -1);
+            LOG("Adding test tag %s", tag);
             tags.tags[i - 1] = strdup(tag);
 
             for (size_t i = 0; i < opts->tags_amount; i++) {
                 if (!strcmp(tag, opts->tags[i])) {
+                    LOG("Found tags match with test run.");
                     register_test = true;
                 }
             }
@@ -71,21 +89,25 @@ int l_module_taf_register_test(lua_State *L) {
             lua_pop(L, 1); // pop tags[i]
         }
 
+        LOG("Successfully added test tags.");
+
         body_index = 2;
         luaL_checktype(L, s + 2, LUA_TFUNCTION);
         break;
     }
     default: {
+        const char *typename = lua_typename(L, s + 1);
+        LOG("Wrong argument type for second argument: %s", typename);
         luaL_error(
             L,
             "Expected test body or array of tags for second argument, got %s.",
-            lua_typename(L, s + 1));
+            typename);
         return 0;
     }
     }
 
     if (!register_test) {
-        // Skipping this test, does not contain required tags
+        LOG("Skipping test registering: test does not containg required tags.");
         return 0;
     }
 
@@ -93,26 +115,38 @@ int l_module_taf_register_test(lua_State *L) {
     int ref = luaL_ref(L, LUA_REGISTRYINDEX); /* pop & ref */
 
     test_case_t test_case = {.name = strdup(name), .tags = tags, .ref = ref};
+
+    LOG("Creating test case with name %s,  reference %d", test_case.name,
+        test_case.ref);
+
     test_case_enqueue(&test_case);
+
+    LOG("Successfully registered new test '%s'", test_case.name);
 
     return 0;
 }
 
 int l_module_taf_defer(lua_State *L) {
+    LOG("Adding new defer to defer queue...");
+
     int s = selfshift(L);
     int nargs = lua_gettop(L) - (s - 1);
+    LOG("Amount of arguments: %d", nargs);
 
     luaL_checktype(L, s, LUA_TFUNCTION);
 
     lua_getfield(L, LUA_REGISTRYINDEX, DEFER_LIST_KEY);
     if (lua_isnil(L, -1)) {
+        LOG("Defer queue is nil, creating new one...");
         lua_pop(L, 1);
         lua_newtable(L);
         lua_pushvalue(L, -1);
         lua_setfield(L, LUA_REGISTRYINDEX, DEFER_LIST_KEY);
+        LOG("Successfully created new defer queue.");
     }
     int list = lua_gettop(L);
 
+    LOG("Pushing defer to defer queue...");
     lua_newtable(L);
     for (int i = 0; i < nargs; ++i) {
         lua_pushvalue(L, s + i);
@@ -122,17 +156,21 @@ int l_module_taf_defer(lua_State *L) {
     lua_Integer idx = luaL_len(L, list) + 1;
     lua_rawseti(L, list, idx);
 
+    LOG("Successfully added new defer to defer queue.");
+
     return 0;
 }
 
 static inline void log_helper(taf_log_level level, int n, int s, lua_State *L) {
 
+    LOG("Constructing log message buffer with %d arguments...", n);
     luaL_Buffer buf;
     luaL_buffinit(L, &buf);
 
     for (int i = s; i <= n; i++) {
         size_t len;
         const char *s = luaL_tolstring(L, i, &len);
+        LOG("Argument %d: %s", i, s);
         luaL_addlstring(&buf, s, len);
         lua_pop(L, 1);
 
@@ -142,9 +180,9 @@ static inline void log_helper(taf_log_level level, int n, int s, lua_State *L) {
     luaL_pushresult(&buf);
 
     size_t mlen;
-    const char *msg = lua_tolstring(L, -1, &mlen); // still valid on stack
-    char *copy = malloc(mlen + 1);                 /* your own buffer   */
-    memcpy(copy, msg, mlen + 1);
+    const char *msg = lua_tolstring(L, -1, &mlen);
+    char *copy = strndup(msg, mlen);
+    LOG("Final message string: %.*s", (int)mlen, msg);
 
     const char *file = "(?)";
     int line = 0;
@@ -153,16 +191,20 @@ static inline void log_helper(taf_log_level level, int n, int s, lua_State *L) {
     // parent of that caller, if it exists
     if (lua_getstack(L, 2, &ar) && lua_getinfo(L, "Sl", &ar) &&
         ar.currentline > 0) {
+        LOG("Parent caller detected.");
         file = (ar.source[0] == '@') ? ar.source + 1 : ar.source;
         line = ar.currentline;
     } else if (lua_getstack(L, 1, &ar) && lua_getinfo(L, "Sl", &ar) &&
                ar.currentline > 0) {
         // direct Lua caller
+        LOG("Direct caller detected.");
         file = (ar.source[0] == '@') ? ar.source + 1 : ar.source;
         line = ar.currentline;
     }
+    LOG("File: %s, line: %d", file, line);
 
     if (level == TAF_LOG_LEVEL_CRITICAL) {
+        LOG("Log level is critical, raising error...");
         luaL_error(L, "%s", copy);
         return;
     }
@@ -175,6 +217,9 @@ static inline void log_helper(taf_log_level level, int n, int s, lua_State *L) {
 }
 
 int l_module_taf_log(lua_State *L) {
+
+    LOG("Invoked taf-main log...");
+
     int n = lua_gettop(L);
 
     int s = selfshift(L);
@@ -183,28 +228,44 @@ int l_module_taf_log(lua_State *L) {
 
     taf_log_level log_level = taf_log_level_from_str(log_level_str);
     if (log_level < 0) {
+        LOG("Unknown log level %s, throwing error...", log_level_str);
         luaL_error(L, "Unknown log level %s", log_level_str);
         return 0;
     }
 
     log_helper(log_level, n, s + 1, L);
 
+    LOG("Successfully finished taf-main log.");
+
     return 0;
 }
 
 int l_module_taf_print(lua_State *L) {
+
+    LOG("Invoked taf-main print...");
+
     int n = lua_gettop(L);
 
     int s = selfshift(L);
 
     log_helper(TAF_LOG_LEVEL_INFO, n, s, L);
 
+    LOG("Successfully finished taf-main print.");
+
     return 0;
 }
 
 int l_module_taf_millis(lua_State *L) {
+
+    LOG("Invoked taf-main millis...");
+
     uint64_t uptime = millis_since_start();
+
+    LOG("Pushing uptime: %llu", uptime);
     lua_pushnumber(L, uptime);
+
+    LOG("Sucessfully finished taf-main uptime.");
+
     return 1;
 }
 
@@ -220,7 +281,13 @@ static const luaL_Reg module_fns[] = {
 };
 
 int l_module_taf_register_module(lua_State *L) {
+    LOG("Registering taf-main module...");
+
+    LOG("Registering module functions...");
     lua_newtable(L);
     luaL_setfuncs(L, module_fns, 0);
+    LOG("Module functions registered.");
+
+    LOG("Successfully registered taf-main module.");
     return 1;
 }

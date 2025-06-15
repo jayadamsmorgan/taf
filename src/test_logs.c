@@ -1,6 +1,7 @@
 #include "test_logs.h"
 
 #include "cmd_parser.h"
+#include "internal_logging.h"
 #include "project_parser.h"
 #include "taf_tui.h"
 #include "version.h"
@@ -29,6 +30,7 @@ static size_t raw_log_test_failure_cap;
 static int test_index;
 
 static json_object *raw_log_test_output_to_json(raw_log_test_output_t *output) {
+    LOG("Converting raw log test output to JSON...");
     json_object *output_obj = json_object_new_object();
     json_object_object_add(output_obj, "file",
                            json_object_new_string(output->file));
@@ -42,10 +44,12 @@ static json_object *raw_log_test_output_to_json(raw_log_test_output_t *output) {
     json_object_object_add(
         output_obj, "msg",
         json_object_new_string_len(output->msg, output->msg_len));
+    LOG("Successfully converted raw log test output to JSON.");
     return output_obj;
 }
 
 static json_object *raw_log_test_to_json(raw_log_test_t *test) {
+    LOG("Converting raw log test '%s' to JSON...", test->name);
     json_object *test_obj = json_object_new_object();
     json_object_object_add(test_obj, "name",
                            json_object_new_string(test->name));
@@ -75,10 +79,14 @@ static json_object *raw_log_test_to_json(raw_log_test_t *test) {
                               raw_log_test_output_to_json(&test->output[i]));
     }
     json_object_object_add(test_obj, "output", output_arr);
+    LOG("Successfully converted raw log test to JSON.");
     return test_obj;
 }
 
 json_object *taf_raw_log_to_json(raw_log_t *log) {
+
+    LOG("Converting raw log object to JSON...");
+
     json_object *root = json_object_new_object();
     json_object_object_add(root, "taf_version",
                            json_object_new_string(log->taf_version));
@@ -102,6 +110,8 @@ json_object *taf_raw_log_to_json(raw_log_t *log) {
     }
     json_object_object_add(root, "tests", tests_arr);
 
+    LOG("Successfully converted raw log to JSON.");
+
     return root;
 }
 
@@ -116,12 +126,18 @@ static inline size_t jarray_len(struct json_object *arr) {
 }
 
 raw_log_t *taf_json_to_raw_log(struct json_object *root) {
-    if (!root || !json_object_is_type(root, json_type_object))
+    LOG("Converting JSON object into raw log object...");
+
+    if (!root || !json_object_is_type(root, json_type_object)) {
+        LOG("JSON object is either nil or not an object");
         return NULL;
+    }
 
     raw_log_t *log = calloc(1, sizeof *log);
-    if (!log)
+    if (!log) {
+        LOG("Cannot allocate raw log object: Out of memory.");
         return NULL;
+    }
 
     struct json_object *o = NULL;
 
@@ -237,20 +253,26 @@ raw_log_t *taf_json_to_raw_log(struct json_object *root) {
         }
     }
 
+    LOG("Successfully converted JSON object into raw log object.");
+
     return log;
 }
 
 void taf_log_tests_create(int amount) {
 
+    LOG("Starting TAF test logging...");
+
     taf_tui_set_test_amount(amount);
 
     cmd_test_options *opts = cmd_parser_get_test_options();
     if (opts->no_logs) {
+        LOG("No logs option turned on, skipping TAF test logging.");
         no_logs = true;
         return;
     }
 
     log_level = opts->log_level;
+    LOG("Log level: %s", taf_log_level_to_str(log_level));
 
     char time_str[TS_LEN];
     get_date_time_now(time_str);
@@ -263,17 +285,33 @@ void taf_log_tests_create(int amount) {
     } else {
         snprintf(logs_dir, PATH_MAX, "%s/logs", proj->project_path);
     }
+    LOG("Logs directory path: %s", logs_dir);
     if (!directory_exists(logs_dir)) {
-        create_directory(logs_dir, MKDIR_MODE);
+        LOG("Logs directory doesn't exist, creating...");
+        if (create_directory(logs_dir, MKDIR_MODE)) {
+            LOG("Unable to create logs directory.");
+            internal_logging_deinit();
+            exit(EXIT_FAILURE);
+        }
     }
 
     snprintf(raw_log_file_path, PATH_MAX, "%s/test_run_%s_raw.json", logs_dir,
              time_str);
+    LOG("Raw log path: %s", raw_log_file_path);
 
     snprintf(output_log_file_path, PATH_MAX, "%s/test_run_%s_output.log",
              logs_dir, time_str);
-    output_log_file = fopen(output_log_file_path, "w");
+    LOG("Output log path: %s", output_log_file_path);
 
+    output_log_file = fopen(output_log_file_path, "w");
+    if (!output_log_file) {
+        LOG("Unable to create output log file.");
+        internal_logging_deinit();
+        exit(EXIT_FAILURE);
+    }
+    LOG("Created output log file.");
+
+    LOG("Initializing raw log...");
     raw_log = calloc(1, sizeof *raw_log);
     raw_log->tests = calloc(amount, sizeof(raw_log_test_t));
     raw_log->tests_count = amount;
@@ -291,34 +329,42 @@ void taf_log_tests_create(int amount) {
     raw_log->os = "unknown";
 #endif
     raw_log->os_version = get_os_string();
-}
 
-static char *memdup0(const void *src, size_t len) {
-    char *p = malloc(len + 1);
-    if (!p)
-        return NULL;
-    memcpy(p, src, len);
-    p[len] = '\0';
-    return p;
+    LOG("Raw log initialized.");
+
+    LOG("Successfully started TAF test logging.");
 }
 
 void taf_log_test(taf_log_level level, const char *file, int line,
                   const char *buffer, size_t buffer_len) {
 
+    LOG("TAF logging test: log_level '%s', file '%s', line %d, buffer: '%.*s', "
+        "buffer_len: %zu",
+        taf_log_level_to_str(log_level), file, line, (int)buffer_len, buffer,
+        buffer_len);
+
     taf_tui_log(level, file, line, buffer);
 
-    if (!no_logs && level <= log_level) {
-        char ts[TS_LEN];
-        get_date_time_now(ts);
+    if (no_logs) {
+        LOG("Skipping logging test to log files...");
+        return;
+    }
+
+    char ts[TS_LEN];
+    get_date_time_now(ts);
+
+    if (level <= log_level) {
+        LOG("Writing to output log file...");
 
         fprintf(output_log_file, "[%s][%s][%s][%s:%d]: ", ts,
                 taf_log_level_to_str(level), current.name, file, line);
 
         fwrite(buffer, 1, buffer_len, output_log_file);
-        fputc('\n', output_log_file);
-        fputc('\n', output_log_file);
+        fputs("\n\n", output_log_file);
+        LOG("Wrote to output log file.");
     }
 
+    LOG("Adding raw log test output...");
     raw_log_test_t *t = &raw_log->tests[test_index];
 
     if (t->output_count >= raw_log_test_output_cap) {
@@ -329,15 +375,14 @@ void taf_log_test(taf_log_level level, const char *file, int line,
 
     raw_log_test_output_t *out = &t->output[t->output_count++];
     out->level = level;
-    out->msg = memdup0(buffer, buffer_len);
+    out->msg = strndup(buffer, buffer_len);
     out->msg_len = buffer_len;
     out->file = strdup(file);
     out->line = line;
-    char ts2[TS_LEN];
-    get_date_time_now(ts2);
-    out->date_time = strdup(ts2);
+    out->date_time = strdup(ts);
 
     if (level == TAF_LOG_LEVEL_ERROR) {
+        LOG("Adding failure reason...");
         if (t->failure_reasons_count >= raw_log_test_failure_cap) {
             raw_log_test_failure_cap *= 2;
             t->failure_reasons =
@@ -348,16 +393,23 @@ void taf_log_test(taf_log_level level, const char *file, int line,
         raw_log_test_output_t *fail =
             &t->failure_reasons[t->failure_reasons_count++];
         *fail = *out;
-        fail->msg = memdup0(buffer, buffer_len);
+        fail->msg = strndup(buffer, buffer_len);
         fail->file = strdup(file);
-        fail->date_time = strdup(ts2);
+        fail->date_time = strdup(ts);
     }
+
+    LOG("Successfully TAF logged.");
 }
 
 void taf_log_test_started(int index, test_case_t test_case) {
+
+    LOG("TAF Logging test '%s' started with index %d...", test_case.name,
+        index);
+
     taf_tui_set_current_test(index, test_case.name);
 
     if (no_logs) {
+        LOG("Skipping logging test started to log files...");
         return;
     }
 
@@ -368,6 +420,7 @@ void taf_log_test_started(int index, test_case_t test_case) {
     get_date_time_now(time_str);
     fprintf(output_log_file, "[%s][%s]: Test %d Started.\n\n", time_str,
             test_case.name, index);
+    LOG("Wrote to output log file");
 
     raw_log_test_t *test = &raw_log->tests[index - 1];
     test->started = strdup(time_str);
@@ -388,13 +441,18 @@ void taf_log_test_started(int index, test_case_t test_case) {
     test->failure_reasons =
         malloc(sizeof(*test->failure_reasons) * raw_log_test_failure_cap);
     test->failure_reasons_count = 0;
+
+    LOG("Successfully TAF logged starting of a test.");
 }
 
 void taf_log_test_passed(int index, test_case_t test_case) {
 
+    LOG("TAF logging test '%s' passed at index %d...", test_case.name, index);
+
     taf_tui_test_passed(index, test_case.name);
 
     if (no_logs) {
+        LOG("Skipping logging test passed to log files...");
         return;
     }
 
@@ -402,18 +460,26 @@ void taf_log_test_passed(int index, test_case_t test_case) {
     get_date_time_now(time_str);
     fprintf(output_log_file, "[%s][%s]: Test %d Passed.\n\n", time_str,
             test_case.name, index);
+    LOG("Wrote to output log file");
 
     raw_log_test_t *test = &raw_log->tests[index - 1];
     test->finished = strdup(time_str);
     test->status = "passed";
+
+    LOG("Successfully TAF logged passing of a test.");
 }
 
 void taf_log_test_failed(int index, test_case_t test_case, const char *msg,
                          const char *file, int line) {
 
+    LOG("TAF logging test '%s' failed at index %d with msg '%s' at file '%s "
+        "and line %d",
+        test_case.name, index, msg, file, line);
+
     taf_tui_test_failed(index, test_case.name, msg);
 
     if (no_logs) {
+        LOG("Skipping logging test failed to log files...");
         return;
     }
 
@@ -422,6 +488,7 @@ void taf_log_test_failed(int index, test_case_t test_case, const char *msg,
 
     fprintf(output_log_file, "[%s][%s]: Test %d Failed: %s\n\n", time_str,
             test_case.name, index, msg);
+    LOG("Wrote to output log file");
 
     raw_log_test_t *test = &raw_log->tests[index - 1];
     test->finished = strdup(time_str);
@@ -443,9 +510,12 @@ void taf_log_test_failed(int index, test_case_t test_case, const char *msg,
     fail_reason->line = line;
     fail_reason->file = strdup(file);
     test->failure_reasons_count++;
+
+    LOG("Successfully TAF logged test failed.");
 }
 
 void taf_raw_log_free(raw_log_t *log) {
+    LOG("Freeing raw log object...");
     if (!log)
         return;
 
@@ -487,11 +557,16 @@ void taf_raw_log_free(raw_log_t *log) {
     free(log->tests);
 
     free(log);
+
+    LOG("Successfully freed raw log object.");
 }
 
 void taf_log_tests_finalize() {
 
+    LOG("Finalizing TAF logging...");
+
     if (no_logs) {
+        LOG("No logs specified, nothing to finalize.");
         return;
     }
 
@@ -502,14 +577,19 @@ void taf_log_tests_finalize() {
 
     json_object *raw_log_root = taf_raw_log_to_json(raw_log);
 
+    LOG("Saving raw log file...");
     if (json_object_to_file_ext(raw_log_file_path, raw_log_root,
                                 JSON_C_TO_STRING_SPACED |
                                     JSON_C_TO_STRING_PRETTY |
                                     JSON_C_TO_STRING_NOSLASHESCAPE) == -1) {
-        // TODO: internal log: Error saving
+        LOG("Unable to save raw log file: %s", json_util_get_last_err());
     }
 
+    LOG("Freeing JSON object...");
+    json_object_put(raw_log_root);
+
     // Cleanup
+    LOG("Freeing raw log object...");
     free(raw_log->finished);
     free(raw_log->os_version);
     free(raw_log->started);
@@ -544,8 +624,7 @@ void taf_log_tests_finalize() {
     free(raw_log->tests);
     free(raw_log);
 
-    json_object_put(raw_log_root);
-
+    LOG("Flushing and closing output log file...");
     fflush(output_log_file);
     fclose(output_log_file);
 
@@ -555,8 +634,11 @@ void taf_log_tests_finalize() {
     char latest_raw[PATH_MAX];
     snprintf(latest_raw, PATH_MAX, "%s/test_run_latest_raw.json", logs_dir);
 
+    LOG("Creating symlinks '%s' and '%s'...", latest_log, latest_raw);
     replace_symlink(output_log_file_path, latest_log);
     replace_symlink(raw_log_file_path, latest_raw);
+
+    LOG("Successfully finalized TAF logging.");
 }
 
 static const char *taf_log_level_str_map[] = {"CRITICAL", "ERROR", "WARNING",

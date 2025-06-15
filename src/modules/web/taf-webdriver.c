@@ -1,5 +1,6 @@
 #include "modules/web/taf-webdriver.h"
 
+#include "internal_logging.h"
 #include "modules/web/webdriver.h"
 
 #include "util/lua.h"
@@ -27,12 +28,15 @@ static wd_driver_backend str_to_wd_driver_backend(const char *str) {
 }
 
 int l_module_web_session_start(lua_State *L) {
+    LOG("Invoked taf-webdriver session_start...");
     int s = selfshift(L);
 
     int port = luaL_checkinteger(L, s);
     const char *driver = luaL_checkstring(L, s + 1);
+    LOG("Port: %d, driver: %s", port, driver);
     wd_driver_backend backend = str_to_wd_driver_backend(driver);
     if (backend < 0) {
+        LOG("Wrong backend %s", driver);
         lua_pushnil(L);
         lua_pushstring(L, "Specified driver was not found.");
         return 2;
@@ -40,8 +44,10 @@ int l_module_web_session_start(lua_State *L) {
 
     luaL_checktype(L, s + 2, LUA_TTABLE);
     size_t len = lua_rawlen(L, s + 2);
+    LOG("WebDriver cmd argument count: %zu", len);
     char **args = malloc(sizeof(*args) * (len + 1));
     if (!args) {
+        LOG("Out of memory.");
         lua_pushnil(L);
         lua_pushstring(L, "malloc: out of memory");
         return 2;
@@ -51,8 +57,10 @@ int l_module_web_session_start(lua_State *L) {
         lua_geti(L, s + 2, i + 1);
         size_t str_len;
         const char *arg = luaL_checklstring(L, -1, &str_len);
+        LOG("CMD arg %zu: %s", i, arg);
         args[i] = malloc(sizeof(char) * (str_len + 1));
         if (!args[i]) {
+            LOG("Out of memory.");
             lua_pushnil(L);
             lua_pushstring(L, "malloc: out of memory");
             return 2;
@@ -63,21 +71,25 @@ int l_module_web_session_start(lua_State *L) {
 
     args[len] = malloc(sizeof(char) * 30);
     if (!args[len]) {
+        LOG("Out of memory.");
         lua_pushnil(L);
         lua_pushstring(L, "malloc: out of memory");
         return 2;
     }
     snprintf(args[len], 30, "--port=%d", port);
+    LOG("Last CMD 'port' argument: %s", args[len]);
 
     char errbuf[WD_ERRORSIZE];
     wd_pid_t driver_pid = wd_spawn_driver(backend, len + 1, args, errbuf);
 
+    LOG("Freeing arguments...");
     for (size_t i = 0; i < len + 1; i++) {
         free(args[i]);
     }
     free(args);
 
     if (driver_pid < 0) {
+        LOG("Unable to spawn the driver, returning...");
         lua_pushnil(L);
         lua_pushstring(L, errbuf);
         return 2;
@@ -171,13 +183,21 @@ static int l_gc(lua_State *L) { return l_module_web_session_end(L); }
 static const luaL_Reg port_mt[] = {{"__gc", l_gc}, {NULL, NULL}};
 
 int l_module_web_register_module(lua_State *L) {
+    LOG("Registering taf-webdriver module...");
+
     /* metatable for port userdata */
+    LOG("Registering GC functions...");
     luaL_newmetatable(L, "taf-webdriver");
     luaL_setfuncs(L, port_mt, 0);
     lua_pop(L, 1);
+    LOG("GC functions registered.");
 
     /* module table */
+    LOG("Registering module functions...");
     lua_newtable(L);
     luaL_setfuncs(L, module_fns, 0);
+    LOG("Module functions registered.");
+
+    LOG("Successfully registered taf-webdriver module.");
     return 1;
 }
