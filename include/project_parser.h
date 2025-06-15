@@ -21,6 +21,8 @@ typedef struct {
 
 } project_parsed_t;
 
+void parsed_project_init();
+
 bool project_parser_parse();
 
 project_parsed_t *get_parsed_project();

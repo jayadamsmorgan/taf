@@ -17,6 +17,11 @@
 
 static project_parsed_t *proj_parsed = NULL;
 
+void parsed_project_init() {
+    //
+    proj_parsed = calloc(1, sizeof *proj_parsed);
+}
+
 project_parsed_t *get_parsed_project() {
     //
     return proj_parsed;
@@ -222,6 +227,7 @@ bool project_parser_parse() {
 void project_parser_free() {
     LOG("Freeing parsed project...");
     free(proj_parsed->project_path);
+    free(proj_parsed->min_taf_ver_str);
     free(proj_parsed->project_name);
     for (size_t i = 0; i < proj_parsed->targets_amount; i++)
         free(proj_parsed->targets[i]);
