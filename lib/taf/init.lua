@@ -31,6 +31,9 @@ local M = {}
 -- Expose submodules of 'taf'
 M.serial = require("taf.serial")
 M.web = require("taf.web")
+M.proc = require("taf.proc")
+M.json = require("taf.json")
+M.http = require("taf.http")
 
 --- Get amount of milliseconds since test started
 ---
