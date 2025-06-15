@@ -282,6 +282,7 @@ static void inject_modules_dir(lua_State *L) {
     lua_pop(L, 2);               /* pop path + package */
 
     LOG("Successfully injected TAF library directory.");
+
 }
 
 static void register_clua_module(lua_State *L, const char *name,
