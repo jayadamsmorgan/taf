@@ -6,10 +6,12 @@ M.low = http
 
 --- @alias setoptfunc fun(self: http_handle, curlopt: integer, value: boolean|integer|string|[string]|function): http_handle
 --- @alias performfunc fun(self:http_handle)
+--- @alias cleanupfunc fun(self:http_handle)
 
 --- @class http_handle
 --- @field setopt setoptfunc pretty much cURL easy setopt (chainable)
 --- @field perform performfunc pretty much cURL easy perform
+--- @field cleanup cleanupfunc cleanup after done using (also invoked by GC)
 
 --- @return http_handle
 M.new = function()

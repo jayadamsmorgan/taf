@@ -14,7 +14,6 @@
 #include "modules/proc/taf-proc.h"
 #include "modules/serial/taf-serial.h"
 #include "modules/taf/taf.h"
-#include "modules/web/taf-webdriver.h"
 
 #include "util/files.h"
 #include "util/time.h"
@@ -282,7 +281,6 @@ static void inject_modules_dir(lua_State *L) {
     lua_pop(L, 2);               /* pop path + package */
 
     LOG("Successfully injected TAF library directory.");
-
 }
 
 static void register_clua_module(lua_State *L, const char *name,
@@ -305,7 +303,6 @@ static void register_test_api(lua_State *L) {
     register_clua_module(L, "taf-main", l_module_taf_register_module);
     register_clua_module(L, "taf-proc", l_module_proc_register_module);
     register_clua_module(L, "taf-serial", l_module_serial_register_module);
-    register_clua_module(L, "taf-webdriver", l_module_web_register_module);
 
     inject_modules_dir(L);
 

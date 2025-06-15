@@ -121,9 +121,6 @@ sources = [
   'src/modules/proc/taf-proc.c',
   'src/modules/serial/taf-serial.c',
   'src/modules/taf/taf.c',
-  'src/modules/web/taf-webdriver.c',
-  'src/modules/web/webdriver.c',
-  'src/modules/web/requests.c',
 ]
 
 include_dir = include_directories('include')
