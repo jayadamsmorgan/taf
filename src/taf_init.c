@@ -111,6 +111,7 @@ int taf_init() {
         fprintf(
             stderr,
             "Already in the project, use 'taf config' instead to tweak it.\n");
+        internal_logging_deinit();
         return EXIT_FAILURE;
     }
 
@@ -118,18 +119,22 @@ int taf_init() {
         LOG("Project already exists.");
         fprintf(stderr, "Project with name %s already exists.\n",
                 opts->project_name);
+        internal_logging_deinit();
         return EXIT_FAILURE;
     }
 
     int ret = create_project(opts);
     if (ret) {
         fprintf(stderr, "Unable to create project, error code: %d\n", ret);
+        internal_logging_deinit();
         return EXIT_FAILURE;
     }
 
     printf("Created new project '%s'\n", opts->project_name);
 
     project_parser_free();
+
+    internal_logging_deinit();
 
     return EXIT_SUCCESS;
 }

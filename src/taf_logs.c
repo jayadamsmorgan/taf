@@ -1,5 +1,7 @@
 #include "taf_logs.h"
 
+#include "internal_logging.h"
+
 #include "cmd_parser.h"
 #include "project_parser.h"
 #include "test_logs.h"
@@ -21,10 +23,19 @@ int taf_logs_info() {
 
     cmd_logs_info_options *opts = cmd_parser_get_logs_info_options();
 
+    if (opts->internal_logging && internal_logging_init()) {
+        fprintf(stderr, "Unable to init internal_logging.\n");
+        return EXIT_FAILURE;
+    }
+
+    LOG("Starting taf logs info...");
+
     char log_file_path[PATH_MAX];
 
     if (!strcmp(opts->arg, "latest")) {
+        LOG("Getting latest log...");
         if (project_parser_parse()) {
+            internal_logging_deinit();
             return EXIT_FAILURE;
         }
         project_parsed_t *proj = get_parsed_project();
@@ -33,15 +44,22 @@ int taf_logs_info() {
     } else if (file_exists(opts->arg)) {
         snprintf(log_file_path, PATH_MAX, "%s", opts->arg);
     } else {
+        LOG("Log file '%s' not found.", log_file_path);
         fprintf(stderr, "Log file %s not found.\n", opts->arg);
+        internal_logging_deinit();
         return EXIT_FAILURE;
     }
 
+    LOG("Log path: %s", log_file_path);
+
+    LOG("Getting json object...");
     json_object *root = json_object_from_file(log_file_path);
     raw_log_t *raw_log = taf_json_to_raw_log(root);
     if (!raw_log || !raw_log->os || !raw_log->os_version) {
+        LOG("Log file is incorrect or corrupt");
         fprintf(stderr, "Log file %s is either incorrect or corrupt.\n",
                 log_file_path);
+        internal_logging_deinit();
         return EXIT_FAILURE;
     }
 
@@ -92,6 +110,10 @@ int taf_logs_info() {
     printf("Total tests passed: %zu\n", passed);
     printf("Total tests failed: %zu\n", raw_log->tests_count - passed);
     printf("Test run finished on %s\n", raw_log->finished);
+
+    internal_logging_deinit();
+
+    project_parser_free();
 
     return EXIT_SUCCESS;
 }
