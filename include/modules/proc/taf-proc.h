@@ -33,16 +33,16 @@ typedef struct {
 // proc:spawn(argc:[string]) -> proc_handle
 int l_module_proc_spawn(lua_State *L);
 
-// proc:read(proc: proc_handle, want:integer=4096) -> string
+// proc_handle:read(self: proc_handle, want:integer=4096) -> string
 int l_module_proc_read(lua_State *L);
 
-// proc:write(proc: proc_handle, buf:string) -> integer
+// proc_handle:write(self: proc_handle, buf:string) -> integer
 int l_module_proc_write(lua_State *L);
 
-// proc:wait(proc: proc_handle) -> integer
+// proc_handle:wait(self: proc_handle) -> integer
 int l_module_proc_wait(lua_State *L);
 
-// proc:kill(proc: proc_handle)
+// proc_handle:kill(self: proc_handle)
 int l_module_proc_kill(lua_State *L);
 
 /******************* API END *************************/

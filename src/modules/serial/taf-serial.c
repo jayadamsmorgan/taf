@@ -6,20 +6,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-static inline int push_result_nil(lua_State *L, enum sp_return r,
-                                  const char *log) {
-    if (r != SP_OK) {
-        const char *err = sp_last_error_message();
-        LOG("Unable to %s: %s", log, err);
-        lua_pushstring(L, err);
-        return 1;
-    }
-
-    LOG("Successfully finished taf-serial %s.", log);
-    lua_pushnil(L);
-    return 1;
-}
-
 static inline l_module_serial_t *check_port(lua_State *L, int idx) {
     return luaL_checkudata(L, idx, "taf-serial");
 }
@@ -37,17 +23,14 @@ int l_module_serial_get_port_by_name(lua_State *L) {
     if (r != SP_OK) {
         const char *err = sp_last_error_message();
         LOG("SP error: %s", err);
-        lua_pushnil(L);
-        lua_pushstring(L, err);
-        return 2;
+        return luaL_error(L, err);
     }
 
     luaL_getmetatable(L, "taf-serial");
     lua_setmetatable(L, -2);
-    lua_pushnil(L);
 
     LOG("Successfully finished taf-serial get_port.");
-    return 2;
+    return 1;
 }
 
 typedef struct {
@@ -243,29 +226,24 @@ int l_module_serial_list_ports(lua_State *L) {
     if (r != SP_OK) {
         const char *err = sp_last_error_message();
         LOG("Could not get serial ports: %s", err);
-        lua_pushnil(L);
-        lua_pushstring(L, err);
-        return 2;
+        return luaL_error(L, err);
     }
 
     LOG("Creating result list...");
-    lua_newtable(L); /* result list (idx = 1..) */
+    lua_newtable(L);
     int idx = 1;
 
     for (struct sp_port **p = ports; *p; ++p) {
         l_port_info_helper(L, *p);
 
-        /* list[idx] = port_info */
         lua_rawseti(L, -2, idx++);
     }
 
     LOG("Freeing serial port list...");
     sp_free_port_list(ports);
 
-    lua_pushnil(L); /* no error */
-
     LOG("Successfully finished taf-serial list_ports");
-    return 2; /* (result-table, nil) */
+    return 1;
 }
 
 static inline enum sp_mode mode_from_str(const char *str) {
@@ -288,11 +266,18 @@ int l_module_serial_open(lua_State *L) {
     const char *mode_str = luaL_checkstring(L, s + 1);
     enum sp_mode mode = mode_from_str(mode_str);
     if (mode < 0) {
-        lua_pushstring(L, "invalid mode, use 'r', 'w' or 'rw'");
-        return 1;
+        return luaL_error(L, "invalid mode, use 'r', 'w' or 'rw'");
     }
 
-    return push_result_nil(L, sp_open(u->port, mode), "open");
+    enum sp_return r = sp_open(u->port, mode);
+    if (r != SP_OK) {
+        const char *err = sp_last_error_message();
+        LOG("Unable to open port: %s", err);
+        return luaL_error(L, err);
+    }
+
+    LOG("Successfully finished taf-serial open.");
+    return 0;
 }
 
 int l_module_serial_set_baudrate(lua_State *L) {
@@ -301,8 +286,14 @@ int l_module_serial_set_baudrate(lua_State *L) {
     l_module_serial_t *u = check_port(L, s);
 
     enum sp_return r = (sp_set_baudrate(u->port, luaL_checkinteger(L, s + 1)));
+    if (r != SP_OK) {
+        const char *err = sp_last_error_message();
+        LOG("Unable to set baudrate: %s", err);
+        return luaL_error(L, err);
+    }
 
-    return push_result_nil(L, r, "set_baudrate");
+    LOG("Successfully finished taf-serial set_baudrate.");
+    return 0;
 }
 
 int l_module_serial_set_bits(lua_State *L) {
@@ -311,8 +302,14 @@ int l_module_serial_set_bits(lua_State *L) {
     l_module_serial_t *u = check_port(L, s);
 
     enum sp_return r = (sp_set_bits(u->port, luaL_checkinteger(L, s + 1)));
+    if (r != SP_OK) {
+        const char *err = sp_last_error_message();
+        LOG("Unable to set bits: %s", err);
+        return luaL_error(L, err);
+    }
 
-    return push_result_nil(L, r, "set_bits");
+    LOG("Successfully finished taf-serial set_bits.");
+    return 0;
 }
 
 static inline enum sp_parity parity_from_str(const char *str) {
@@ -336,12 +333,19 @@ int l_module_serial_set_parity(lua_State *L) {
     const char *str = luaL_checkstring(L, s + 1);
     enum sp_parity par = parity_from_str(str);
     if (par < 0) {
-        lua_pushstring(
+        return luaL_error(
             L, "invalid parity, use 'none', 'odd', 'even', 'mark' or 'space'");
-        return 1;
     }
 
-    return push_result_nil(L, sp_set_parity(u->port, par), "set_parity");
+    enum sp_return r = sp_set_parity(u->port, par);
+    if (r != SP_OK) {
+        const char *err = sp_last_error_message();
+        LOG("Unable to set parity: %s", err);
+        return luaL_error(L, err);
+    }
+
+    LOG("Successfully finished taf-serial set_parity.");
+    return 0;
 }
 
 int l_module_serial_set_stopbits(lua_State *L) {
@@ -350,8 +354,14 @@ int l_module_serial_set_stopbits(lua_State *L) {
     l_module_serial_t *u = check_port(L, s);
 
     enum sp_return r = (sp_set_stopbits(u->port, luaL_checkinteger(L, s + 1)));
+    if (r != SP_OK) {
+        const char *err = sp_last_error_message();
+        LOG("Unable to set parity: %s", err);
+        return luaL_error(L, err);
+    }
 
-    return push_result_nil(L, r, "set_stopbits");
+    LOG("Successfully finished taf-serial set_stopbits.");
+    return 0;
 }
 
 static inline enum sp_rts sp_rts_from_str(const char *str) {
@@ -370,11 +380,19 @@ int l_module_serial_set_rts(lua_State *L) {
     l_module_serial_t *u = check_port(L, s);
     enum sp_rts rts = sp_rts_from_str(luaL_checkstring(L, s + 1));
     if (rts < 0) {
-        lua_pushstring(L, "invalid rts option, use 'off', 'on' or 'flowctrl'");
-        return 1;
+        return luaL_error(L,
+                          "invalid rts option, use 'off', 'on' or 'flowctrl'");
     }
 
-    return push_result_nil(L, sp_set_rts(u->port, rts), "set_rts");
+    enum sp_return r = sp_set_rts(u->port, rts);
+    if (r != SP_OK) {
+        const char *err = sp_last_error_message();
+        LOG("Unable to set RTS: %s", err);
+        return luaL_error(L, err);
+    }
+
+    LOG("Successfully finished taf-serial set_rts.");
+    return 0;
 }
 
 static inline enum sp_cts sp_cts_from_str(const char *str) {
@@ -391,11 +409,18 @@ int l_module_serial_set_cts(lua_State *L) {
     l_module_serial_t *u = check_port(L, s);
     enum sp_cts cts = sp_cts_from_str(luaL_checkstring(L, s + 1));
     if (cts < 0) {
-        lua_pushstring(L, "invalid cts option, use 'ignore' or 'flowctrl'");
-        return 1;
+        return luaL_error(L, "invalid cts option, use 'ignore' or 'flowctrl'");
     }
 
-    return push_result_nil(L, sp_set_cts(u->port, cts), "set_cts");
+    enum sp_return r = sp_set_cts(u->port, cts);
+    if (r != SP_OK) {
+        const char *err = sp_last_error_message();
+        LOG("Unable to set CTS: %s", err);
+        return luaL_error(L, err);
+    }
+
+    LOG("Successfully finished taf-serial set_cts.");
+    return 0;
 }
 
 static inline enum sp_dtr sp_dtr_from_str(const char *str) {
@@ -414,11 +439,19 @@ int l_module_serial_set_dtr(lua_State *L) {
     l_module_serial_t *u = check_port(L, s);
     enum sp_dtr dtr = sp_dtr_from_str(luaL_checkstring(L, s + 1));
     if (dtr < 0) {
-        lua_pushstring(L, "invalid dtr option, use 'off', 'on' or 'flowctrl'");
-        return 1;
+        return luaL_error(L,
+                          "invalid dtr option, use 'off', 'on' or 'flowctrl'");
     }
 
-    return push_result_nil(L, sp_set_dtr(u->port, dtr), "set_dtr");
+    enum sp_return r = sp_set_dtr(u->port, dtr);
+    if (r != SP_OK) {
+        const char *err = sp_last_error_message();
+        LOG("Unable to set DTR: %s", err);
+        return luaL_error(L, err);
+    }
+
+    LOG("Successfully finished taf-serial set_dtr.");
+    return 0;
 }
 
 static inline enum sp_dsr sp_dsr_from_str(const char *str) {
@@ -435,11 +468,18 @@ int l_module_serial_set_dsr(lua_State *L) {
     l_module_serial_t *u = check_port(L, s);
     enum sp_dsr dsr = sp_dsr_from_str(luaL_checkstring(L, s + 1));
     if (dsr < 0) {
-        lua_pushstring(L, "invalid dsr option, use 'ignore' or 'flowctrl'");
-        return 1;
+        return luaL_error(L, "invalid dsr option, use 'ignore' or 'flowctrl'");
     }
 
-    return push_result_nil(L, sp_set_dsr(u->port, dsr), "set_dsr");
+    enum sp_return r = sp_set_dsr(u->port, dsr);
+    if (r != SP_OK) {
+        const char *err = sp_last_error_message();
+        LOG("Unable to set DSR: %s", err);
+        return luaL_error(L, err);
+    }
+
+    LOG("Successfully finished taf-serial set_dsr.");
+    return 0;
 }
 
 static inline enum sp_xonxoff sp_xonxoff_from_str(const char *str) {
@@ -460,13 +500,19 @@ int l_module_serial_set_xon_xoff(lua_State *L) {
     l_module_serial_t *u = check_port(L, s);
     enum sp_xonxoff xonxoff = sp_xonxoff_from_str(luaL_checkstring(L, s + 1));
     if (xonxoff < 0) {
-        lua_pushstring(
+        return luaL_error(
             L, "invalid xonxoff option, use 'i', 'o', 'io' or 'disable'");
-        return 1;
     }
 
-    return push_result_nil(L, sp_set_xon_xoff(u->port, xonxoff),
-                           "set_xon_xoff");
+    enum sp_return r = sp_set_xon_xoff(u->port, xonxoff);
+    if (r != SP_OK) {
+        const char *err = sp_last_error_message();
+        LOG("Unable to set XON/XOFF: %s", err);
+        return luaL_error(L, err);
+    }
+
+    LOG("Successfully finished taf-serial set_xon_xoff.");
+    return 0;
 }
 
 static inline enum sp_flowcontrol sp_flowcontrol_from_str(const char *str) {
@@ -488,13 +534,20 @@ int l_module_serial_set_flowcontrol(lua_State *L) {
     enum sp_flowcontrol fc =
         sp_flowcontrol_from_str(luaL_checkstring(L, s + 1));
     if (fc < 0) {
-        lua_pushstring(L, "invalid flowcontrol option, use 'dtrdsr', 'rtscts', "
+        return luaL_error(L,
+                          "invalid flowcontrol option, use 'dtrdsr', 'rtscts', "
                           "'xonxoff' or 'none'");
-        return 1;
     }
 
-    return push_result_nil(L, sp_set_flowcontrol(u->port, fc),
-                           "set_flowcontrol");
+    enum sp_return r = sp_set_flowcontrol(u->port, fc);
+    if (r != SP_OK) {
+        const char *err = sp_last_error_message();
+        LOG("Unable to set flowcontrol: %s", err);
+        return luaL_error(L, err);
+    }
+
+    LOG("Successfully finished taf-serial set_flowcontrol.");
+    return 0;
 }
 
 /*----------- reading ------------------------------------------------*/
@@ -514,18 +567,15 @@ static inline int read_helper(lua_State *L, int blocking) {
         const char *err = sp_last_error_message();
         LOG("Unable to read: %s", err);
         free(buf);
-        lua_pushnil(L);
-        lua_pushstring(L, err);
-        return 2;
+        return luaL_error(L, err);
     }
 
     LOG("Read %d bytes: %.*s", got, got, buf);
     lua_pushlstring(L, buf, got);
     free(buf);
-    lua_pushnil(L);
 
     LOG("Successfully finished taf-serial read.");
-    return 2;
+    return 1;
 }
 
 int l_module_serial_read_blocking(lua_State *L) { return read_helper(L, 1); }
@@ -549,17 +599,14 @@ static inline int write_helper(lua_State *L, int blocking) {
     if (wrote < 0) {
         const char *err = sp_last_error_message();
         LOG("Unable to write: %s", err);
-        lua_pushnil(L);
-        lua_pushstring(L, err);
-        return 2;
+        return luaL_error(L, err);
     }
     LOG("Wrote %d bytes.", wrote);
 
     lua_pushinteger(L, wrote);
-    lua_pushnil(L);
 
     LOG("Successfully finished taf-serial write.");
-    return 2;
+    return 1;
 }
 
 int l_module_serial_write_blocking(lua_State *L) { return write_helper(L, 1); }
@@ -578,17 +625,14 @@ static inline int status_helper(lua_State *L, int direction) {
     if (r < SP_OK) {
         const char *err = sp_last_error_message();
         LOG("Unable to get_waiting: %s", err);
-        lua_pushnil(L);
-        lua_pushstring(L, err);
-        return 2;
+        return luaL_error(L, err);
     }
     LOG("Waiting: %d", r);
     lua_pushinteger(L, r);
-    lua_pushnil(L);
 
     LOG("Successfully finished taf-serial get_waiting.");
 
-    return 2;
+    return 1;
 }
 
 int l_module_serial_get_input_waiting(lua_State *L) {
@@ -619,11 +663,18 @@ int l_module_serial_flush(lua_State *L) {
     enum sp_buffer dir = sp_buffer_from_str(mode);
     LOG("Direction: %d", dir);
     if (dir < 0) {
-        lua_pushstring(L, "invalid direction, use 'i', 'o' or 'io'");
-        return 1;
+        return luaL_error(L, "invalid direction, use 'i', 'o' or 'io'");
     }
 
-    return push_result_nil(L, sp_flush(u->port, dir), "flush");
+    enum sp_return r = sp_flush(u->port, dir);
+    if (r != SP_OK) {
+        const char *err = sp_last_error_message();
+        LOG("Unable to flush: %s", err);
+        return luaL_error(L, err);
+    }
+
+    LOG("Successfully finished taf-serial flush.");
+    return 0;
 }
 
 int l_module_serial_drain(lua_State *L) {
@@ -631,7 +682,15 @@ int l_module_serial_drain(lua_State *L) {
     int s = selfshift(L);
     l_module_serial_t *u = check_port(L, s);
 
-    return push_result_nil(L, sp_drain(u->port), "drain");
+    enum sp_return r = sp_drain(u->port);
+    if (r != SP_OK) {
+        const char *err = sp_last_error_message();
+        LOG("Unable to drain: %s", err);
+        return luaL_error(L, err);
+    }
+
+    LOG("Successfully finished taf-serial drain.");
+    return 0;
 }
 
 int l_module_serial_close(lua_State *L) {
@@ -643,8 +702,7 @@ int l_module_serial_close(lua_State *L) {
         if (r != SP_OK) {
             const char *err = sp_last_error_message();
             LOG("Unable to close: %s", err);
-            lua_pushstring(L, err);
-            return 1;
+            return luaL_error(L, err);
         }
         LOG("Freeing port...");
         sp_free_port(u->port);
@@ -653,8 +711,7 @@ int l_module_serial_close(lua_State *L) {
         LOG("Port is NULL.");
     }
     LOG("Successfully finished taf-serial close.");
-    lua_pushnil(L);
-    return 1;
+    return 0;
 }
 
 static int l_gc(lua_State *L) {
@@ -663,17 +720,13 @@ static int l_gc(lua_State *L) {
 }
 
 /*----------- registration ------------------------------------------*/
-static const luaL_Reg port_mt[] = {{"__gc", l_gc}, {NULL, NULL}};
-
-static const luaL_Reg module_fns[] = {
+static const luaL_Reg port_mt[] = {
     {"close", l_module_serial_close},
     {"drain", l_module_serial_drain},
     {"flush", l_module_serial_flush},
-    {"get_port", l_module_serial_get_port_by_name},
     {"get_port_info", l_module_serial_get_port_info},
     {"get_waiting_input", l_module_serial_get_input_waiting},
     {"get_waiting_output", l_module_serial_get_output_waiting},
-    {"list_devices", l_module_serial_list_ports},
     {"open", l_module_serial_open},
     {"read_blocking", l_module_serial_read_blocking},
     {"read_nonblocking", l_module_serial_read_nonblocking},
@@ -689,20 +742,27 @@ static const luaL_Reg module_fns[] = {
     {"set_xon_xoff", l_module_serial_set_xon_xoff},
     {"write_blocking", l_module_serial_write_blocking},
     {"write_nonblocking", l_module_serial_write_nonblocking},
+    {"__gc", l_gc},
+    {NULL, NULL}};
+
+static const luaL_Reg module_fns[] = {
+    {"get_port", l_module_serial_get_port_by_name},
+    {"list_devices", l_module_serial_list_ports},
     {NULL, NULL},
 };
 
 int l_module_serial_register_module(lua_State *L) {
     LOG("Registering taf-serial module...");
 
-    /* metatable for port userdata */
-    LOG("Registering GC functions...");
     luaL_newmetatable(L, "taf-serial");
-    luaL_setfuncs(L, port_mt, 0);
-    lua_pop(L, 1);
-    LOG("GC functions registered.");
 
-    /* module table */
+    LOG("Registering port functions...");
+    lua_newtable(L);
+    luaL_setfuncs(L, port_mt, 0);
+    lua_setfield(L, -2, "__index");
+    lua_pop(L, 1);
+    LOG("Port functions registered.");
+
     LOG("Registering module functions...");
     lua_newtable(L);
     luaL_setfuncs(L, module_fns, 0);

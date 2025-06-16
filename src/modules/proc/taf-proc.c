@@ -66,8 +66,7 @@ int l_module_proc_spawn(lua_State *L) {
     char **argv = malloc(sizeof(*argv) * (len + 1));
     if (!argv) {
         LOG("Out of memory.");
-        luaL_error(L, "taf-proc:run: Out of memory");
-        return 0;
+        return luaL_error(L, "taf-proc:run: Out of memory");
     }
     for (size_t i = 0; i < len; i++) {
         lua_geti(L, s, i + 1);
@@ -76,8 +75,7 @@ int l_module_proc_spawn(lua_State *L) {
         argv[i] = strndup(str, str_len);
         if (!argv[i]) {
             LOG("Out of memory.");
-            luaL_error(L, "taf-proc:run: Out of memory");
-            return 0;
+            return luaL_error(L, "taf-proc:run: Out of memory");
         }
         LOG("argv[%zu]: %s", i, argv[i]);
         lua_pop(L, 1);
@@ -294,6 +292,12 @@ static const luaL_Reg proc_fns[] = {
     {"write", l_module_proc_write}, //
     {"wait", l_module_proc_wait},   //
     {"kill", l_module_proc_kill},   //
+    {"__gc", l_gc},                 //
+    {NULL, NULL},                   //
+};
+
+static const luaL_Reg module_fns[] = {
+    {"spawn", l_module_proc_spawn}, //
     {NULL, NULL},                   //
 };
 
@@ -302,22 +306,16 @@ int l_module_proc_register_module(lua_State *L) {
 
     luaL_newmetatable(L, "taf-proc");
 
-    LOG("Registering GC functions...");
-    lua_pushcfunction(L, l_gc);
-    lua_setfield(L, -2, "__gc");
-    LOG("GC functions registered.");
-
     LOG("Registering proc functions...");
     lua_newtable(L);
     luaL_setfuncs(L, proc_fns, 0);
     lua_setfield(L, -2, "__index");
     lua_pop(L, 1);
-    LOG("proc functions registered.");
+    LOG("Proc functions registered.");
 
     LOG("Registering module functions...");
     lua_newtable(L);
-    lua_pushcfunction(L, l_module_proc_spawn);
-    lua_setfield(L, -2, "spawn");
+    luaL_setfuncs(L, module_fns, 0);
     LOG("Module functions registered.");
 
     LOG("Successfully registered taf-proc module.");

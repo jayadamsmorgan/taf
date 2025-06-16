@@ -17,10 +17,14 @@ typedef struct {
 
 /******************* API START ***********************/
 
+// http:new() -> handle
 int l_module_http_new(lua_State *L);
 
+// handle:setopt(self:handle,opt:integer,value:integer|bool|function|string|[string])
+// -> handle
 int l_module_http_setopt(lua_State *L);
 
+// handle:perform(self:handle)
 int l_module_http_perform(lua_State *L);
 
 /******************* API END *************************/

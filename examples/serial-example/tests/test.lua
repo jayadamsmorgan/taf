@@ -3,48 +3,32 @@ local serial = taf.serial
 local vars = require("variables")
 
 taf.test("List serial devices", { "tag1", "tag2" }, function()
-	local devices, err = serial.list_devices()
-	if err then
-		print(err)
-		return
-	end
-	assert(devices ~= nil)
+	local devices = serial.list_devices()
 	for i, device in ipairs(devices) do
-		print(i)
-		print(device.path)
-		print(device.type)
-		print(device.description)
+		print("[" .. i .. "]: Found device: ", device.path, device.type, device.description)
 	end
 end)
 
 taf.test("Get port info", { "tag2", "tag3" }, function()
-	local info, err = serial.get_port_info(vars.port_name)
-	assert(not err)
-	assert(info)
-	print(info.type)
+	local port = serial.get_port(vars.port_name)
+	local info = port:get_port_info()
+	print("Found device: ", info.path, info.type, info.description)
 end)
 
 taf.test("Reading from serial device", { "tag2" }, function()
-	taf.log_error("This is first failure reason")
-	taf.log_critical("This is second failure reason")
+	local port = serial.get_port(vars.port_name)
 
-	local err
-	local port
-	port, err = serial.open(vars.port_name)
-	assert(not err)
-	assert(port)
-
-	taf.defer(serial.close, port) -- Runs last
+	port:open("rw")
 
 	taf.defer(function()
-		taf.log("E", "Tearing down test with status '" .. "'")
+		port:close()
 	end)
 
-	taf.defer(print, "This defer should run first")
+	port:set_baudrate(vars.baudrate)
+	port:set_bits(vars.bits)
+	port:set_parity(vars.parity)
+	port:set_stopbits(vars.stopbits)
 
-	local result
-	result, err = serial.read_until(port, "src.-CH8", 4000)
-	assert(result)
+	local result = port:read_until("src.-CH8", 4000)
 	print(result)
-	assert(err == nil)
 end)

@@ -5,9 +5,10 @@ local M = {}
 
 M.low = ts
 
---- C pointer to serial port handle
----
---- @alias serial_port userdata
+--- @alias serial_flush_direction
+--- | '"i"' input
+--- | '"o"' output
+--- | '"io"' input/ouput
 
 --- Mode to open serial device with
 ---
@@ -39,15 +40,6 @@ M.low = ts
 --- | 1
 --- | 2
 
---- Options to open serial port with
----
---- @class serial_opts
---- @field mode serial_mode?
---- @field baudrate number?
---- @field bits serial_data_bits?
---- @field parity serial_parity?
---- @field stopbits serial_stop_bits?
-
 --- Type of the serial device connected
 ---
 --- @alias serial_port_type
@@ -55,6 +47,48 @@ M.low = ts
 --- | '"usb"'
 --- | '"bluetooth"'
 --- | '"unknown"'
+
+--- Serial RS232 DSR option
+---
+--- @alias serial_dsr
+--- | '"ignore"'
+--- | '"flowctrl"'
+
+--- Serial RS232 CTS option
+---
+--- @alias serial_cts
+--- | '"ignore"'
+--- | '"flowctrl"'
+
+--- Serial RS232 DTR option
+---
+--- @alias serial_dtr
+--- | '"off"'
+--- | '"on"'
+--- | '"flowctrl"'
+
+--- Serial RS232 RTS option
+---
+--- @alias serial_rts
+--- | '"off"'
+--- | '"on"'
+--- | '"flowctrl"'
+
+--- Serial RS232 XON/XOFF option
+---
+--- @alias serial_xonxoff
+--- | '"i"'       input
+--- | '"o"'       output
+--- | '"io"'      input/output
+--- | '"disable"' disable XON/XOFF
+
+--- Serial RS232 flowcontrol option
+---
+--- @alias serial_flowctrl
+--- | '"dtrdsr"'
+--- | '"rtscts"'
+--- | '"xonxoff"'
+--- | '"none"'
 
 --- Full info about the serial port
 ---
@@ -71,262 +105,74 @@ M.low = ts
 --- @field usb_bus number? usb bus number of usb serial device
 --- @field bluetooth_address string? bluetooth MAC address of bluetooth serial device
 
---- @type serial_opts
-local default_serial_opts = {
-	mode = "rw",
-	baudrate = 115200,
-	bits = 8,
-	parity = "none",
-	stopbits = 1,
-}
+--- @alias close_func fun(self:serial_port)
+--- @alias drain_func fun(self:serial_port)
+--- @alias flush_func fun(self:serial_port, direction:serial_flush_direction)
+--- @alias get_port_info_func fun(self:serial_port):serial_port_info
+--- @alias get_waiting_input_func fun(self:serial_port): integer
+--- @alias get_waiting_output_func fun(self:serial_port): integer
+--- @alias open_func fun(self:serial_port, mode: serial_mode)
+--- @alias read_blocking_func fun(self:serial_port, byte_amount:integer, timeout:integer?): string
+--- @alias read_nonblocking_func fun(self:serial_port, byte_amount:integer): string
+--- @alias read_until_func fun(self:serial_port, pattern:string?, timeout:number?, chunk_size:number?): string
+--- @alias set_baudrate_func fun(self:serial_port, baudrate:integer)
+--- @alias set_bits_func fun(self:serial_port, bits:serial_data_bits)
+--- @alias set_cts_func fun(self:serial_port, cts:serial_cts)
+--- @alias set_dsr_func fun(self:serial_port, dsr:serial_dsr)
+--- @alias set_dtr_func fun(self:serial_port, dtr:serial_dtr)
+--- @alias set_flowcontrol_func fun(self:serial_port, flowctrl:serial_flowctrl)
+--- @alias set_parity_func fun(self:serial_port, parity:serial_parity)
+--- @alias set_rts_func fun(self:serial_port, rts:serial_rts)
+--- @alias set_stopbits_func fun(self:serial_port, stopbits:serial_stop_bits)
+--- @alias set_xon_xoff_func fun(self:serial_port, xonxoff:serial_xonxoff)
+--- @alias write_blocking_func fun(self:serial_port, str:string, timeout:integer): integer
+--- @alias write_nonblocking_func fun(self:serial_port, str:string): integer
 
---- Default options for serial.open()
+--- Serial port handle
 ---
---- @return serial_opts opts
-M.default_serial_options = function()
-	return default_serial_opts
-end
+--- @class serial_port
+--- @field close close_func
+--- @field drain drain_func
+--- @field flush flush_func
+--- @field get_port_info get_port_info_func
+--- @field get_waiting_input get_waiting_input_func
+--- @field get_waiting_output get_waiting_output_func
+--- @field open open_func
+--- @field read_blocking read_blocking_func
+--- @field read_nonblocking read_nonblocking_func
+--- @field read_until read_until_func
+--- @field set_baudrate set_baudrate_func
+--- @field set_bits set_bits_func
+--- @field set_cts set_cts_func
+--- @field set_dsr set_dsr_func
+--- @field set_dtr set_dtr_func
+--- @field set_flowcontrol set_flowcontrol_func
+--- @field set_parity set_parity_func
+--- @field set_rts set_rts_func
+--- @field set_stopbits set_stopbits_func
+--- @field set_xon_xoff set_xon_xoff_func
+--- @field private write_blocking write_blocking_func
+--- @field private write_nonblocking write_nonblocking_func
 
---- Open serial device port with options
+--- Get port by it's path or name (but not open it)
 ---
---- @param port_or_path serial_port | string path to serial device or serial port to open
---- @param opts serial_opts? options to open serial device with
+--- @param path string
 ---
---- @return serial_port? result, string? error
-M.open = function(port_or_path, opts)
-	--- @type serial_port?
-	local port
-
-	--- @type string?
-	local err
-
-	if type(port_or_path) == "string" then
-		port, err = ts:get_port(port_or_path)
-		if err then
-			return nil, err
-		end
-	elseif type(port_or_path) == "userdata" then
-		port = port_or_path
-	else
-		return nil, "argument 'port_or_path' is of invalid type or nil"
+--- @return serial_port
+M.get_port = function(path)
+	local port = ts:get_port(path)
+	local mt = getmetatable(port)
+	function mt.__index:read_until(pattern, timeout, chunk_size)
+		return M.read_until(self, pattern, timeout, chunk_size)
 	end
-
-	local default_opts = default_serial_opts
-
-	if not opts then
-		opts = default_opts
-	else
-		opts.mode = opts.mode or default_opts.mode
-		opts.baudrate = opts.baudrate or default_opts.baudrate
-		opts.bits = opts.bits or default_opts.bits
-		opts.parity = opts.parity or default_opts.parity
-		opts.stopbits = opts.stopbits or default_opts.stopbits
-	end
-
-	err = ts:open(port, opts.mode)
-	if err then
-		return nil, err
-	end
-
-	err = ts:set_baudrate(port, opts.baudrate)
-	if err then
-		ts:close(port)
-		return nil, err
-	end
-
-	err = ts:set_bits(port, opts.bits)
-	if err then
-		ts:close(port)
-		return nil, err
-	end
-
-	err = ts:set_parity(port, opts.parity)
-	if err then
-		ts:close(port)
-		return nil, err
-	end
-
-	err = ts:set_stopbits(port, opts.stopbits)
-	if err then
-		ts:close(port)
-		return nil, err
-	end
-
-	return port, nil
-end
-
---- Close the opened port
----
---- @param port serial_port port returned after serial.open()
----
---- @return string? error
-M.close = function(port)
-	return ts:close(port)
-end
-
---- Set baudrate for opened port
----
---- @param port serial_port port returned after serial.open()
---- @param baudrate number
----
---- @return string? error
-M.set_baudrate = function(port, baudrate)
-	return ts:set_baudrate(port, baudrate)
-end
-
---- Set data bits for opened port
----
---- @param port serial_port port returned after serial.open()
---- @param bits serial_data_bits
----
---- @return string? error
-M.set_bits = function(port, bits)
-	return ts:set_bits(port, bits)
-end
-
---- Set parity for opened port
----
---- @param port serial_port port returned after serial.open()
---- @param parity serial_parity
----
---- @return string? error
-M.set_parity = function(port, parity)
-	return ts:set_parity(port, parity)
-end
-
---- Set stopbits for opened port
----
---- @param port serial_port port returned after serial.open()
---- @param stopbits serial_stop_bits
----
---- @return string? error
-M.set_stopbits = function(port, stopbits)
-	return ts:set_stopbits(port, stopbits)
-end
-
---- Serial RS232 RTS option
----
---- @alias SerialRTS
---- | '"off"'
---- | '"on"'
---- | '"flowctrl"'
-
---- Set RS232 RTS for opened port
----
---- @param port serial_port
---- @param rts SerialRTS
----
---- @return string? error
-M.set_rts = function(port, rts)
-	return ts:set_rts(port, rts)
-end
-
---- Serial RS232 CTS option
----
---- @alias SerialCTS
---- | '"ignore"'
---- | '"flowctrl"'
-
---- Set RS232 CTS for opened port
----
---- @param port serial_port
---- @param cts SerialCTS
----
---- @return string? error
-M.set_cts = function(port, cts)
-	return ts:set_cts(port, cts)
-end
-
---- Serial RS232 DTR option
----
---- @alias SerialDTR
---- | '"off"'
---- | '"on"'
---- | '"flowctrl"'
-
---- Set RS232 DTR for opened port
----
---- @param port serial_port
---- @param dtr SerialDTR
----
---- @return string? error
-M.set_dtr = function(port, dtr)
-	return ts:set_dtr(port, dtr)
-end
-
---- Serial RS232 DSR option
----
---- @alias SerialDSR
---- | '"ignore"'
---- | '"flowctrl"'
-
---- Set RS232 DSR for opened port
----
---- @param port serial_port
---- @param dsr SerialDSR
----
---- @return string? error
-M.set_dsr = function(port, dsr)
-	return ts:set_dsr(port, dsr)
-end
-
---- Serial RS232 XON/XOFF option
----
---- @alias SerialXONXOFF
---- | '"i"'       input
---- | '"o"'       output
---- | '"io"'      input/output
---- | '"disable"' disable XON/XOFF
-
---- Set RS232 XON/XOFF for opened port
----
----@param port serial_port
----@param xonxoff SerialXONXOFF
----
----@return string? error
-M.set_xonxoff = function(port, xonxoff)
-	return ts:set_xonxoff(port, xonxoff)
-end
-
---- Serial RS232 flowcontrol option
----
---- @alias serial_flowctrl
---- | '"dtrdsr"'
---- | '"rtscts"'
---- | '"xonxoff"'
---- | '"none"'
-
---- Set RS232 flowcontrol option for opened port
----
---- @param port serial_port
---- @param flowctrl serial_flowctrl
----
---- @return string? error
-M.set_flowcontrol = function(port, flowctrl)
-	return ts:set_flowcontrol(port, flowctrl)
+	return port
 end
 
 --- List info about all connected serial devices in the system
 ---
---- @return serial_port_info[]? result, string? error
+--- @return serial_port_info[] result
 M.list_devices = function()
 	return ts:list_devices()
-end
-
---- @param port_or_path serial_port | string
----
---- @return serial_port_info? result, string? error
-M.get_port_info = function(port_or_path)
-	local port = port_or_path
-	if type(port_or_path) == "string" then
-		local err
-		port, err = ts:get_port(port_or_path)
-		if err then
-			return nil, err
-		end
-	end
-
-	return ts:get_port_info(port), nil
 end
 
 --- Reads from serial port until it encounters the matching pattern
@@ -337,9 +183,9 @@ end
 --- @param timeout number? optional timeout value. keep nil for blocking indefinetely, 0 for nonblocking reads
 --- @param chunk_size number? the size of the read chunks, defaults to 64
 ---
---- @return string result, string? error
+--- @return string result
 M.read_until = function(port, pattern, timeout, chunk_size)
-	M.flush(port, "io")
+	port:flush("io")
 
 	local now_ms = function()
 		return taf:millis()
@@ -362,30 +208,21 @@ M.read_until = function(port, pattern, timeout, chunk_size)
 		if deadline then
 			local remaining = math.max(0, math.ceil(deadline - now_ms()))
 			if remaining == 0 then
-				return collected(), "timeout"
+				error("timeout")
 			end
 		end
 
-		local chunk, err
+		local chunk
 		if timeout == nil then
 			-- block forever
-			chunk, err = ts:read_blocking(port, chunk_size, 0)
+			chunk = port:read_blocking(chunk_size, 0)
 		elseif timeout == 0 then
 			-- non-blocking
-			chunk, err = ts:read_nonblocking(port, chunk_size)
-			if not chunk or #chunk == 0 then
-				return collected(), err or "would block"
-			end
+			chunk = port:read_nonblocking(chunk_size)
 		else
 			-- finite timeout
 			local remaining = math.max(1, math.ceil(deadline - now_ms()))
-			chunk, err = ts:read_blocking(port, chunk_size, remaining)
-			if not chunk then
-				return collected(), err -- I/O failure
-			end
-			if #chunk == 0 then
-				return collected(), "timeout" -- timed out with no data
-			end
+			chunk = port:read_blocking(chunk_size, remaining)
 		end
 
 		-- got data – stash it
@@ -393,77 +230,9 @@ M.read_until = function(port, pattern, timeout, chunk_size)
 
 		-- stop when pattern seen
 		if collected():find(pattern) then
-			return collected(), nil
+			return collected()
 		end
 	end
-end
-
---- Write string to serial port
----
---- @param port serial_port
---- @param buffer string string to write to serial port
---- @param timeout number? optional timeout for blocking writes. keep nil for blocking indefinetely, 0 for nonblocking writes
----
---- @return number? bytes_written, string? error
-M.write = function(port, buffer, timeout)
-	if timeout == nil then
-		return ts:write_blocking(port, buffer, 0)
-	elseif timeout == 0 then
-		return ts:write_nonblocking(port, buffer)
-	else
-		return ts:write_blocking(port, buffer, timeout)
-	end
-end
-
---- Get the number of bytes waiting in the input buffer
----
---- @param port serial_port
----
---- @return number? bytes, string? error
-M.input_waiting = function(port)
-	return ts:input_waiting(port)
-end
-
---- Get the number of bytes waiting in the output buffer
----
---- @param port serial_port
----
---- @return number? bytes, string? error
-M.output_waiting = function(port)
-	return ts:output_waiting(port)
-end
-
---- @alias serial_flush_direction
---- | '"i"' input
---- | '"o"' output
---- | '"io"' input/ouput
-
---- Flush serial port buffers
----
---- @param port serial_port
---- @param direction serial_flush_direction
----
---- @return string? error
-M.flush = function(port, direction)
-	return ts:flush(port, direction)
-end
-
---- Wait for buffered data to be transmitted
----
---- @param port serial_port
----
---- @return string? error
-M.drain = function(port)
-	return ts:drain(port)
-end
-
---- Get port by it's path or name (but not open it)
----
---- @param path string
----
---- @return serial_port
-M.get_port = function(path)
-	return ts:get_port(path)
 end
 
 return M

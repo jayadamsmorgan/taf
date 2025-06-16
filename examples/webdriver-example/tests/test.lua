@@ -30,7 +30,7 @@ taf.test("testing web session start", function()
 	taf.sleep(1000)
 
 	-- Open yahoo.com
-	webdriver.open_url(session, "https://yahoo.com/")
+	webdriver.open_url(session, "https://github.com/")
 
 	taf.sleep(1000)
 
@@ -51,13 +51,13 @@ taf.test("testing web session start", function()
 
 	-- Get the site url
 	local url = webdriver.get_current_url(session)
-	assert(url == "https://www.yahoo.com/")
+	assert(url == "https://github.com/")
 
 	-- Get the site title
 	local title
 	title = webdriver.get_title(session)
 	print(title)
-	assert(title == "Yahoo | Mail, Weather, Search, Politics, News, Finance, Sports & Videos")
+	assert(title == "GitHub · Build and ship software on a single, collaborative platform · GitHub")
 
 	taf.sleep(500)
 end)

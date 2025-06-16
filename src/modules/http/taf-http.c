@@ -250,6 +250,11 @@ static const luaL_Reg handle_fns[] = {
     {NULL, NULL},                       //
 };
 
+static const luaL_Reg module_fns[] = {
+    {"new", l_module_http_new}, //
+    {NULL, NULL},               //
+};
+
 int l_module_http_register_module(lua_State *L) {
     LOG("Registering taf-http module...");
 
@@ -269,8 +274,7 @@ int l_module_http_register_module(lua_State *L) {
 
     LOG("Registering module functions...");
     lua_newtable(L);
-    lua_pushcfunction(L, l_module_http_new);
-    lua_setfield(L, -2, "new");
+    luaL_setfuncs(L, module_fns, 0);
     LOG("Module functions registered.");
 
     LOG("Successfully registered registered.");
