@@ -2,7 +2,7 @@
 #define CMD_PARSER_H
 
 #include "test_logs.h"
-
+#include "stdbool.h"
 typedef enum {
     CMD_INIT,
     CMD_TEST,

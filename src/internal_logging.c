@@ -55,7 +55,7 @@ void internal_log(const char *file, int line, const char *func, const char *fmt,
             func, line);
 
     va_list arg;
-    va_start(arg, ...);
+    va_start(arg, fmt);
     vfprintf(internal_log_file, fmt, arg);
     va_end(arg);
 
