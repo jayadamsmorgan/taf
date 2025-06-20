@@ -74,9 +74,9 @@ static json_object *raw_log_test_to_json(raw_log_test_t *test) {
     }
     json_object_object_add(test_obj, "tags", tag_arr);
     json_object *output_arr = json_object_new_array();
-    for (size_t i = 0; i < test->output_count; i++) {
+    for (size_t i = 0; i < test->outputs_count; i++) {
         json_object_array_add(output_arr,
-                              raw_log_test_output_to_json(&test->output[i]));
+                              raw_log_test_output_to_json(&test->outputs[i]));
     }
     json_object_object_add(test_obj, "output", output_arr);
     LOG("Successfully converted raw log test to JSON.");
@@ -228,13 +228,13 @@ raw_log_t *taf_json_to_raw_log(struct json_object *root) {
             if (json_object_object_get_ex(jt, "output", &tmp) &&
                 json_object_is_type(tmp, json_type_array)) {
 
-                t->output_count = jarray_len(tmp);
-                t->output = calloc(t->output_count, sizeof *t->output);
+                t->outputs_count = jarray_len(tmp);
+                t->outputs = calloc(t->outputs_count, sizeof *t->outputs);
 
-                for (size_t k = 0; k < t->output_count; ++k) {
+                for (size_t k = 0; k < t->outputs_count; ++k) {
                     struct json_object *jo =
                         json_object_array_get_idx(tmp, (int)k);
-                    raw_log_test_output_t *out = &t->output[k];
+                    raw_log_test_output_t *out = &t->outputs[k];
 
                     struct json_object *jfield;
                     if (json_object_object_get_ex(jo, "file", &jfield))
@@ -367,13 +367,13 @@ void taf_log_test(taf_log_level level, const char *file, int line,
     LOG("Adding raw log test output...");
     raw_log_test_t *t = &raw_log->tests[test_index];
 
-    if (t->output_count >= raw_log_test_output_cap) {
+    if (t->outputs_count >= raw_log_test_output_cap) {
         raw_log_test_output_cap *= 2;
-        t->output =
-            realloc(t->output, raw_log_test_output_cap * sizeof *t->output);
+        t->outputs =
+            realloc(t->outputs, raw_log_test_output_cap * sizeof *t->outputs);
     }
 
-    raw_log_test_output_t *out = &t->output[t->output_count++];
+    raw_log_test_output_t *out = &t->outputs[t->outputs_count++];
     out->level = level;
     out->msg = strndup(buffer, buffer_len);
     out->msg_len = buffer_len;
@@ -433,9 +433,9 @@ void taf_log_test_started(int index, test_case_t test_case) {
 
     test->name = strdup(test_case.name);
     raw_log_test_output_cap = 2;
-    test->output =
+    test->outputs =
         malloc(sizeof(raw_log_test_output_t) * raw_log_test_output_cap);
-    test->output_count = 0;
+    test->outputs_count = 0;
 
     raw_log_test_failure_cap = 2;
     test->failure_reasons =
@@ -546,13 +546,13 @@ void taf_raw_log_free(raw_log_t *log) {
             free(t->tags[k]);
         free(t->tags);
 
-        for (size_t k = 0; k < t->output_count; ++k) {
-            raw_log_test_output_t *o = &t->output[k];
+        for (size_t k = 0; k < t->outputs_count; ++k) {
+            raw_log_test_output_t *o = &t->outputs[k];
             free(o->file);
             free(o->date_time);
             free(o->msg);
         }
-        free(t->output);
+        free(t->outputs);
     }
     free(log->tests);
 
@@ -614,12 +614,12 @@ void taf_log_tests_finalize() {
             free(test->tags[j]);
         }
         free(test->tags);
-        for (size_t j = 0; j < test->output_count; j++) {
-            free(test->output[j].msg);
-            free(test->output[j].date_time);
-            free(test->output[j].file);
+        for (size_t j = 0; j < test->outputs_count; j++) {
+            free(test->outputs[j].msg);
+            free(test->outputs[j].date_time);
+            free(test->outputs[j].file);
         }
-        free(test->output);
+        free(test->outputs);
     }
     free(raw_log->tests);
     free(raw_log);

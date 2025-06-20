@@ -98,10 +98,22 @@ int taf_logs_info() {
             passed++;
         } else if (test->failure_reasons_count != 0) {
             printf("    Failure reasons:\n");
-            for (size_t i = 0; i < test->failure_reasons_count; i++) {
-                raw_log_test_output_t *failure = &test->failure_reasons[i];
-                printf("        %zu: [%s]: %s\n", i + 1,
+            for (size_t j = 0; j < test->failure_reasons_count; j++) {
+                raw_log_test_output_t *failure = &test->failure_reasons[j];
+                printf("        %zu: [%s]: %s\n", j + 1,
                        taf_log_level_to_str(failure->level), failure->msg);
+            }
+        }
+        if (opts->include_outputs) {
+            if (test->outputs_count == 0) {
+                printf("    No test outputs.\n\n");
+                continue;
+            }
+            printf("    Outputs:\n");
+            for (size_t j = 0; j < test->outputs_count; j++) {
+                raw_log_test_output_t *output = &test->outputs[j];
+                printf("        %zu: [%s]: %s\n", j + 1,
+                       taf_log_level_to_str(output->level), output->msg);
             }
         }
         printf("\n");

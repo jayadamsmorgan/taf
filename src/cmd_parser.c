@@ -69,6 +69,7 @@ static void print_logs_info_help(FILE *file) {
                   "Display information about the test run.\n"
                   "\n"
                   "Options:\n"
+                  "  -o, --outputs            Include outputs\n"
                   "  -i, --internal-log       Dump internal logging file\n"
                   "  -h, --help               Display help\n");
 }
@@ -358,8 +359,13 @@ static void get_logs_info_help(const char *) {
     exit(EXIT_SUCCESS);
 }
 
+static void set_logs_info_outputs(const char *) {
+    logs_info_opts.include_outputs = true;
+}
+
 static cmd_option all_logs_info_options[] = {
     {"--internal-log", "-i", false, set_internal_logging},
+    {"--outputs", "-o", false, set_logs_info_outputs},
     {"--help", "-h", false, get_logs_info_help},
     {NULL, NULL, false, NULL},
 };
@@ -373,12 +379,13 @@ static cmd_category parse_logs_options(int argc, char **argv) {
     }
 
     if (STR_EQ(argv[2], "info")) {
-        if (argc != 4) {
+        if (argc < 4) {
             print_logs_info_help(stderr);
             return CMD_UNKNOWN;
         }
         logs_info_opts.arg = argv[3];
         logs_info_opts.internal_logging = false;
+        logs_info_opts.include_outputs = false;
         parse_additional_options(all_logs_info_options, 3, argc, argv);
         return CMD_LOGS_INFO;
     } else if (STR_EQ(argv[2], "help") || STR_EQ(argv[2], "-h") ||

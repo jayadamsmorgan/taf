@@ -35,8 +35,8 @@ typedef struct {
     char **tags;
     size_t tags_count;
 
-    raw_log_test_output_t *output;
-    size_t output_count;
+    raw_log_test_output_t *outputs;
+    size_t outputs_count;
 } raw_log_test_t;
 
 typedef struct {

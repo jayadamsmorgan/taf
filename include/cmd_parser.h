@@ -1,8 +1,8 @@
 #ifndef CMD_PARSER_H
 #define CMD_PARSER_H
 
-#include "test_logs.h"
 #include "stdbool.h"
+#include "test_logs.h"
 typedef enum {
     CMD_INIT,
     CMD_TEST,
@@ -41,6 +41,9 @@ typedef struct {
 
 typedef struct {
     char *arg;
+
+    bool include_outputs;
+
     bool internal_logging;
 } cmd_logs_info_options;
 
