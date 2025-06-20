@@ -91,6 +91,10 @@ int l_module_proc_spawn(lua_State *L) {
         const char *err = strerror(errno);
         LOG(" Unable to pipe(): %s", err);
         proc_close_streams(proc);
+        LOG("Freeing argv...");
+        for (size_t i = 0; i < len; i++)
+            free(argv[i]);
+        free(argv);
         return luaL_error(L, "pipe(): %s", err);
     }
 

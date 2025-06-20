@@ -559,20 +559,20 @@ static inline int read_helper(lua_State *L, int blocking) {
     int to_ms = luaL_optinteger(L, s + 2, 0);
     LOG("Amount of bytes to read: %d, timeout: %d", n, to_ms);
 
-    char *buf = malloc((size_t)n + 1);
+    luaL_Buffer b;
+    char *buf = luaL_buffinitsize(L, &b, n);
     int got = blocking ? sp_blocking_read(u->port, buf, n, to_ms)
                        : sp_nonblocking_read(u->port, buf, n);
 
     if (got < 0) {
         const char *err = sp_last_error_message();
         LOG("Unable to read: %s", err);
-        free(buf);
         return luaL_error(L, err);
     }
 
     LOG("Read %d bytes: %.*s", got, got, buf);
-    lua_pushlstring(L, buf, got);
-    free(buf);
+    luaL_addsize(&b, got);
+    luaL_pushresult(&b);
 
     LOG("Successfully finished taf-serial read.");
     return 1;

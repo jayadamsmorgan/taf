@@ -194,14 +194,11 @@ M.read_until = function(port, pattern, timeout, chunk_size)
 	chunk_size = chunk_size or 64
 	pattern = pattern or "\n"
 
-	local buf = {} -- pieces collected so far
+	local buftable = {}
+	local buflen = 0
 	local deadline
 	if timeout and timeout > 0 then
 		deadline = now_ms() + timeout
-	end
-
-	local function collected()
-		return table.concat(buf)
 	end
 
 	while true do
@@ -214,25 +211,30 @@ M.read_until = function(port, pattern, timeout, chunk_size)
 
 		local chunk
 		if timeout == nil then
-			-- block forever
 			chunk = port:read_blocking(chunk_size, 0)
 		elseif timeout == 0 then
-			-- non-blocking
 			chunk = port:read_nonblocking(chunk_size)
 		else
-			-- finite timeout
 			local remaining = math.max(1, math.ceil(deadline - now_ms()))
 			chunk = port:read_blocking(chunk_size, remaining)
 		end
 
-		-- got data – stash it
-		buf[#buf + 1] = chunk
+		if chunk and #chunk > 0 then
+			table.insert(buftable, chunk)
+			buflen = buflen + #chunk
 
-		-- stop when pattern seen
-		if collected():find(pattern) then
-			return collected()
+			local full_buf = table.concat(buftable)
+			if full_buf:find(pattern, 1, true) then
+				return full_buf
+			end
+		end
+
+		if timeout == 0 and (not chunk or #chunk == 0) then
+			break
 		end
 	end
+
+	return ""
 end
 
 return M

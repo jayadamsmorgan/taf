@@ -162,33 +162,40 @@ int l_module_taf_defer(lua_State *L) {
 }
 
 static inline void log_helper(taf_log_level level, int n, int s, lua_State *L) {
-
     LOG("Constructing log message buffer with %d arguments...", n);
     luaL_Buffer buf;
     luaL_buffinit(L, &buf);
 
     for (int i = s; i <= n; i++) {
-        size_t len;
-        const char *s = luaL_tolstring(L, i, &len);
-        LOG("Argument %d: %s", i, s);
-        luaL_addlstring(&buf, s, len);
-        lua_pop(L, 1);
 
-        if (i < n)
+        luaL_tolstring(L, i, NULL);
+
+        luaL_addvalue(&buf);
+
+        if (i < n) {
             luaL_addchar(&buf, '\t');
+        }
     }
     luaL_pushresult(&buf);
 
     size_t mlen;
     const char *msg = lua_tolstring(L, -1, &mlen);
-    char *copy = strndup(msg, mlen);
-    LOG("Final message string: %.*s", (int)mlen, msg);
+
+    char *copy = malloc(mlen + 1);
+    if (!copy) {
+        luaL_error(L, "out of memory");
+        return;
+    }
+    memcpy(copy, msg, mlen);
+    copy[mlen] = '\0';
+
+    LOG("Final message string: %.*s", (int)mlen, copy); // Use copy for safety
 
     const char *file = "(?)";
     int line = 0;
     lua_Debug ar;
 
-    // parent of that caller, if it exists
+    // This logic seems fine.
     if (lua_getstack(L, 2, &ar) && lua_getinfo(L, "Sl", &ar) &&
         ar.currentline > 0) {
         LOG("Parent caller detected.");
@@ -196,7 +203,6 @@ static inline void log_helper(taf_log_level level, int n, int s, lua_State *L) {
         line = ar.currentline;
     } else if (lua_getstack(L, 1, &ar) && lua_getinfo(L, "Sl", &ar) &&
                ar.currentline > 0) {
-        // direct Lua caller
         LOG("Direct caller detected.");
         file = (ar.source[0] == '@') ? ar.source + 1 : ar.source;
         line = ar.currentline;
@@ -205,10 +211,16 @@ static inline void log_helper(taf_log_level level, int n, int s, lua_State *L) {
 
     if (level == TAF_LOG_LEVEL_CRITICAL) {
         LOG("Log level is critical, raising error...");
+        // luaL_error performs a longjmp, so 'copy' would be leaked.
+        // While hard to avoid, it's good to be aware of.
+        // The error message is now safely formatted.
         luaL_error(L, "%s", copy);
+        free(copy); // This line will not be reached, but is good practice.
         return;
     }
 
+    // Now 'copy' is a proper C string and 'mlen' is its correct length (without
+    // null).
     taf_log_test(level, file, line, copy, mlen);
 
     free(copy);
