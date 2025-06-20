@@ -29,6 +29,6 @@ taf.test("Reading from serial device", { "tag2" }, function()
 	port:set_parity(vars.parity)
 	port:set_stopbits(vars.stopbits)
 
-	local result = port:read_until("src.-CH8", 4000)
+	local result = port:read_until("Hello Rockchip", 15000)
 	print(result)
 end)
