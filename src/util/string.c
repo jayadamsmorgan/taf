@@ -1,5 +1,6 @@
 #include "util/string.h"
 
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -68,4 +69,63 @@ size_t *string_wrapped_lines(const char *text, size_t max_len, size_t *count) {
         indices = tmp;
 
     return indices; /* caller must free() */
+}
+
+char *string_strip(const char *s) {
+    if (!s)
+        return NULL;
+
+    const char *start = s;
+    while (*start && isspace((unsigned char)*start))
+        ++start;
+
+    if (*start == '\0') {
+        char *out = malloc(1);
+        if (out)
+            *out = '\0';
+        return out;
+    }
+
+    const char *end = start + strlen(start) - 1;
+    while (end > start && isspace((unsigned char)*end))
+        --end;
+
+    size_t len = (size_t)(end - start + 1);
+    char *out = malloc(len + 1);
+    if (!out)
+        return NULL;
+
+    memcpy(out, start, len);
+    out[len] = '\0';
+    return out;
+}
+
+char *string_join(char *items[], size_t count) {
+    size_t len = 1;
+    for (size_t i = 0; i < count; ++i) {
+        if (items[i] == NULL)
+            continue;
+        len += strlen(items[i]);
+        if (i + 1 < count)
+            len += 2;
+    }
+
+    char *out = malloc(len);
+    if (!out)
+        return NULL;
+
+    char *dst = out;
+    for (size_t i = 0; i < count; ++i) {
+        const char *s = items[i] ? items[i] : "";
+        size_t slen = strlen(s);
+        memcpy(dst, s, slen);
+        dst += slen;
+
+        if (i + 1 < count) {
+            *dst++ = ',';
+            *dst++ = ' ';
+        }
+    }
+    *dst = '\0';
+    return out;
 }

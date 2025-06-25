@@ -8,4 +8,8 @@ size_t string_split_by_delim(char *s, char *out[], const char *delim,
 
 size_t *string_wrapped_lines(const char *text, size_t max_len, size_t *count);
 
+char *string_join(char *items[], size_t count);
+
+char *string_strip(const char *s);
+
 #endif // UTIL_STRING_H

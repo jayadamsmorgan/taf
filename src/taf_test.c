@@ -92,14 +92,13 @@ static void line_hook(lua_State *L, lua_Debug *ar) {
 
         const char *text = get_line_text(src, ar->currentline);
 
-        taf_tui_set_current_line(ar->short_src, ar->currentline,
+        taf_tui_set_current_line(src, ar->currentline,
                                  text ? text : "(source unavailable)");
 
         int div = g_last - g_first;
-        float percentage;
-        percentage =
-            div == 0 ? 0 : (float)(ar->currentline - g_first) / div * 100;
-        taf_tui_set_test_progress((int)percentage);
+        double progress;
+        progress = div == 0 ? 0 : (double)(ar->currentline - g_first) / div;
+        taf_tui_set_test_progress(progress);
 
         taf_tui_update();
     }
@@ -165,6 +164,7 @@ static int run_all_tests(lua_State *L) {
     test_case_t *tests = test_case_get_all(&amount);
     LOG("Test amount: %zu", amount);
     taf_log_tests_create(amount);
+    reset_taf_start_millis();
 
     for (size_t i = 0; i < amount; ++i) {
 
@@ -177,6 +177,12 @@ static int run_all_tests(lua_State *L) {
 
         LOG("Pushing test body with index %d...", tests[i].ref);
         lua_rawgeti(L, LUA_REGISTRYINDEX, tests[i].ref);
+        lua_pushvalue(L, -1);
+        lua_Debug ar;
+        if (lua_getinfo(L, ">S", &ar)) {
+            g_first = ar.linedefined;
+            g_last = ar.lastlinedefined;
+        }
 
         LOG("Resetting taf.millis...");
         reset_millis();
@@ -436,7 +442,7 @@ int taf_test() {
         return EXIT_FAILURE;
     }
 
-    if (taf_tui_init(opts->log_level)) {
+    if (taf_tui_init()) {
         free(module_path);
         internal_logging_deinit();
         return EXIT_FAILURE;

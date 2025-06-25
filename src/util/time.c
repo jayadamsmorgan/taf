@@ -27,6 +27,7 @@ uint64_t millis_since_start(void) {
 #include <time.h>
 
 static struct timespec first = {0};
+static struct timespec taf_start = {0};
 
 void reset_millis(void) {
     //
@@ -41,6 +42,30 @@ uint64_t millis_since_start(void) {
     /* signed differences to avoid wrap-around */
     int64_t ds = (int64_t)now.tv_sec - (int64_t)first.tv_sec;
     int64_t dns = (int64_t)now.tv_nsec - (int64_t)first.tv_nsec;
+
+    /* normalise if nano part went negative */
+    if (dns < 0) {
+        ds -= 1;
+        dns += 1000000000L;
+    }
+
+    /* convert to milliseconds */
+    return (uint64_t)ds * 1000ULL + (uint64_t)(dns / 1000000L);
+}
+
+void reset_taf_start_millis(void) {
+    //
+    clock_gettime(CLOCK_MONOTONIC, &taf_start);
+}
+
+uint64_t millis_since_taf_start(void) {
+    struct timespec now;
+
+    clock_gettime(CLOCK_MONOTONIC, &now);
+
+    /* signed differences to avoid wrap-around */
+    int64_t ds = (int64_t)now.tv_sec - (int64_t)taf_start.tv_sec;
+    int64_t dns = (int64_t)now.tv_nsec - (int64_t)taf_start.tv_nsec;
 
     /* normalise if nano part went negative */
     if (dns < 0) {

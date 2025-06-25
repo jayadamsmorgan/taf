@@ -343,15 +343,15 @@ void taf_log_test(taf_log_level level, const char *file, int line,
         taf_log_level_to_str(log_level), file, line, (int)buffer_len, buffer,
         buffer_len);
 
-    taf_tui_log(level, file, line, buffer);
+    char ts[TS_LEN];
+    get_date_time_now(ts);
+
+    taf_tui_log(ts, level, file, line, buffer, buffer_len);
 
     if (no_logs) {
         LOG("Skipping logging test to log files...");
         return;
     }
-
-    char ts[TS_LEN];
-    get_date_time_now(ts);
 
     if (level <= log_level) {
         LOG("Writing to output log file...");
@@ -449,15 +449,16 @@ void taf_log_test_passed(int index, test_case_t test_case) {
 
     LOG("TAF logging test '%s' passed at index %d...", test_case.name, index);
 
-    taf_tui_test_passed(index, test_case.name);
+    char time_str[TS_LEN];
+    get_date_time_now(time_str);
+
+    taf_tui_test_passed(time_str);
 
     if (no_logs) {
         LOG("Skipping logging test passed to log files...");
         return;
     }
 
-    char time_str[TS_LEN];
-    get_date_time_now(time_str);
     fprintf(output_log_file, "[%s][%s]: Test %d Passed.\n\n", time_str,
             test_case.name, index);
     LOG("Wrote to output log file");
@@ -476,15 +477,15 @@ void taf_log_test_failed(int index, test_case_t test_case, const char *msg,
         "and line %d",
         test_case.name, index, msg, file, line);
 
-    taf_tui_test_failed(index, test_case.name, msg);
+    char time_str[TS_LEN];
+    get_date_time_now(time_str);
+
+    taf_tui_test_failed(time_str, msg);
 
     if (no_logs) {
         LOG("Skipping logging test failed to log files...");
         return;
     }
-
-    char time_str[TS_LEN];
-    get_date_time_now(time_str);
 
     fprintf(output_log_file, "[%s][%s]: Test %d Failed: %s\n\n", time_str,
             test_case.name, index, msg);
