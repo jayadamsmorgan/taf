@@ -9,6 +9,10 @@
 #include <spawn.h>
 #include <string.h>
 
+#ifdef __linux__
+#include <wait.h>
+#endif // __linux__
+
 extern char **environ;
 
 static void close_fd(int fd) {

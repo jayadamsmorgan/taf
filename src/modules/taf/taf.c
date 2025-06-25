@@ -271,9 +271,9 @@ int l_module_taf_millis(lua_State *L) {
 
     LOG("Invoked taf-main millis...");
 
-    uint64_t uptime = millis_since_start();
+    unsigned long uptime = millis_since_start();
 
-    LOG("Pushing uptime: %llu", uptime);
+    LOG("Pushing uptime: %lu", uptime);
     lua_pushnumber(L, uptime);
 
     LOG("Sucessfully finished taf-main uptime.");

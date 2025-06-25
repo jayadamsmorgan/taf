@@ -1,5 +1,7 @@
 #include "util/time.h"
 
+#include <stdint.h>
+
 // WINDOWS
 #if defined(_WIN32) || defined(_WIN64)
 
@@ -34,7 +36,7 @@ void reset_millis(void) {
     clock_gettime(CLOCK_MONOTONIC, &first);
 }
 
-uint64_t millis_since_start(void) {
+unsigned long millis_since_start(void) {
     struct timespec now;
 
     clock_gettime(CLOCK_MONOTONIC, &now);
@@ -50,7 +52,7 @@ uint64_t millis_since_start(void) {
     }
 
     /* convert to milliseconds */
-    return (uint64_t)ds * 1000ULL + (uint64_t)(dns / 1000000L);
+    return (unsigned long)ds * 1000ULL + (unsigned long)(dns / 1000000L);
 }
 
 void reset_taf_start_millis(void) {
@@ -58,7 +60,7 @@ void reset_taf_start_millis(void) {
     clock_gettime(CLOCK_MONOTONIC, &taf_start);
 }
 
-uint64_t millis_since_taf_start(void) {
+unsigned long millis_since_taf_start(void) {
     struct timespec now;
 
     clock_gettime(CLOCK_MONOTONIC, &now);
@@ -74,7 +76,7 @@ uint64_t millis_since_taf_start(void) {
     }
 
     /* convert to milliseconds */
-    return (uint64_t)ds * 1000ULL + (uint64_t)(dns / 1000000L);
+    return (unsigned long)ds * 1000ULL + (unsigned long)(dns / 1000000L);
 }
 #endif
 

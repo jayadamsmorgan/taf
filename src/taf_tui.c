@@ -22,7 +22,7 @@ typedef enum {
 
 typedef struct {
     ui_test_progress_state state;
-    uint64_t elapsed;
+    unsigned long elapsed;
     char *name;
     char *failure_reason;
     char *time;
@@ -128,11 +128,11 @@ void taf_tui_update() {
     } else {
         ms = millis_since_taf_start();
     }
-    const uint64_t minutes = ms / 60000;
-    const uint64_t seconds = (ms / 1000) % 60;
-    const uint64_t millis = ms % 1000;
+    const unsigned long minutes = ms / 60000;
+    const unsigned long seconds = (ms / 1000) % 60;
+    const unsigned long millis = ms % 1000;
     ncplane_printf_aligned(ui_plane, project_info_dimy + 11, NCALIGN_RIGHT,
-                           "Elapsed Time: %llum %llu.%llus │", minutes, seconds,
+                           "Elapsed Time: %lum %lu.%lus │", minutes, seconds,
                            millis);
     ncplane_printf_yx(ui_plane, 1, 2, "Project: %s", ui.project_name);
     int offset = 0;
@@ -164,7 +164,7 @@ void taf_tui_update() {
         ncplane_putstr_yx(test_progress_plane, 3 - offset, 2,
                           test_state_to_str_map[hist->state]);
         ncplane_set_fg_default(test_progress_plane);
-        ncplane_printf_yx(test_progress_plane, 3 - offset, 10, "[ %llums ] %s",
+        ncplane_printf_yx(test_progress_plane, 3 - offset, 10, "[ %lums ] %s",
                           hist->state == RUNNING ? millis_since_start()
                                                  : hist->elapsed,
                           hist->name);

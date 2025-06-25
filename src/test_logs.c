@@ -295,12 +295,21 @@ void taf_log_tests_create(int amount) {
         }
     }
 
-    snprintf(raw_log_file_path, PATH_MAX, "%s/test_run_%s_raw.json", logs_dir,
+    int n = snprintf(raw_log_file_path, PATH_MAX, "%s/test_run_%s_raw.json", logs_dir,
              time_str);
+    if (n < 1) {
+        LOG("snprintf error");
+        exit(EXIT_FAILURE);
+    }
+
     LOG("Raw log path: %s", raw_log_file_path);
 
-    snprintf(output_log_file_path, PATH_MAX, "%s/test_run_%s_output.log",
+    n = snprintf(output_log_file_path, PATH_MAX, "%s/test_run_%s_output.log",
              logs_dir, time_str);
+    if (n < 1) {
+        LOG("snprintf error");
+        exit(EXIT_FAILURE);
+    }
     LOG("Output log path: %s", output_log_file_path);
 
     output_log_file = fopen(output_log_file_path, "w");
@@ -631,9 +640,17 @@ void taf_log_tests_finalize() {
 
     // Create 'latest' symlinks:
     char latest_log[PATH_MAX];
-    snprintf(latest_log, PATH_MAX, "%s/test_run_latest_output.log", logs_dir);
+    int n = snprintf(latest_log, PATH_MAX, "%s/test_run_latest_output.log", logs_dir);
+    if (n < 0) {
+        LOG("snprintf error");
+        exit(EXIT_FAILURE);
+    }
     char latest_raw[PATH_MAX];
-    snprintf(latest_raw, PATH_MAX, "%s/test_run_latest_raw.json", logs_dir);
+    n = snprintf(latest_raw, PATH_MAX, "%s/test_run_latest_raw.json", logs_dir);
+    if (n < 0) {
+        LOG("snprintf error");
+        exit(EXIT_FAILURE);
+    }
 
     LOG("Creating symlinks '%s' and '%s'...", latest_log, latest_raw);
     replace_symlink(output_log_file_path, latest_log);

@@ -1,8 +1,10 @@
 #ifndef CMD_PARSER_H
 #define CMD_PARSER_H
 
-#include "stdbool.h"
 #include "test_logs.h"
+
+#include <stdbool.h>
+
 typedef enum {
     CMD_INIT,
     CMD_TEST,
