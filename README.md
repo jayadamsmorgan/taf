@@ -22,25 +22,9 @@ Leveraging the simplicity of Lua for test scripting and the raw performance of a
 *   **🧹 Guaranteed Teardown:** Use the elegant `taf.defer` function to ensure resources are always cleaned up, whether a test passes or fails.
 *   **🗂️ Detailed Logging:** Automatically generates human-readable text logs and machine-readable JSON logs for every test run, perfect for CI/CD integration and reporting.
 
-## Getting Started
+## Overview
 
-Three simple steps to run your first test:
-
-1.  **Build the Project**
-    Clone the repository and follow the [build instructions](./BUILD.md) to compile the `taf` executable.
-
-2.  **Initialize a New Project**
-    Use the `init` command to scaffold a new project directory.
-    ```bash
-    taf init my_new_project
-    cd my_new_project
-    ```
-
-3.  **Run the Example Tests**
-    Execute the tests using the `test` command.
-    ```bash
-    taf test
-    ```
+![](overview.gif)
 
 ## Dive Deeper: Full Documentation
 
@@ -58,8 +42,21 @@ This project is fully documented to help you get the most out of TAF. All docume
 
 ## Installation
 
-Currently, TAF must be built from source. Please see the detailed **[Build Instructions](./BUILD.md)**.
+### [Homebrew](https://brew.sh) (MacOS / Linux)
+
+```
+brew tap jayadamsmorgan/taf
+brew install taf
+```
+
+### Build from source
+
+Please see the detailed **[Build Instructions](./BUILD.md)**.
 
 ## Contributing
 
-Contributions are welcome! Whether it's bug reports, feature requests, or code contributions, please feel free to open an issue or submit a pull request. We would love to hear from you
+Contributions are welcome!
+
+Whether it's bug reports, feature requests, or code contributions, please feel free to open an issue or submit a pull request.
+
+We would love to hear from you!
