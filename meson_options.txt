@@ -1,0 +1,13 @@
+option(
+  'lua_install_dir',
+  type: 'string',
+  value: '',
+  description: 'Install path for Lua modules; empty defaults to ~/.taf/<ver>/lib'
+)
+
+option(
+  'install_setgid',
+  type: 'boolean',
+  value: true,
+  description: 'Install taf binary set-gid dialout (needs root)'
+)

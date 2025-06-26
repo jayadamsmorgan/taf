@@ -120,11 +120,31 @@ include_dir = include_directories('include')
 
 
 if is_linux
-    #   rwx r-s r-x   → set-gid + 2755
-    #   this is needed to be able to open serial ports
-    taf_install_mode = ['rwxr-sr-x', 'root', 'dialout']
+    need_setgid = get_option('install_setgid')
+    if need_setgid
+      #   rwx r-s r-x   → set-gid + 2755
+      #   this is needed to be able to open serial ports
+      taf_install_mode = ['rwxr-sr-x', 'root', 'dialout']
+    else
+      taf_install_mode = 'rwxr-xr-x'
+    endif
 else
     taf_install_mode = 'rwxr-xr-x'
+endif
+
+lua_install_dir = get_option('lua_install_dir')
+add_project_arguments(
+  '-DLUA_INSTALL_DIR="@0@"'.format(lua_install_dir),
+  language: 'c',
+)
+
+if lua_install_dir == ''
+  # default for developers: ~/.taf/<version>/lib
+  fs = import('fs')
+  taf_lib_path = fs.expanduser('~/.taf') / meson.project_version()
+else
+  # used by package managers: e.g. ${prefix}/share/taf/lua
+  taf_lib_path = lua_install_dir
 endif
 
 executable(
@@ -143,9 +163,5 @@ executable(
     install: true,
     install_mode: taf_install_mode,
 )
-
-#--- lua libraries ----------------------------------------------------
-fs = import('fs')
-taf_lib_path = fs.expanduser('~/.taf') / meson.project_version()
 
 install_subdir('lib', install_dir: taf_lib_path)

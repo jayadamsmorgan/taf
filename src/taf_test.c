@@ -251,6 +251,14 @@ static char *get_lib_dir() {
     }
 
     // Check default fallback
+    if (strlen(LUA_INSTALL_DIR) != 0) {
+        LOG("LUA_INSTALL_DIR specified: %s", LUA_INSTALL_DIR);
+        char path[PATH_MAX];
+        snprintf(path, PATH_MAX, "%s/lib", LUA_INSTALL_DIR);
+        return strdup(path);
+    }
+
+    LOG("LUA_INSTALL_DIR not specified, trying '~/.taf'...");
     const char *home_path = getenv("HOME");
     if (!home_path || !*home_path) {
         fprintf(stderr, "Unable to load taf lua library: 'HOME' "
