@@ -5,6 +5,9 @@ local http = require("taf.http")
 
 local M = {}
 
+-- Internal W3C constant for element reference key
+local ELEM_KEY = "element-6066-11e4-a52e-4f735466cecf"
+
 --- @alias webdriver
 --- | '"chromedriver"'
 --- | '"geckodriver"'
@@ -332,6 +335,92 @@ end
 M.screenshot = function(session)
 	local res = M.session_cmd(session, "GET", "screenshot", {})
 	return res.value
+end
+
+--- Drag-and-drop. Uses W3C Actions (§17) with a single mouse pointer device.
+---
+--- @param session session
+--- @param source_id string element to grab
+--- @param target_id string element to drop on
+---
+--- @return table raw WebDriver response
+M.drag_and_drop = function(session, source_id, target_id)
+	local BUTTON_LMB = 0 -- left mouse button for pointer actions
+	local payload = {
+		actions = {
+			{
+				type = "pointer",
+				id = "mouse",
+				parameters = { pointerType = "mouse" },
+				actions = {
+					{ type = "pointerMove", origin = { [ELEM_KEY] = source_id }, x = 0, y = 0 },
+					{ type = "pointerDown", button = BUTTON_LMB },
+					{ type = "pause", duration = 100 },
+					{ type = "pointerMove", origin = { [ELEM_KEY] = target_id }, x = 0, y = 0 },
+					{ type = "pointerUp", button = BUTTON_LMB },
+				},
+			},
+		},
+	}
+	return M.session_cmd(session, "POST", "actions", payload)
+end
+
+--- Input text
+---
+--- @param session session
+--- @param element_id string
+--- @param text string
+--- @param clear_first boolean? (default: true)
+---
+--- @return table raw WebDriver response
+M.input_text = function(session, element_id, text, clear_first)
+	if clear_first ~= false then
+		M.session_cmd(session, "POST", ("element/%s/clear"):format(element_id), {})
+	end
+	return M.send_keys(session, element_id, text)
+end
+
+-- Wait until element *visible*.
+-- Polls `/displayed` endpoint until it returns true or timeout.
+--
+--- @param session session
+--- @param using string   selector strategy   (css selector, xpath…)
+--- @param value string   selector
+--- @param timeout integer? milliseconds (default 5000)
+---
+--- @return string element_id (throws error on timeout)
+M.wait_until_visible = function(session, using, value, timeout)
+	timeout = timeout or 5000
+	local start = tm.millis()
+	local elem_id
+
+	while tm.millis() - start < timeout do
+		local ok, id = pcall(M.find_element, session, using, value)
+		if ok then
+			local res = M.session_cmd(session, "GET", ("element/%s/displayed"):format(id), {})
+			if res.value == true then
+				elem_id = id
+				break
+			end
+		end
+		tm.sleep(100) -- small poll interval (ms)
+	end
+
+	if not elem_id then
+		error(("wait_until_visible timeout after %d ms for selector %s:%s"):format(timeout, using, value))
+	end
+	return elem_id
+end
+
+--- Scroll element into view
+---
+--- @param session session
+--- @param element_id string
+---
+--- @return table raw WebDriver response
+M.scroll_into_view = function(session, element_id)
+	local js = "arguments[0].scrollIntoView({block:'center',inline:'nearest'});"
+	return M.execute(session, js, { { [ELEM_KEY] = element_id } })
 end
 
 --- Low level helper
