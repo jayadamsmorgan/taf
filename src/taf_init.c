@@ -24,6 +24,54 @@ static const char *gitignore_contents = //
     ".DS_Store"                         //
     ;
 
+static const char *luarc_contents =          //
+    "{\n"                                    //
+    "  \"runtime\": {\n"                     //
+    "\n"                                     //
+    "    \"version\": \"Lua5.4\",\n"         //
+    "\n"                                     //
+    "    \"path\": [\n"                      //
+    "      \"?.lua\",\n"                     //
+    "      \"?/init.lua\",\n"                //
+    "      \"lib/?.lua\",\n"                 //
+    "      \"lib/?/init.lua\"\n"             //
+    "    ]\n"                                //
+    "\n"                                     //
+    "  },\n"                                 //
+    "\n"                                     //
+    "  \"workspace\": {\n"                   //
+    "\n"                                     //
+    "    \"checkThirdParty\": false,\n"      //
+    "\n"                                     //
+    "    \"library\": [\n"                   //
+    "      \"~/.taf/" TAF_VERSION "/lib\"\n" //
+    "    ]\n"                                //
+    "\n"                                     //
+    "  }\n"                                  //
+    "\n"                                     //
+    "}"                                      //
+    ;
+
+static int create_file(const char *name, const char *location,
+                       const char *contents) {
+    char file_path[PATH_MAX];
+    snprintf(file_path, PATH_MAX, "%s/%s", location, name);
+    LOG("Creating %s file at %s...", name, file_path);
+    FILE *fp = fopen(file_path, "w");
+    if (!fp) {
+        LOG("Unable to create %s file.", name);
+        return -1;
+    }
+
+    LOG("Writing %s contents...", name);
+    fprintf(fp, "%s", contents);
+    LOG("Closing & flushing %s file...", name);
+    fflush(fp);
+    fclose(fp);
+
+    return 0;
+}
+
 static int create_project(cmd_init_options *opts) {
     LOG("Creating project...");
     LOG("Project name: %s", opts->project_name);
@@ -74,20 +122,11 @@ static int create_project(cmd_init_options *opts) {
 
     project_parser_save();
 
-    char gitignore_path[PATH_MAX];
-    snprintf(gitignore_path, PATH_MAX, "%s/.gitignore", proj->project_path);
-    LOG("Creating .gitignore file '%s'", gitignore_path);
-    FILE *fp = fopen(gitignore_path, "w");
-    if (!fp) {
-        LOG("Unable to create .gitignore file.");
+    if (create_file(".gitignore", proj->project_path, gitignore_contents))
         return -5;
-    }
 
-    LOG("Writing .gitignore contents...");
-    fprintf(fp, "%s", gitignore_contents);
-    LOG("Closing & flushing .gitignore file...");
-    fflush(fp);
-    fclose(fp);
+    if (create_file(".luarc.json", proj->project_path, luarc_contents))
+        return -6;
 
     LOG("Successfully finished creating project.");
 
