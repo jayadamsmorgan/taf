@@ -40,6 +40,8 @@ static void print_test_help(FILE *file) {
             "not output "
             "log files after a "
             "test run\n"
+            "  -p, --taf-lib-path <path>                                   "
+            "Specify custom path to TAF Lua libraries\n"
             "  -t, --tags <tag1,tag2>                                      "
             "Perform tests "
             "with specified tags\n"
@@ -319,9 +321,14 @@ static void get_test_help(const char *) {
     exit(EXIT_SUCCESS);
 }
 
+static void set_test_taf_lib_path(const char *arg) {
+    test_opts.custom_taf_lib_path = strdup(arg);
+}
+
 static cmd_option all_test_options[] = {
     {"--log-level", "-l", true, set_log_level},
     {"--no-logs", "-n", false, set_test_no_logs},
+    {"--taf-lib-path", "-p", true, set_test_taf_lib_path},
     {"--tags", "-t", true, set_test_tags},
     {"--internal-log", "-i", false, set_internal_logging},
     {"--help", "-h", false, get_test_help},
@@ -336,6 +343,7 @@ static cmd_category parse_test_options(int argc, char **argv) {
     test_opts.no_logs = false;
     test_opts.log_level = TAF_LOG_LEVEL_INFO;
     test_opts.internal_logging = false;
+    test_opts.custom_taf_lib_path = NULL;
 
     if (argc <= 2) {
         return CMD_TEST;

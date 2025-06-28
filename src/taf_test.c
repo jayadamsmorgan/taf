@@ -238,7 +238,12 @@ static int run_all_tests(lua_State *L) {
 static char *get_lib_dir() {
     LOG("Getting TAF library directory location...");
 
-    // TODO: check optional CMD arg first
+    // Check argument first
+    cmd_test_options *opts = cmd_parser_get_test_options();
+    if (opts->custom_taf_lib_path) {
+        LOG("--taf-lib-path specified: %s", opts->custom_taf_lib_path);
+        return strdup(opts->custom_taf_lib_path);
+    }
 
     // Check 'TAF_LIB_PATH' env variable
     char *env_path = getenv("TAF_LIB_PATH");
@@ -250,11 +255,11 @@ static char *get_lib_dir() {
         return env_path;
     }
 
-    // Check default fallback
-    if (strlen(LUA_INSTALL_DIR) != 0) {
-        LOG("LUA_INSTALL_DIR specified: %s", LUA_INSTALL_DIR);
+    // Check TAF_DIR_PATH if TAF was installed with package manager
+    if (strlen(TAF_DIR_PATH) != 0) {
+        LOG("LUA_INSTALL_DIR specified: %s", TAF_DIR_PATH);
         char path[PATH_MAX];
-        snprintf(path, PATH_MAX, "%s/lib", LUA_INSTALL_DIR);
+        snprintf(path, PATH_MAX, "%s/lib", TAF_DIR_PATH);
         return strdup(path);
     }
 
@@ -271,8 +276,7 @@ static char *get_lib_dir() {
     }
     LOG("HOME path: %s", home_path);
     char default_path[PATH_MAX];
-    snprintf(default_path, sizeof default_path, "%s/.taf/" TAF_VERSION "/lib",
-             home_path);
+    snprintf(default_path, sizeof default_path, "%s/.taf/lib", home_path);
     LOG("TAF library path: %s", default_path);
 
     return strdup(default_path);
@@ -359,6 +363,17 @@ int taf_test() {
     }
 
     project_parsed_t *proj = get_parsed_project();
+
+    const unsigned long min_version_required =
+        TAF_VERSION_NUM(proj->min_taf_ver_major, proj->min_taf_ver_minor,
+                        proj->min_taf_ver_patch);
+    if (min_version_required < TAF_VERSION_NUM_CURRENT) {
+        printf("\x1b[33mWARNING: This project was created with a newer TAF "
+               "version '%s' "
+               "(current TAF version '%s'), some features might not work as "
+               "expected.\n\x1b[0m",
+               proj->min_taf_ver_str, TAF_VERSION);
+    }
 
     if (!opts->target && proj->multitarget) {
         fprintf(stderr, "Project is multitarget, specify target with "
