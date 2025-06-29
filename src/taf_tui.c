@@ -524,7 +524,11 @@ void taf_tui_deinit() {
 
     notcurses_stop(nc);
 
-    puts("\nFor more info: 'taf logs info latest'");
+    puts("\n");
+    cmd_test_options *opts = cmd_parser_get_test_options();
+    if (!opts->no_logs) {
+        puts("For more info: 'taf logs info latest'");
+    }
 
     for (size_t i = 0; i < ui.test_history_size; i++) {
         ui_test_history_t *hist = &ui.test_history[i];
