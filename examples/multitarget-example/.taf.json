@@ -1,0 +1,12 @@
+{
+  "project_name": "multitarget-example",
+  "min_taf_version": "1.0.2",
+  "min_taf_version_major": 1,
+  "min_taf_version_minor": 0,
+  "min_taf_version_patch": 2,
+  "multitarget": true,
+  "targets": [
+    "target1",
+    "target2"
+  ]
+}
