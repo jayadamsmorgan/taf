@@ -30,10 +30,11 @@
 static int g_first = 0;
 static int g_last = 0;
 
-static char *module_path;
+static char *module_path = NULL;
 
-static char test_folder_path[PATH_MAX];
-static char lib_folder_path[PATH_MAX];
+static char *test_dir_path = NULL;
+static char *test_common_dir_path = NULL;
+static char *lib_dir_path = NULL;
 
 typedef struct line_cache {
     char *path;
@@ -268,7 +269,7 @@ static char *get_lib_dir() {
     if (!home_path || !*home_path) {
         fprintf(stderr, "Unable to load taf lua library: 'HOME' "
                         "environment variable is not set.\n"
-                        "Use --libpath path_to_taf_lib_folder or set "
+                        "Use --libpath path_to_taf_lib_dir or set "
                         "'TAF_LIB_PATH' environment variable.\n");
         LOG("Unable to find TAF library directory: HOME is not set.");
         internal_logging_deinit();
@@ -276,7 +277,7 @@ static char *get_lib_dir() {
     }
     LOG("HOME path: %s", home_path);
     char default_path[PATH_MAX];
-    snprintf(default_path, sizeof default_path, "%s/.taf/lib", home_path);
+    snprintf(default_path, PATH_MAX, "%s/.taf/lib", home_path);
     LOG("TAF library path: %s", default_path);
 
     return strdup(default_path);
@@ -290,11 +291,20 @@ static void inject_modules_dir(lua_State *L) {
     lua_getglobal(L, "package");
     lua_getfield(L, -1, "path"); /* pkg.path string */
     const char *old_path = lua_tostring(L, -1);
-    lua_pushfstring(L,
-                    "%s;%s/?.lua;%s/?/init.lua;%s/?.lua;%s/?/init.lua;%s/"
-                    "?.lua;%s/?/init.lua",
-                    old_path, module_path, module_path, lib_folder_path,
-                    lib_folder_path, test_folder_path, test_folder_path);
+    if (directory_exists(test_common_dir_path)) {
+        lua_pushfstring(L,
+                        "%s;%s/?.lua;%s/?/init.lua;%s/?.lua;%s/?/init.lua;%s/"
+                        "?.lua;%s/?/init.lua;%s/?.lua;%s/?/init.lua",
+                        old_path, module_path, module_path, lib_dir_path,
+                        lib_dir_path, test_dir_path, test_dir_path,
+                        test_common_dir_path, test_common_dir_path);
+    } else {
+        lua_pushfstring(L,
+                        "%s;%s/?.lua;%s/?/init.lua;%s/?.lua;%s/?/init.lua;%s/"
+                        "?.lua;%s/?/init.lua",
+                        old_path, module_path, module_path, lib_dir_path,
+                        lib_dir_path, test_dir_path, test_dir_path);
+    }
     lua_setfield(L, -3, "path"); /* package.path = … */
     lua_pop(L, 2);               /* pop path + package */
 
@@ -345,6 +355,30 @@ static int load_lua_files(lua_State *L, str_array_t *files) {
     return 0;
 }
 
+static int load_lua_dir(const char *dir_path, lua_State *L) {
+    if (!directory_exists(dir_path)) {
+        LOG("Directory %s doesn't exist.", dir_path);
+        return -1;
+    }
+
+    str_array_t lua_files = list_lua_recursive(dir_path);
+    if (lua_files.count != 0) {
+        LOG("Found lua files in '%s', loading...", dir_path);
+
+        if (load_lua_files(L, &lua_files)) {
+            free_str_array(&lua_files);
+            return -2;
+        }
+
+        free_str_array(&lua_files);
+        return 0;
+    } else {
+        LOG("No lua files found in '%s'.", dir_path);
+        free_str_array(&lua_files);
+        return -1;
+    }
+}
+
 int taf_test() {
 
     cmd_test_options *opts = cmd_parser_get_test_options();
@@ -367,7 +401,7 @@ int taf_test() {
     const unsigned long min_version_required =
         TAF_VERSION_NUM(proj->min_taf_ver_major, proj->min_taf_ver_minor,
                         proj->min_taf_ver_patch);
-    if (min_version_required < TAF_VERSION_NUM_CURRENT) {
+    if (min_version_required > TAF_VERSION_NUM_CURRENT) {
         printf("\x1b[33mWARNING: This project was created with a newer TAF "
                "version '%s' "
                "(current TAF version '%s'), some features might not work as "
@@ -376,8 +410,7 @@ int taf_test() {
     }
 
     if (!opts->target && proj->multitarget) {
-        fprintf(stderr, "Project is multitarget, specify target with "
-                        "'--target' option.\n");
+        fprintf(stderr, "Project is multitarget, but no target specified.\n");
         LOG("No target specified.");
         internal_logging_deinit();
         return EXIT_FAILURE;
@@ -389,70 +422,74 @@ int taf_test() {
         internal_logging_deinit();
         return EXIT_FAILURE;
     }
-
-    // Load test paths
-    if (proj->multitarget) {
-        LOG("Target: %s", opts->target);
-        snprintf(test_folder_path, PATH_MAX, "%s/tests/%s", proj->project_path,
-                 opts->target);
-        LOG("Test folder path: %s", test_folder_path);
-        if (!directory_exists(test_folder_path)) {
-            fprintf(stderr, "Unable to find 'tests/%s' folder.\n",
-                    opts->target);
-            LOG("Test folder path does not exist.");
-            internal_logging_deinit();
-            return EXIT_FAILURE;
+    if (opts->target) {
+        bool found = false;
+        for (size_t i = 0; i < proj->targets_amount; i++) {
+            if (!strcmp(opts->target, proj->targets[i])) {
+                found = true;
+                break;
+            }
         }
-    } else {
-        snprintf(test_folder_path, PATH_MAX, "%s/tests", proj->project_path);
-        if (!directory_exists(test_folder_path)) {
-            LOG("Test folder path does not exist");
-            fprintf(stderr, "Unable to find 'tests' folder.\n");
+        if (!found) {
+            fprintf(stderr, "Target '%s' was not found.\n", opts->target);
+            LOG("Target %s was not found.", opts->target);
             internal_logging_deinit();
             return EXIT_FAILURE;
         }
     }
-    snprintf(lib_folder_path, PATH_MAX, "%s/lib", proj->project_path);
-    LOG("Project lib folder path: %s", lib_folder_path);
-
-    str_array_t lua_test_files = list_lua_recursive(test_folder_path);
-    if (lua_test_files.count == 0) {
-        fprintf(stderr, "No tests to execute.\n");
-        LOG("No tests files found.");
-        internal_logging_deinit();
-        return EXIT_FAILURE;
-    }
-    for (size_t i = 0; i < lua_test_files.count; i++)
-        LOG("Found test file %s", lua_test_files.items[i]);
 
     LOG("Creating Lua state...");
     lua_State *L = luaL_newstate();
     LOG("Opening Lua libs...");
     luaL_openlibs(L);
 
+    asprintf(&lib_dir_path, "%s/lib", proj->project_path);
+    if (proj->multitarget) {
+        asprintf(&test_common_dir_path, "%s/tests/common", proj->project_path);
+        asprintf(&test_dir_path, "%s/tests/%s", proj->project_path,
+                 opts->target);
+    } else {
+        asprintf(&test_dir_path, "%s/tests", proj->project_path);
+    }
+
     register_test_api(L);
 
-    // Load lib files if they are present
-    if (directory_exists(lib_folder_path)) {
-        LOG("Checking project lib folder...");
-
-        str_array_t lua_lib_files = list_lua_recursive(lib_folder_path);
-
-        if (load_lua_files(L, &lua_lib_files)) {
+    LOG("Project lib directory path: %s", lib_dir_path);
+    if (load_lua_dir(lib_dir_path, L) == -2) {
+        test_case_free_all(L);
+        lua_close(L);
+        free(module_path);
+        free(test_common_dir_path);
+        free(test_dir_path);
+        free(lib_dir_path);
+        project_parser_free();
+        internal_logging_deinit();
+        return EXIT_FAILURE;
+    }
+    if (proj->multitarget) {
+        if (load_lua_dir(test_common_dir_path, L) == -2) {
+            test_case_free_all(L);
+            lua_close(L);
             free(module_path);
-            free_str_array(&lua_lib_files);
+            free(test_common_dir_path);
+            free(test_dir_path);
+            free(lib_dir_path);
+            project_parser_free();
             internal_logging_deinit();
             return EXIT_FAILURE;
         }
-
-        free_str_array(&lua_lib_files);
     }
-
-    LOG("Loading test files...");
-    if (load_lua_files(L, &lua_test_files))
+    if (load_lua_dir(test_dir_path, L) == -2) {
+        test_case_free_all(L);
+        lua_close(L);
+        free(module_path);
+        free(test_common_dir_path);
+        free(test_dir_path);
+        free(lib_dir_path);
+        project_parser_free();
+        internal_logging_deinit();
         return EXIT_FAILURE;
-
-    free_str_array(&lua_test_files);
+    }
 
     size_t amount;
     test_case_get_all(&amount);
@@ -460,24 +497,34 @@ int taf_test() {
     if (amount == 0) {
         LOG("No tests found.");
         fprintf(stderr, "No tests to execute.\n");
+        test_case_free_all(L);
+        lua_close(L);
         free(module_path);
+        free(test_common_dir_path);
+        free(test_dir_path);
+        free(lib_dir_path);
+        project_parser_free();
         internal_logging_deinit();
         return EXIT_FAILURE;
     }
 
     if (taf_tui_init()) {
+        test_case_free_all(L);
+        lua_close(L);
         free(module_path);
+        free(test_common_dir_path);
+        free(test_dir_path);
+        free(lib_dir_path);
+        project_parser_free();
         internal_logging_deinit();
         return EXIT_FAILURE;
     }
 
     LOG("Enabling line hook...");
-    lua_sethook(L, line_hook, LUA_MASKLINE, 0); // Enable line hook
+    lua_sethook(L, line_hook, LUA_MASKLINE, 0);
 
-    /* -------- run the queued tests ------------------ */
     int exitcode = run_all_tests(L);
 
-    /* -------- tidy‑up ------------------------------- */
     LOG("Tidying up...");
 
     taf_tui_deinit();
@@ -492,6 +539,9 @@ int taf_test() {
     internal_logging_deinit();
 
     free(module_path);
+    free(test_common_dir_path);
+    free(test_dir_path);
+    free(lib_dir_path);
 
     return exitcode;
 }
