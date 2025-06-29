@@ -24,32 +24,35 @@ static const char *gitignore_contents = //
     ".DS_Store"                         //
     ;
 
-static const char *luarc_contents =     //
-    "{\n"                               //
-    "  \"runtime\": {\n"                //
-    "\n"                                //
-    "    \"version\": \"Lua5.4\",\n"    //
-    "\n"                                //
-    "    \"path\": [\n"                 //
-    "      \"?.lua\",\n"                //
-    "      \"?/init.lua\",\n"           //
-    "      \"lib/?.lua\",\n"            //
-    "      \"lib/?/init.lua\"\n"        //
-    "    ]\n"                           //
-    "\n"                                //
-    "  },\n"                            //
-    "\n"                                //
-    "  \"workspace\": {\n"              //
-    "\n"                                //
-    "    \"checkThirdParty\": false,\n" //
-    "\n"                                //
-    "    \"library\": [\n"              //
-    "      \"~/.taf/lib\"\n"            //
-    "    ]\n"                           //
-    "\n"                                //
-    "  }\n"                             //
-    "\n"                                //
-    "}"                                 //
+static const char *luarc_contents =                                 //
+    "{\n"                                                           //
+    "  \"runtime\": {\n"                                            //
+    "\n"                                                            //
+    "    \"version\": \"Lua5.4\",\n"                                //
+    "\n"                                                            //
+    "    \"path\": [\n"                                             //
+    "      \"?.lua\",\n"                                            //
+    "      \"?/init.lua\",\n"                                       //
+    "      \"lib/?.lua\",\n"                                        //
+    "      \"lib/?/init.lua\"\n"                                    //
+    "    ]\n"                                                       //
+    "\n"                                                            //
+    "  },\n"                                                        //
+    "\n"                                                            //
+    "  \"workspace\": {\n"                                          //
+    "\n"                                                            //
+    "    \"checkThirdParty\": false,\n"                             //
+    "\n"                                                            //
+    "    \"library\": [\n"                                          //
+    "      \"~/.taf/lib\",\n"                                       //
+    "      \"/home/linuxbrew/.linuxbrew/opt/taf/share/taf/lib\",\n" //
+    "      \"/opt/homebrew/opt/taf/share/taf/lib\",\n"              //
+    "      \"/usr/local/opt/taf/share/taf/lib\"\n"                  //
+    "    ]\n"                                                       //
+    "\n"                                                            //
+    "  }\n"                                                         //
+    "\n"                                                            //
+    "}"                                                             //
     ;
 
 static int create_file(const char *name, const char *location,
