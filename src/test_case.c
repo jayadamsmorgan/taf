@@ -14,6 +14,13 @@ void test_case_enqueue(test_case_t *tc) {
         LOG("Test case is NULL");
         return;
     }
+    for (size_t i = 0; i < tests_len; i++) {
+        if (!strcmp(tc->name, tests[i].name)) {
+            LOG("Overwriting test '%s'...", tc->name);
+            memcpy(&tests[i], tc, sizeof(test_case_t));
+            return;
+        }
+    }
     LOG("Adding test '%s' to the queue", tc->name);
     if (tests_len == tests_cap) { /* grow 2× */
         LOG("Reallocating: cap: %zu, len: %zu", tests_cap, tests_len);
