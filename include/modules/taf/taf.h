@@ -13,6 +13,9 @@
 // taf:defer(defer_func: function(status: string))
 int l_module_taf_defer(lua_State *L);
 
+// taf:get_current_target() -> target: string
+int l_module_taf_get_current_target(lua_State *L);
+
 // taf:log(log_level: string, ...)
 int l_module_taf_log(lua_State *L);
 
@@ -26,10 +29,10 @@ int l_module_taf_print(lua_State *L);
 // taf:test(name: string, tags: [string], body: function)
 int l_module_taf_register_test(lua_State *L);
 
-/******************* API END *************************/
-
 // taf:sleep(ms: number)
 int l_module_taf_sleep(lua_State *L);
+
+/******************* API END *************************/
 
 // Register "taf-main" module
 int l_module_taf_register_module(lua_State *L);

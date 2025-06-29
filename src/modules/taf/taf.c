@@ -281,15 +281,32 @@ int l_module_taf_millis(lua_State *L) {
     return 1;
 }
 
+int l_module_taf_get_current_target(lua_State *L) {
+
+    LOG("Invokedd taf-main get_current_target...");
+
+    cmd_test_options *opts = cmd_parser_get_test_options();
+    if (opts->target) {
+        lua_pushstring(L, opts->target);
+    } else {
+        lua_pushstring(L, "");
+    }
+
+    LOG("Successfully finished taf-main get_current_target.");
+
+    return 1;
+}
+
 /*----------- registration ------------------------------------------*/
 static const luaL_Reg module_fns[] = {
-    {"defer", l_module_taf_defer},        //
-    {"sleep", l_module_taf_sleep},        //
-    {"millis", l_module_taf_millis},      //
-    {"print", l_module_taf_print},        //
-    {"log", l_module_taf_log},            //
-    {"test", l_module_taf_register_test}, //
-    {NULL, NULL},                         //
+    {"defer", l_module_taf_defer},                           //
+    {"get_current_target", l_module_taf_get_current_target}, //
+    {"sleep", l_module_taf_sleep},                           //
+    {"millis", l_module_taf_millis},                         //
+    {"print", l_module_taf_print},                           //
+    {"log", l_module_taf_log},                               //
+    {"test", l_module_taf_register_test},                    //
+    {NULL, NULL},                                            //
 };
 
 int l_module_taf_register_module(lua_State *L) {

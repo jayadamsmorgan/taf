@@ -57,6 +57,13 @@ M.defer = function(defer_func, ...)
 	tm:defer(defer_func, ...)
 end
 
+--- Get current target name if project is multitarget. Returns an empty string otherwise.
+---
+--- @return string target
+M.get_current_target = function()
+	return tm:get_current_target()
+end
+
 --- Print something to logs & TUI. Same as default Lua `print()`. Both will use 'info' log level
 ---
 --- @param ... any

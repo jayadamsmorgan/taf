@@ -147,6 +147,13 @@ end)
 -- > Closing resource with status: passed <-- First defer
 ```
 
+#### `taf.get_current_target()`
+
+Gets the name of current test target executing if project is multitarget. Otherwise returns an empty string.
+
+**Returns:**
+*   (`string`): Target currently executing.
+
 #### `taf.sleep(ms)`
 
 Pauses the test execution for a specified duration.
