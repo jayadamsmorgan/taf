@@ -43,9 +43,11 @@ int taf_target_add() {
         fflush(stdout);
         int first, ch;
         first = getchar();
-        do {
-            ch = getchar();
-        } while (ch != '\n' && ch != EOF);
+        if (first != '\n') {
+            do {
+                ch = getchar();
+            } while (ch != '\n' && ch != EOF);
+        }
 
         if (first == 'N' || first == 'n') {
             LOG("Aborting by user choice.");
@@ -53,7 +55,7 @@ int taf_target_add() {
             internal_logging_deinit();
             return EXIT_SUCCESS;
         }
-        if (first != 'Y' && first != 'y') {
+        if (first != 'Y' && first != 'y' && first != '\n') {
             goto repeat;
         }
         LOG("Converting...");
@@ -139,7 +141,8 @@ int taf_target_remove() {
 
     if (!proj->multitarget) {
         LOG("Project is not multitarget.");
-        fprintf(stderr, "Unable to add target: project is not multitarget.\n");
+        fprintf(stderr,
+                "Unable to remove target: project is not multitarget.\n");
         return EXIT_FAILURE;
     }
 
@@ -156,6 +159,32 @@ int taf_target_remove() {
 
             for (size_t j = 0; j < proj->targets_amount; j++) {
                 LOG("targets[%zu]: %s", j, proj->targets[j]);
+            }
+
+            if (proj->targets_amount == 0) {
+            repeat:
+                printf(
+                    "Removing last target '%s'.\n"
+                    "Do you wish to convert project to single-target? [Y/n]\n",
+                    opts->target);
+                fflush(stdout);
+                int first, ch;
+                first = getchar();
+                if (first != '\n') {
+                    do {
+                        ch = getchar();
+                    } while (ch != '\n' && ch != EOF);
+                }
+
+                if (first == 'Y' || first == 'y' || first == '\n') {
+                    LOG("Converting project to single-target...");
+                    proj->multitarget = false;
+                    printf("Successfully converted project '%s' to "
+                           "single-target.\n",
+                           proj->project_name);
+                } else if (first != 'N' && first != 'n') {
+                    goto repeat;
+                }
             }
 
             project_parser_save();
