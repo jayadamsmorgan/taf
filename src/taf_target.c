@@ -9,6 +9,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+static int convert_project_to_multitarget(project_parsed_t *proj) {
+    char *dir_path;
+    asprintf(&dir_path, "%s/tests/common", proj->project_path);
+    int res = create_directory(dir_path, MKDIR_MODE);
+    free(dir_path);
+    proj->multitarget = true;
+
+    return res;
+}
+
 int taf_target_add() {
 
     cmd_target_add_options *opts = cmd_parser_get_target_add_options();
@@ -27,9 +37,37 @@ int taf_target_add() {
 
     if (!proj->multitarget) {
         LOG("Project is not multitarget.");
-        fprintf(stderr, "Unable to add target: project is not multitarget.\n");
-        internal_logging_deinit();
-        return EXIT_FAILURE;
+    repeat:
+        printf(
+            "Project is not multitarget, do you want to convert it? [Y/n]\n");
+        fflush(stdout);
+        int first, ch;
+        first = getchar();
+        do {
+            ch = getchar();
+        } while (ch != '\n' && ch != EOF);
+
+        if (first == 'N' || first == 'n') {
+            LOG("Aborting by user choice.");
+            puts("Aborting...\n");
+            internal_logging_deinit();
+            return EXIT_SUCCESS;
+        }
+        if (first != 'Y' && first != 'y') {
+            goto repeat;
+        }
+        LOG("Converting...");
+        if (convert_project_to_multitarget(proj)) {
+            LOG("Error converting.");
+            fputs("Error converting project to multitarget. Check "
+                  "permissions.\n",
+                  stderr);
+            internal_logging_deinit();
+            return EXIT_FAILURE;
+        }
+        printf("Successfully converted project '%s' to multitarget.\n"
+               "Your files remained intact, please reorganize them.\n\n",
+               proj->project_name);
     }
 
     for (size_t i = 0; i < proj->targets_amount; i++) {
