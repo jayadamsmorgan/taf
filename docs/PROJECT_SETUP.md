@@ -36,6 +36,8 @@ taf init your_project_name
 
 This will create the `your_project_name` directory and populate it with the `lib/`, `tests/`, and `.taf.json` files.
 
+> **Note:** Single-Target project may be converted to Multi-Target by [Adding a Target](#adding-a-target)
+
 ---
 
 ## Multi-Target Project
@@ -73,6 +75,8 @@ taf init your_project_name --multitarget
 ```
 
 This will create the base structure, including the essential `tests/common/` directory.
+
+> **Note:** Multi-Target project may be converted to Single-Target by [Removing a Target](#adding-a-target) when you only have 1 target left
 
 ### Managing Targets
 
