@@ -275,6 +275,9 @@ static size_t sanitize_inplace(char *buf, size_t len) {
 
 void taf_tui_log(char *time, taf_log_level log_level, const char *, int,
                  const char *buffer, size_t buffer_len) {
+    if (log_level > ui.log_level) {
+        return;
+    }
     // This is a total mess...
     // I don't like it even one bit but it works for now...
     char *tmp = malloc(buffer_len + 1);
