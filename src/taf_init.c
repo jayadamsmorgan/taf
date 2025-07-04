@@ -172,7 +172,11 @@ int taf_init() {
         return EXIT_FAILURE;
     }
 
-    printf("Created new project '%s'\n", opts->project_name);
+    if (opts->multitarget) {
+        printf("Created new multitarget project '%s'\n", opts->project_name);
+    } else {
+        printf("Created new project '%s'\n", opts->project_name);
+    }
 
     project_parser_free();
 
