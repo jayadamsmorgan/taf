@@ -264,8 +264,8 @@ int l_module_serial_open(lua_State *L) {
     l_module_serial_t *u = check_port(L, s);
 
     const char *mode_str = luaL_checkstring(L, s + 1);
-    enum sp_mode mode = mode_from_str(mode_str);
-    if (mode < 0) {
+    int mode = mode_from_str(mode_str);
+    if (mode == -1) {
         return luaL_error(L, "invalid mode, use 'r', 'w' or 'rw'");
     }
 
@@ -323,7 +323,7 @@ static inline enum sp_parity parity_from_str(const char *str) {
         return SP_PARITY_MARK;
     if (!strcmp(str, "space"))
         return SP_PARITY_SPACE;
-    return SP_PARITY_INVALID;
+    return -1;
 }
 
 int l_module_serial_set_parity(lua_State *L) {
@@ -331,8 +331,8 @@ int l_module_serial_set_parity(lua_State *L) {
     int s = selfshift(L);
     l_module_serial_t *u = check_port(L, s);
     const char *str = luaL_checkstring(L, s + 1);
-    enum sp_parity par = parity_from_str(str);
-    if (par < 0) {
+    int par = parity_from_str(str);
+    if (par == -1) {
         return luaL_error(
             L, "invalid parity, use 'none', 'odd', 'even', 'mark' or 'space'");
     }
@@ -371,15 +371,15 @@ static inline enum sp_rts sp_rts_from_str(const char *str) {
         return SP_RTS_ON;
     if (!strcmp(str, "flowctrl"))
         return SP_RTS_FLOW_CONTROL;
-    return SP_RTS_INVALID;
+    return -1;
 }
 
 int l_module_serial_set_rts(lua_State *L) {
     LOG("Invoked taf-serial set_rts...");
     int s = selfshift(L);
     l_module_serial_t *u = check_port(L, s);
-    enum sp_rts rts = sp_rts_from_str(luaL_checkstring(L, s + 1));
-    if (rts < 0) {
+    int rts = sp_rts_from_str(luaL_checkstring(L, s + 1));
+    if (rts == -1) {
         return luaL_error(L,
                           "invalid rts option, use 'off', 'on' or 'flowctrl'");
     }
@@ -400,15 +400,15 @@ static inline enum sp_cts sp_cts_from_str(const char *str) {
         return SP_CTS_IGNORE;
     if (!strcmp(str, "flowctrl"))
         return SP_CTS_FLOW_CONTROL;
-    return SP_CTS_INVALID;
+    return -1;
 }
 
 int l_module_serial_set_cts(lua_State *L) {
     LOG("Invoked taf-serial set_cts...");
     int s = selfshift(L);
     l_module_serial_t *u = check_port(L, s);
-    enum sp_cts cts = sp_cts_from_str(luaL_checkstring(L, s + 1));
-    if (cts < 0) {
+    int cts = sp_cts_from_str(luaL_checkstring(L, s + 1));
+    if (cts == -1) {
         return luaL_error(L, "invalid cts option, use 'ignore' or 'flowctrl'");
     }
 
@@ -430,15 +430,15 @@ static inline enum sp_dtr sp_dtr_from_str(const char *str) {
         return SP_DTR_ON;
     if (!strcmp(str, "flowctrl"))
         return SP_DTR_FLOW_CONTROL;
-    return SP_DTR_INVALID;
+    return -1;
 }
 
 int l_module_serial_set_dtr(lua_State *L) {
     LOG("Invoked taf-serial set_dtr...");
     int s = selfshift(L);
     l_module_serial_t *u = check_port(L, s);
-    enum sp_dtr dtr = sp_dtr_from_str(luaL_checkstring(L, s + 1));
-    if (dtr < 0) {
+    int dtr = sp_dtr_from_str(luaL_checkstring(L, s + 1));
+    if (dtr == -1) {
         return luaL_error(L,
                           "invalid dtr option, use 'off', 'on' or 'flowctrl'");
     }
@@ -459,15 +459,15 @@ static inline enum sp_dsr sp_dsr_from_str(const char *str) {
         return SP_DSR_IGNORE;
     if (!strcmp(str, "flowctrl"))
         return SP_DSR_FLOW_CONTROL;
-    return SP_DSR_INVALID;
+    return -1;
 }
 
 int l_module_serial_set_dsr(lua_State *L) {
     LOG("Invoked taf-serial set_dsr...");
     int s = selfshift(L);
     l_module_serial_t *u = check_port(L, s);
-    enum sp_dsr dsr = sp_dsr_from_str(luaL_checkstring(L, s + 1));
-    if (dsr < 0) {
+    int dsr = sp_dsr_from_str(luaL_checkstring(L, s + 1));
+    if (dsr == -1) {
         return luaL_error(L, "invalid dsr option, use 'ignore' or 'flowctrl'");
     }
 
@@ -491,15 +491,15 @@ static inline enum sp_xonxoff sp_xonxoff_from_str(const char *str) {
         return SP_XONXOFF_INOUT;
     if (!strcmp(str, "disable"))
         return SP_XONXOFF_DISABLED;
-    return SP_XONXOFF_INVALID;
+    return -1;
 }
 
 int l_module_serial_set_xon_xoff(lua_State *L) {
     LOG("Invoked taf-serial set_xon_xoff...");
     int s = selfshift(L);
     l_module_serial_t *u = check_port(L, s);
-    enum sp_xonxoff xonxoff = sp_xonxoff_from_str(luaL_checkstring(L, s + 1));
-    if (xonxoff < 0) {
+    int xonxoff = sp_xonxoff_from_str(luaL_checkstring(L, s + 1));
+    if (xonxoff == -1) {
         return luaL_error(
             L, "invalid xonxoff option, use 'i', 'o', 'io' or 'disable'");
     }
@@ -531,9 +531,8 @@ int l_module_serial_set_flowcontrol(lua_State *L) {
     LOG("Invoked taf-serial set_flowcontrol...");
     int s = selfshift(L);
     l_module_serial_t *u = check_port(L, s);
-    enum sp_flowcontrol fc =
-        sp_flowcontrol_from_str(luaL_checkstring(L, s + 1));
-    if (fc < 0) {
+    int fc = sp_flowcontrol_from_str(luaL_checkstring(L, s + 1));
+    if (fc == -1) {
         return luaL_error(L,
                           "invalid flowcontrol option, use 'dtrdsr', 'rtscts', "
                           "'xonxoff' or 'none'");
@@ -660,9 +659,9 @@ int l_module_serial_flush(lua_State *L) {
     int s = selfshift(L);
     l_module_serial_t *u = check_port(L, s);
     const char *mode = luaL_checkstring(L, s + 1);
-    enum sp_buffer dir = sp_buffer_from_str(mode);
+    int dir = sp_buffer_from_str(mode);
     LOG("Direction: %d", dir);
-    if (dir < 0) {
+    if (dir == -1) {
         return luaL_error(L, "invalid direction, use 'i', 'o' or 'io'");
     }
 

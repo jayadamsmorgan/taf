@@ -238,10 +238,10 @@ int l_module_taf_log(lua_State *L) {
 
     const char *log_level_str = luaL_checkstring(L, s);
 
-    taf_log_level log_level = taf_log_level_from_str(log_level_str);
-    if (log_level < 0) {
+    int log_level = taf_log_level_from_str(log_level_str);
+    if (log_level == -1) {
         LOG("Unknown log level %s, throwing error...", log_level_str);
-        luaL_error(L, "Unknown log level %s", log_level_str);
+        luaL_error(L, "Unknown log level '%s'", log_level_str);
         return 0;
     }
 
