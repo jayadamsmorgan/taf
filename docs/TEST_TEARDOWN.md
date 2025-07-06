@@ -30,7 +30,16 @@ taf.test("Resource cleanup example", function()
 end)
 ```
 
-> **Important:** It does not matter if the test passes or fails; once a defer function is registered, it will be invoked. However, if the test exits *before* the `taf.defer` line is reached (like in our `assert` example), the defer function will not have been registered and will not run.
+> **Important:**
+> * **It does not matter if the test passes or fails.**
+>
+>    Once a defer function is registered, it will be invoked.
+>    However, if the test exits *before* the `taf.defer` line is reached (like in our `assert` example), the defer function will not have been registered and will not run.
+>
+> * **Defer cannot fail test in any way.**
+>
+>    Test status is determined ***before*** defer queue is executed.
+>    If defer fails TAF will let you know about it.
 
 ## Execution Order: Last-In, First-Out (LIFO)
 
