@@ -14,7 +14,7 @@ local M = {}
 --- | '"w"' warning
 --- | '"W"' warning
 --- | '"warning"'
---- | '"WARNING'
+--- | '"WARNING"'
 --- | '"i"' info
 --- | '"I"' info
 --- | '"info"'
