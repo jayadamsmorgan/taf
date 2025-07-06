@@ -24,7 +24,7 @@ typedef struct {
     ui_test_progress_state state;
     unsigned long elapsed;
     char *name;
-    char *failure_reason;
+
     char *time;
 } ui_test_history_t;
 
@@ -132,7 +132,7 @@ void taf_tui_update() {
     const unsigned long seconds = (ms / 1000) % 60;
     const unsigned long millis = ms % 1000;
     ncplane_printf_aligned(ui_plane, project_info_dimy + 11, NCALIGN_RIGHT,
-                           "Elapsed Time: %lum %lu.%lus │", minutes, seconds,
+                           "Elapsed Time: %lum %lu.%03lus │", minutes, seconds,
                            millis);
     ncplane_printf_yx(ui_plane, 1, 2, "Project: %s", ui.project_name);
     int offset = 0;
@@ -313,11 +313,46 @@ void taf_tui_log(char *time, taf_log_level log_level, const char *, int,
     taf_tui_update();
 }
 
+void taf_tui_defer_queue_started(char *time) {
+    ui_test_history_t *hist = &ui.test_history[ui.test_history_size - 1];
+
+    ncplane_move_rel(ui_plane, 2, 0);
+    ncplane_erase(ui_plane);
+    notcurses_render(nc);
+    ncplane_scrollup_child(notcurses_stdplane(nc), ui_plane);
+    ncplane_resize_simple(log_plane, ncplane_dim_y(log_plane) + 2, absx);
+    ncplane_printf_yx(log_plane, ncplane_dim_y(log_plane) - 2, 0, "%s ", time);
+    ncplane_set_fg_palindex(log_plane, 5);
+    ncplane_printf(log_plane, "Defer Queue for Test '%s' STARTED...",
+                   hist->name);
+    ncplane_set_fg_default(log_plane);
+    for (uint i = 0; i < ncplane_dim_x(log_plane); i++) {
+        ncplane_putstr_yx(log_plane, ncplane_dim_y(log_plane) - 1, i, "─");
+    }
+}
+
+void taf_tui_defer_queue_finished(char *time) {
+    ui_test_history_t *hist = &ui.test_history[ui.test_history_size - 1];
+
+    ncplane_move_rel(ui_plane, 2, 0);
+    ncplane_erase(ui_plane);
+    notcurses_render(nc);
+    ncplane_scrollup_child(notcurses_stdplane(nc), ui_plane);
+    ncplane_resize_simple(log_plane, ncplane_dim_y(log_plane) + 2, absx);
+    ncplane_printf_yx(log_plane, ncplane_dim_y(log_plane) - 2, 0, "%s ", time);
+    ncplane_set_fg_palindex(log_plane, 2);
+    ncplane_printf(log_plane, "Defer Queue for Test '%s' FINISHED...",
+                   hist->name);
+    ncplane_set_fg_default(log_plane);
+    for (uint i = 0; i < ncplane_dim_x(log_plane); i++) {
+        ncplane_putstr_yx(log_plane, ncplane_dim_y(log_plane) - 1, i, "─");
+    }
+}
+
 void taf_tui_test_passed(char *time) {
     ui_test_history_t *hist = &ui.test_history[ui.test_history_size - 1];
     hist->state = PASSED;
     hist->elapsed = millis_since_start();
-    hist->failure_reason = NULL;
     hist->time = strdup(time);
     ui.passed_tests++;
 
@@ -339,11 +374,11 @@ void taf_tui_test_passed(char *time) {
     }
 }
 
-void taf_tui_test_failed(char *time, const char *msg) {
+void taf_tui_test_failed(char *time, raw_log_test_output_t *failure_reasons,
+                         size_t failure_reasons_count) {
     ui_test_history_t *hist = &ui.test_history[ui.test_history_size - 1];
     hist->state = FAILED;
     hist->elapsed = millis_since_start();
-    hist->failure_reason = strdup(msg);
     hist->time = strdup(time);
     ui.failed_tests++;
 
@@ -356,22 +391,47 @@ void taf_tui_test_failed(char *time, const char *msg) {
     ncplane_set_fg_palindex(log_plane, 1);
     ncplane_printf(log_plane, "Test '%s' FAILED:", hist->name);
 
-    char *tmp = strdup(msg);
-    sanitize_inplace(tmp, strlen(msg));
-
-    size_t count;
-    size_t *indices = string_wrapped_lines(tmp, absx, &count);
-    for (size_t i = 0; i < count; i++) {
+    for (size_t j = 0; j < failure_reasons_count; j++) {
         ncplane_move_rel(ui_plane, 1, 0);
         ncplane_erase(ui_plane);
         notcurses_render(nc);
         ncplane_scrollup_child(notcurses_stdplane(nc), ui_plane);
-        ncplane_putstr_aligned(log_plane, ncplane_dim_y(log_plane) - 1,
-                               NCALIGN_LEFT, &tmp[indices[i]]);
         ncplane_resize_simple(log_plane, ncplane_dim_y(log_plane) + 1, absx);
+
+        char *tmp = strdup(failure_reasons[j].msg);
+        sanitize_inplace(tmp, failure_reasons[j].msg_len);
+
+        ncplane_move_rel(ui_plane, 1, 0);
+        ncplane_erase(ui_plane);
+        notcurses_render(nc);
+        ncplane_scrollup_child(notcurses_stdplane(nc), ui_plane);
+        ncplane_set_fg_default(log_plane);
+        ncplane_printf_yx(log_plane, ncplane_dim_y(log_plane) - 1, 0,
+                          "Failure reason %zu: [", j + 1);
+        ncplane_set_fg_palindex(log_plane, 1);
+        ncplane_printf(log_plane, "%s",
+                       taf_log_level_to_str(failure_reasons[j].level));
+        ncplane_set_fg_default(log_plane);
+        ncplane_putstr(log_plane, "]:");
+        ncplane_resize_simple(log_plane, ncplane_dim_y(log_plane) + 1, absx);
+
+        ncplane_set_fg_palindex(log_plane, 1);
+
+        size_t count;
+        size_t *indices = string_wrapped_lines(tmp, absx, &count);
+        for (size_t i = 0; i < count; i++) {
+            ncplane_move_rel(ui_plane, 1, 0);
+            ncplane_erase(ui_plane);
+            notcurses_render(nc);
+            ncplane_scrollup_child(notcurses_stdplane(nc), ui_plane);
+            ncplane_putstr_aligned(log_plane, ncplane_dim_y(log_plane) - 1,
+                                   NCALIGN_LEFT, &tmp[indices[i]]);
+            ncplane_resize_simple(log_plane, ncplane_dim_y(log_plane) + 1,
+                                  absx);
+        }
+        free(indices);
+        free(tmp);
     }
-    free(indices);
-    free(tmp);
 
     ncplane_set_fg_default(log_plane);
     for (uint i = 0; i < ncplane_dim_x(log_plane); i++) {
@@ -537,7 +597,6 @@ void taf_tui_deinit() {
         ui_test_history_t *hist = &ui.test_history[i];
         free(hist->name);
         free(hist->time);
-        free(hist->failure_reason);
     }
     free(ui.test_history);
 

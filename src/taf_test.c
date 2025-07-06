@@ -118,6 +118,8 @@ static void run_deferred(lua_State *L, const char *status) {
     int list = lua_gettop(L);
     lua_Integer n = luaL_len(L, list);
 
+    taf_log_defer_queue_started();
+
     for (lua_Integer i = n; i >= 1; --i) { // LIFO
         lua_rawgeti(L, list, i);
         int tbl = lua_gettop(L);
@@ -140,6 +142,8 @@ static void run_deferred(lua_State *L, const char *status) {
         lua_pop(L, 1);
     }
 
+    taf_log_defer_queue_finished();
+
     LOG("Clearing defer list...");
     lua_pushnil(L);
     lua_setfield(L, LUA_REGISTRYINDEX, DEFER_LIST_KEY);
@@ -156,6 +160,10 @@ static int taf_errhandler(lua_State *L) {
     return 1;                     // 1 return value for pcall
 }
 
+static bool test_marked_failed = false;
+
+void taf_mark_test_failed() { test_marked_failed = true; }
+
 static int run_all_tests(lua_State *L) {
     LOG("Running tests...");
 
@@ -168,6 +176,8 @@ static int run_all_tests(lua_State *L) {
     reset_taf_start_millis();
 
     for (size_t i = 0; i < amount; ++i) {
+
+        test_marked_failed = false;
 
         taf_log_test_started(i + 1, tests[i]);
 
@@ -217,11 +227,13 @@ static int run_all_tests(lua_State *L) {
         LOG("Popping error handler...");
         lua_remove(L, erridx);
 
-        run_deferred(L, rc == LUA_OK ? "passed" : "failed");
-
         if (rc == LUA_OK) {
-            taf_log_test_passed(i + 1, tests[i]);
-            passed++;
+            if (test_marked_failed) {
+                taf_log_test_failed(i + 1, tests[i], NULL, NULL, 0);
+            } else {
+                taf_log_test_passed(i + 1, tests[i]);
+                passed++;
+            }
         } else {
             taf_log_test_failed(i + 1, tests[i],
                                 trace ? trace : "unknown error",
@@ -229,6 +241,8 @@ static int run_all_tests(lua_State *L) {
             free(file);
             free(trace);
         }
+
+        run_deferred(L, rc == LUA_OK ? "passed" : "failed");
     }
 
     taf_log_tests_finalize();

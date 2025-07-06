@@ -19,6 +19,10 @@ void taf_tui_set_current_line(const char *file, int line, const char *line_str);
 void taf_tui_log(char *time, taf_log_level log_level, const char *file,
                  int line, const char *buffer, size_t buffer_len);
 void taf_tui_test_passed(char *time);
-void taf_tui_test_failed(char *time, const char *msg);
+void taf_tui_test_failed(char *time, raw_log_test_output_t *failure_reasons,
+                         size_t failure_reasons_count);
+
+void taf_tui_defer_queue_started(char *time);
+void taf_tui_defer_queue_finished(char *time);
 
 #endif // TAF_TUI_H
