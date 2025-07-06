@@ -854,6 +854,26 @@ void taf_log_tests_finalize() {
         LOG("Creating symlinks '%s' and '%s'...", latest_log, latest_raw);
         replace_symlink(output_log_file_path, latest_log);
         replace_symlink(raw_log_file_path, latest_raw);
+
+        project_parsed_t *proj = get_parsed_project();
+        if (proj->multitarget) {
+            n = snprintf(latest_log, PATH_MAX,
+                         "%s/logs/test_run_latest_output.log",
+                         proj->project_path);
+            if (n < 0) {
+                LOG("snprintf error");
+                exit(EXIT_FAILURE);
+            }
+            n = snprintf(latest_raw, PATH_MAX,
+                         "%s/logs/test_run_latest_raw.json",
+                         proj->project_path);
+            if (n < 0) {
+                LOG("snprintf error");
+                exit(EXIT_FAILURE);
+            }
+            replace_symlink(output_log_file_path, latest_log);
+            replace_symlink(raw_log_file_path, latest_raw);
+        }
     }
 
     LOG("Successfully finalized TAF logging.");
