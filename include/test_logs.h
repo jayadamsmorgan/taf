@@ -41,6 +41,9 @@ typedef struct {
 
     raw_log_test_output_t *teardown_outputs;
     size_t teardown_outputs_count;
+
+    raw_log_test_output_t *teardown_errors;
+    size_t teardown_errors_count;
 } raw_log_test_t;
 
 typedef struct {
@@ -80,5 +83,7 @@ void taf_log_tests_finalize();
 void taf_log_defer_queue_started();
 
 void taf_log_defer_queue_finished();
+
+void taf_log_defer_failed(const char *trace, const char *file, int line);
 
 #endif // TEST_LOGS_H

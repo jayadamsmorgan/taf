@@ -374,6 +374,35 @@ void taf_tui_test_passed(char *time) {
     }
 }
 
+void taf_tui_defer_failed(char *time, const char *trace, const char *file,
+                          int line) {
+    size_t count;
+    size_t *indices = string_wrapped_lines(trace, absx, &count);
+    ncplane_move_rel(ui_plane, 2, 0);
+    ncplane_erase(ui_plane);
+    notcurses_render(nc);
+    ncplane_scrollup_child(notcurses_stdplane(nc), ui_plane);
+    ncplane_resize_simple(log_plane, ncplane_dim_y(log_plane) + 2, absx);
+    ncplane_printf_yx(log_plane, ncplane_dim_y(log_plane) - 2, 0, "%s ", time);
+    ncplane_set_fg_palindex(log_plane, 3);
+    ncplane_printf(log_plane, "Defer (%s:%d) failed. Traceback:", file, line);
+    for (size_t i = 0; i < count; i++) {
+        ncplane_move_rel(ui_plane, 1, 0);
+        ncplane_erase(ui_plane);
+        notcurses_render(nc);
+        ncplane_scrollup_child(notcurses_stdplane(nc), ui_plane);
+        ncplane_putstr_aligned(log_plane, ncplane_dim_y(log_plane) - 1,
+                               NCALIGN_LEFT, &trace[indices[i]]);
+        ncplane_resize_simple(log_plane, ncplane_dim_y(log_plane) + 1, absx);
+    }
+    ncplane_set_fg_default(log_plane);
+    free(indices);
+    for (uint i = 0; i < ncplane_dim_x(log_plane); i++) {
+        ncplane_putstr_yx(log_plane, ncplane_dim_y(log_plane) - 1, i, "─");
+    }
+    taf_tui_update();
+}
+
 void taf_tui_test_failed(char *time, raw_log_test_output_t *failure_reasons,
                          size_t failure_reasons_count) {
     ui_test_history_t *hist = &ui.test_history[ui.test_history_size - 1];

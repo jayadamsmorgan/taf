@@ -28,6 +28,7 @@ static char raw_log_file_path[PATH_MAX];
 static raw_log_t *raw_log = NULL;
 static size_t raw_log_test_output_cap;
 static size_t raw_log_test_teardown_output_cap;
+static size_t raw_log_test_teardown_errors_cap;
 static size_t raw_log_test_failure_cap;
 static int test_index;
 static bool is_teardown = false;
@@ -93,6 +94,13 @@ static json_object *raw_log_test_to_json(raw_log_test_t *test) {
             raw_log_test_output_to_json(&test->teardown_outputs[i]));
     }
     json_object_object_add(test_obj, "teardown_output", teardown_output_arr);
+    json_object *teardown_errors_arr = json_object_new_array();
+    for (size_t i = 0; i < test->teardown_errors_count; i++) {
+        json_object_array_add(
+            teardown_errors_arr,
+            raw_log_test_output_to_json(&test->teardown_errors[i]));
+    }
+    json_object_object_add(test_obj, "teardown_errors", teardown_errors_arr);
     LOG("Successfully converted raw log test to JSON.");
     return test_obj;
 }
@@ -271,13 +279,40 @@ raw_log_t *taf_json_to_raw_log(struct json_object *root) {
                 json_object_is_type(tmp, json_type_array)) {
 
                 t->teardown_outputs_count = jarray_len(tmp);
-                t->teardown_outputs =
-                    calloc(t->outputs_count, sizeof *t->outputs);
+                t->teardown_outputs = calloc(t->teardown_errors_count,
+                                             sizeof *t->teardown_errors);
 
                 for (size_t k = 0; k < t->teardown_outputs_count; ++k) {
                     struct json_object *jo =
                         json_object_array_get_idx(tmp, (int)k);
                     raw_log_test_output_t *out = &t->teardown_outputs[k];
+
+                    struct json_object *jfield;
+                    if (json_object_object_get_ex(jo, "file", &jfield))
+                        out->file = jdup_string(jfield);
+                    if (json_object_object_get_ex(jo, "date_time", &jfield))
+                        out->date_time = jdup_string(jfield);
+                    if (json_object_object_get_ex(jo, "msg", &jfield))
+                        out->msg = jdup_string(jfield);
+                    if (json_object_object_get_ex(jo, "level", &jfield))
+                        out->level = taf_log_level_from_str(
+                            json_object_get_string(jfield));
+                    if (json_object_object_get_ex(jo, "line", &jfield))
+                        out->line = json_object_get_int(jfield);
+                }
+            }
+
+            if (json_object_object_get_ex(jt, "teardown_errors", &tmp) &&
+                json_object_is_type(tmp, json_type_array)) {
+
+                t->teardown_errors_count = jarray_len(tmp);
+                t->teardown_errors = calloc(t->teardown_errors_count,
+                                            sizeof *t->teardown_errors);
+
+                for (size_t k = 0; k < t->teardown_errors_count; ++k) {
+                    struct json_object *jo =
+                        json_object_array_get_idx(tmp, (int)k);
+                    raw_log_test_output_t *out = &t->teardown_errors[k];
 
                     struct json_object *jfield;
                     if (json_object_object_get_ex(jo, "file", &jfield))
@@ -574,6 +609,7 @@ void taf_log_defer_queue_started() {
 
     is_teardown = true;
     raw_log_test_teardown_output_cap = 2;
+    raw_log_test_teardown_errors_cap = 2;
 
     char time[TS_LEN];
     get_date_time_now(time);
@@ -583,6 +619,9 @@ void taf_log_defer_queue_started() {
     test->teardown_outputs_count = 0;
     test->teardown_outputs = malloc(sizeof(*test->teardown_outputs) *
                                     raw_log_test_teardown_output_cap);
+    test->teardown_errors_count = 0;
+    test->teardown_errors = malloc(sizeof(*test->teardown_errors) *
+                                   raw_log_test_teardown_errors_cap);
 
     taf_tui_defer_queue_started(time);
 
@@ -614,6 +653,43 @@ void taf_log_defer_queue_finished() {
     }
 
     LOG("Successfully TAF logged finish of defer queue.");
+}
+
+void taf_log_defer_failed(const char *trace, const char *file, int line) {
+    LOG("TAF logging defer failure...");
+
+    raw_log_test_t *test = &raw_log->tests[test_index];
+
+    char time[TS_LEN];
+    get_date_time_now(time);
+
+    taf_tui_defer_failed(time, trace, file, line);
+
+    if (!no_logs) {
+        fprintf(output_log_file,
+                "[%s][%s]: Defer failed (%s at %d), traceback: \n%s\n\n", time,
+                test->name, file, line, trace);
+        LOG("Wrote to output log file");
+    }
+
+    if (test->teardown_errors_count >= raw_log_test_teardown_errors_cap) {
+        raw_log_test_teardown_errors_cap *= 2;
+        test->teardown_errors = realloc(test->teardown_errors,
+                                        sizeof(*test->teardown_errors) *
+                                            raw_log_test_teardown_errors_cap);
+    }
+
+    raw_log_test_output_t *teardown_err =
+        &test->teardown_errors[test->teardown_errors_count];
+    teardown_err->date_time = strdup(time);
+    teardown_err->msg = strdup(trace);
+    teardown_err->msg_len = strlen(trace);
+    teardown_err->level = TAF_LOG_LEVEL_CRITICAL;
+    teardown_err->line = line;
+    teardown_err->file = strdup(file);
+    test->failure_reasons_count++;
+
+    LOG("Successfully TAF logged defer failure.");
 }
 
 void taf_raw_log_free(raw_log_t *log) {
@@ -663,6 +739,13 @@ void taf_raw_log_free(raw_log_t *log) {
             free(o->msg);
         }
         free(t->teardown_outputs);
+
+        for (size_t k = 0; k < t->teardown_errors_count; ++k) {
+            raw_log_test_output_t *o = &t->teardown_errors[k];
+            free(o->file);
+            free(o->date_time);
+            free(o->msg);
+        }
 
         free(t->teardown_start);
     }
@@ -734,6 +817,12 @@ void taf_log_tests_finalize() {
             free(test->teardown_outputs[j].file);
         }
         free(test->teardown_outputs);
+        for (size_t j = 0; j < test->teardown_errors_count; j++) {
+            free(test->teardown_errors[j].msg);
+            free(test->teardown_errors[j].date_time);
+            free(test->teardown_errors[j].file);
+        }
+        free(test->teardown_errors);
         free(test->teardown_start);
     }
     free(raw_log->tests);

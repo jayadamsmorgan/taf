@@ -105,6 +105,14 @@ static void line_hook(lua_State *L, lua_Debug *ar) {
     }
 }
 
+static int taf_errhandler(lua_State *L) {
+    const char *msg = lua_tostring(L, 1);
+    if (!msg)
+        msg = "(non-string error)";
+    luaL_traceback(L, L, msg, 1); // replaces TOS with traceback
+    return 1;                     // 1 return value for pcall
+}
+
 static void run_deferred(lua_State *L, const char *status) {
     LOG("Running deferred test queue...");
 
@@ -121,6 +129,12 @@ static void run_deferred(lua_State *L, const char *status) {
     taf_log_defer_queue_started();
 
     for (lua_Integer i = n; i >= 1; --i) { // LIFO
+
+        LOG("Setting up error handler...");
+        lua_pushcfunction(L, taf_errhandler);
+        int erridx = lua_gettop(L);
+        LOG("Error handler index: %d", erridx);
+
         lua_rawgeti(L, list, i);
         int tbl = lua_gettop(L);
 
@@ -137,8 +151,30 @@ static void run_deferred(lua_State *L, const char *status) {
         }
 
         LOG("Executing defer %lld with argcount %d...", i, argcount);
-        int rc = lua_pcall(L, argcount, 0, 0);
+        int rc = lua_pcall(L, argcount, 0, erridx);
         LOG("Executed defer %lld, status: %d", i, rc);
+        if (rc != LUA_OK) {
+            char *file = NULL;
+            int line = 0;
+            char *trace = NULL;
+
+            trace = strdup(lua_tostring(L, -1)); /* traceback string */
+            LOG("Defer traceback: %s", trace);
+
+            if (trace) {
+                const char *colon1 = strchr(trace, ':');
+                if (colon1) {
+                    const char *colon2 = strchr(colon1 + 1, ':');
+                    if (colon2) {
+                        file = strndup(trace, colon1 - trace);
+                        line = atoi(colon1 + 1);
+                    }
+                }
+            }
+            lua_pop(L, 1); /* pop traceback */
+
+            taf_log_defer_failed(trace, file, line);
+        }
         lua_pop(L, 1);
     }
 
@@ -150,14 +186,6 @@ static void run_deferred(lua_State *L, const char *status) {
     LOG("Defer list cleared.");
 
     LOG("Finished running defer queue.");
-}
-
-static int taf_errhandler(lua_State *L) {
-    const char *msg = lua_tostring(L, 1);
-    if (!msg)
-        msg = "(non-string error)";
-    luaL_traceback(L, L, msg, 1); // replaces TOS with traceback
-    return 1;                     // 1 return value for pcall
 }
 
 static bool test_marked_failed = false;
@@ -210,7 +238,6 @@ static int run_all_tests(lua_State *L) {
             trace = strdup(lua_tostring(L, -1)); /* traceback string */
             LOG("Test '%s' traceback: %s", tests[i].name, trace);
 
-            /* first line looks like  "<file>:<line>: <message>" */
             if (trace) {
                 const char *colon1 = strchr(trace, ':');
                 if (colon1) {

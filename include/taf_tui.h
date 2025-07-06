@@ -25,4 +25,7 @@ void taf_tui_test_failed(char *time, raw_log_test_output_t *failure_reasons,
 void taf_tui_defer_queue_started(char *time);
 void taf_tui_defer_queue_finished(char *time);
 
+void taf_tui_defer_failed(char *time, const char *trace, const char *file,
+                          int line);
+
 #endif // TAF_TUI_H
