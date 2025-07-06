@@ -3,8 +3,11 @@ local http = taf.http
 
 taf.test("test taf.http", function()
 	local handle = http.new()
+	taf.defer(function()
+		handle:cleanup()
+	end)
 
-	local src = "hello from lua!"
+	local src = "Hello from Lua!"
 	local pos = 1
 
 	handle
