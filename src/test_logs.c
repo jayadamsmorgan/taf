@@ -34,7 +34,9 @@ static int test_index;
 static bool is_teardown = false;
 
 static json_object *raw_log_test_output_to_json(raw_log_test_output_t *output) {
-    LOG("Converting raw log test output to JSON...");
+    LOG("Converting raw log test output to JSON %s %d %s %d %s %zu...",
+        output->file, output->line, output->date_time, output->level,
+        output->msg, output->msg_len);
     json_object *output_obj = json_object_new_object();
     json_object_object_add(output_obj, "file",
                            json_object_new_string(output->file));
@@ -687,7 +689,7 @@ void taf_log_defer_failed(const char *trace, const char *file, int line) {
     teardown_err->level = TAF_LOG_LEVEL_CRITICAL;
     teardown_err->line = line;
     teardown_err->file = strdup(file);
-    test->failure_reasons_count++;
+    test->teardown_errors_count++;
 
     LOG("Successfully TAF logged defer failure.");
 }
