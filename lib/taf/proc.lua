@@ -42,7 +42,7 @@ end
 --- @param timeout integer? timeout in milliseconds. keep nil for indefinite waiting
 --- @param sleepinterval integer? interval in milliseconds between checking for timeout. Default: 20
 ---
---- @return run_result result, string? err
+--- @return run_result result
 M.run = function(opts, timeout, sleepinterval)
 	local handle = M.spawn(opts)
 	local status = nil
@@ -52,11 +52,7 @@ M.run = function(opts, timeout, sleepinterval)
 		local interval = sleepinterval or 20
 		while status == nil do
 			if tm:millis() >= deadline then
-				return {
-					stdout = "",
-					stderr = "",
-					exitcode = -1,
-				}, "timeout"
+				error("timeout")
 			end
 			tm:sleep(interval)
 			status = handle:wait()
@@ -73,7 +69,7 @@ M.run = function(opts, timeout, sleepinterval)
 		stdout = stdout,
 		stderr = stderr,
 		exitcode = status,
-	}, nil
+	}
 end
 
 return M
