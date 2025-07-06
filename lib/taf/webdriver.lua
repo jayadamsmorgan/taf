@@ -27,6 +27,7 @@ local ELEM_KEY = "element-6066-11e4-a52e-4f735466cecf"
 --- @class wd_session_opts
 --- @field port integer
 --- @field url string? webdriver url (optional, defaults to `http://localhost`)
+--- @field headless webdriver? open selected webdriver in headless state
 
 --- @class session
 --- @field base_url string
@@ -151,39 +152,64 @@ end
 --- @return session
 M.session_start = function(opts)
 	opts.url = opts.url or "http://localhost"
+	opts.port = assert(opts.port, "opts.port is required")
 
-	local url = opts.url .. ":" .. opts.port .. "/session"
+	local always = {}
+	local args = nil
+
+	if opts.headless == "chromedriver" or opts.headless == "operadriver" then
+		always.browserName = "chrome"
+		args = { "--headless=new", "--disable-gpu" }
+
+		-- Chromedriver & Operadriver both use goog:chromeOptions
+		always["goog:chromeOptions"] = { args = args }
+	elseif opts.headless == "geckodriver" then
+		always.browserName = "firefox"
+		args = { "-headless" }
+		always["moz:firefoxOptions"] = { args = args }
+	elseif opts.headless == "msedgedriver" then
+		always.browserName = "MicrosoftEdge"
+		args = { "--headless=new", "--disable-gpu" }
+		always["ms:edgeOptions"] = { args = args }
+	elseif opts.headless ~= nil then
+		error(("Headless mode not supported for %s"):format(opts.headless))
+	end
+
+	if not next(always) and opts.headless == nil then
+		always.browserName = "chrome" -- reasonable default
+	end
+
 	local body_obj = {
 		capabilities = {
+			alwaysMatch = always,
 			firstMatch = { {} },
 		},
 		desiredCapabilities = {},
 	}
+
 	local body = json.serialize(body_obj)
+	local url = ("%s:%d/session"):format(opts.url, opts.port)
 
 	local result = wd_post_json(url, body)
 	if result == "" then
 		error("Unable to start a session: empty result from server")
 	end
 
-	local result_obj = json.deserialize(result)
-
-	if not result_obj.value then
-		error("Unable to start a session: no value `property` in result object.")
+	local obj = json.deserialize(result).value
+	if not obj then
+		error("Unable to start a session: no `value` field in response")
 	end
-
-	if result_obj.value.error and result_obj.value.message then
-		error("Unable to start a session: " .. result_obj.value.message)
+	if obj.error then
+		error("Unable to start a session: " .. tostring(obj.message))
 	end
-
-	if not result_obj.value.sessionId then
+	if not obj.sessionId then
 		error("Unable to start a session: sessionId is not present")
 	end
 
 	return {
 		base_url = opts.url,
 		port = opts.port,
-		id = result_obj.value.sessionId,
+		id = obj.sessionId,
 	}
 end
 
