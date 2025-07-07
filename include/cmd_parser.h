@@ -41,6 +41,8 @@ typedef struct {
     bool internal_logging;
 
     char *custom_taf_lib_path;
+
+    bool headless;
 } cmd_test_options;
 
 typedef struct {

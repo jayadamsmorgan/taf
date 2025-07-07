@@ -1,5 +1,6 @@
 #include "taf_test.h"
 
+#include "headless.h"
 #include "internal_logging.h"
 
 #include "cmd_parser.h"
@@ -43,6 +44,8 @@ typedef struct line_cache {
 } line_cache_t;
 
 static line_cache_t *cache_head = NULL;
+
+static bool headless = false;
 
 static char *get_line_text(const char *path, int lineno) {
 
@@ -549,7 +552,7 @@ int taf_test() {
         return EXIT_FAILURE;
     }
 
-    if (taf_tui_init()) {
+    if (!opts->headless && taf_tui_init()) {
         test_case_free_all(L);
         lua_close(L);
         free(module_path);
@@ -560,15 +563,23 @@ int taf_test() {
         internal_logging_deinit();
         return EXIT_FAILURE;
     }
+    headless = opts->headless;
 
-    LOG("Enabling line hook...");
-    lua_sethook(L, line_hook, LUA_MASKLINE, 0);
+    if (opts->headless) {
+        taf_headless_init();
+    }
+    if (!opts->headless) {
+        LOG("Enabling line hook...");
+        lua_sethook(L, line_hook, LUA_MASKLINE, 0);
+    }
 
     int exitcode = run_all_tests(L);
 
     LOG("Tidying up...");
 
-    taf_tui_deinit();
+    if (!opts->headless) {
+        taf_tui_deinit();
+    }
 
     test_case_free_all(L);
 

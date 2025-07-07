@@ -1,0 +1,27 @@
+{
+  "runtime": {
+
+    "version": "Lua5.4",
+
+    "path": [
+      "?.lua",
+      "?/init.lua",
+      "lib/?.lua",
+      "lib/?/init.lua"
+    ]
+
+  },
+
+  "workspace": {
+
+    "checkThirdParty": false,
+
+    "library": [
+      "~/.taf/lib",
+      "/home/linuxbrew/.linuxbrew/opt/taf/share/taf/lib",
+      "/opt/homebrew/opt/taf/share/taf/lib",
+      "/usr/local/opt/taf/share/taf/lib"
+    ]
+
+  }
+}

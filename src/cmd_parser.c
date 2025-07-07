@@ -47,6 +47,8 @@ static void print_test_help(FILE *file) {
             "with specified tags\n"
             "  -i, --internal-log                                          "
             "Dump internal logging file\n"
+            "  -e, --headless                                              "
+            "Run in headless mode (no TUI)\n"
             "  -h, --help                                                  "
             "Display help\n");
 }
@@ -325,12 +327,18 @@ static void set_test_taf_lib_path(const char *arg) {
     test_opts.custom_taf_lib_path = strdup(arg);
 }
 
+static void set_test_headless(const char *) {
+    //
+    test_opts.headless = true;
+}
+
 static cmd_option all_test_options[] = {
     {"--log-level", "-l", true, set_log_level},
     {"--no-logs", "-n", false, set_test_no_logs},
     {"--taf-lib-path", "-p", true, set_test_taf_lib_path},
     {"--tags", "-t", true, set_test_tags},
     {"--internal-log", "-i", false, set_internal_logging},
+    {"--headless", "-e", false, set_test_headless},
     {"--help", "-h", false, get_test_help},
     {NULL, NULL, false, NULL},
 };
@@ -344,6 +352,7 @@ static cmd_category parse_test_options(int argc, char **argv) {
     test_opts.log_level = TAF_LOG_LEVEL_INFO;
     test_opts.internal_logging = false;
     test_opts.custom_taf_lib_path = NULL;
+    test_opts.headless = NULL;
 
     if (argc <= 2) {
         return CMD_TEST;

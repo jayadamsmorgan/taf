@@ -92,13 +92,14 @@ if is_macos
 endif
 #----------------------------------------------------------------------
 
+main_source = 'src/main.c'
 sources = [
-    'src/main.c',
     'src/taf_init.c',
     'src/taf_logs.c',
     'src/taf_target.c',
     'src/taf_test.c',
     'src/taf_tui.c',
+    'src/headless.c',
     'src/cmd_parser.c',
     'src/internal_logging.c',
     'src/project_parser.c',
@@ -136,9 +137,10 @@ if taf_dir_path == ''
     taf_dir_path = fs.expanduser('~/.taf')
 endif
 
-executable(
-    'taf',
+taf_lib = static_library(
+    'taf_core',
     sources,
+    include_directories: [include_dir],
     dependencies: opt_deps + [
         thread_dep,
         json_dep,
@@ -148,9 +150,43 @@ executable(
         libdeflate_dep,
         notcurses_dep,
     ],
+    install: false,
+)
+
+taf_dep = declare_dependency(
+    link_with: taf_lib,
     include_directories: [include_dir],
+    dependencies: opt_deps + [
+        thread_dep,
+        json_dep,
+        libcurl_dep,
+        lua_dep,
+        libsp_dep,
+        libdeflate_dep,
+        notcurses_dep,
+    ],
+)
+
+executable(
+    'taf',
+    main_source,
+    link_with: taf_lib,
+    include_directories: [include_dir],
+    dependencies: opt_deps + [
+        thread_dep,
+        json_dep,
+        libcurl_dep,
+        lua_dep,
+        libsp_dep,
+        libdeflate_dep,
+        notcurses_dep,
+    ],
     install: true,
     install_mode: taf_install_mode,
 )
 
 install_subdir('lib', install_dir: taf_dir_path)
+
+if get_option('unit_tests')
+    subdir('tests/unit')
+endif

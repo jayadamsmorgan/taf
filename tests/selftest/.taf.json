@@ -1,0 +1,12 @@
+{
+  "project_name": "selftest",
+  "min_taf_version": "1.0.4",
+  "min_taf_version_major": 1,
+  "min_taf_version_minor": 0,
+  "min_taf_version_patch": 4,
+  "multitarget": true,
+  "targets": [
+    "bootstrap",
+    "selftest"
+  ]
+}

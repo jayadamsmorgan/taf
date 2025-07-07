@@ -11,3 +11,5 @@ option(
     value: true,
     description: 'Install taf binary set-gid dialout (needs root)',
 )
+
+option('unit_tests', type: 'boolean', value: false, description: 'Enable tests')

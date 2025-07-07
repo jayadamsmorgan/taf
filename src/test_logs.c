@@ -1,6 +1,7 @@
 #include "test_logs.h"
 
 #include "cmd_parser.h"
+#include "headless.h"
 #include "internal_logging.h"
 #include "project_parser.h"
 #include "taf_test.h"
@@ -32,6 +33,8 @@ static size_t raw_log_test_teardown_errors_cap;
 static size_t raw_log_test_failure_cap;
 static int test_index;
 static bool is_teardown = false;
+
+static bool headless = false;
 
 static json_object *raw_log_test_output_to_json(raw_log_test_output_t *output) {
     LOG("Converting raw log test output to JSON %s %d %s %d %s %zu...",
@@ -342,12 +345,15 @@ void taf_log_tests_create(int amount) {
 
     LOG("Starting TAF test logging...");
 
-    taf_tui_set_test_amount(amount);
-
     cmd_test_options *opts = cmd_parser_get_test_options();
     if (opts->no_logs) {
         LOG("No logs option turned on, skipping TAF test logging.");
         no_logs = true;
+    }
+
+    headless = opts->headless;
+    if (!opts->headless) {
+        taf_tui_set_test_amount(amount);
     }
 
     log_level = opts->log_level;
@@ -434,7 +440,9 @@ void taf_log_test(taf_log_level level, const char *file, int line,
     char ts[TS_LEN];
     get_date_time_now(ts);
 
-    taf_tui_log(ts, level, file, line, buffer, buffer_len);
+    if (headless) {
+        taf_tui_log(ts, level, file, line, buffer, buffer_len);
+    }
 
     if (level <= log_level && !no_logs) {
         LOG("Writing to output log file...");
@@ -476,6 +484,10 @@ void taf_log_test(taf_log_level level, const char *file, int line,
     out->line = line;
     out->date_time = strdup(ts);
 
+    if (headless) {
+        taf_headless_log_test(out);
+    }
+
     if (level == TAF_LOG_LEVEL_ERROR) {
         LOG("Adding failure reason...");
         if (t->failure_reasons_count >= raw_log_test_failure_cap) {
@@ -503,7 +515,9 @@ void taf_log_test_started(int index, test_case_t test_case) {
     LOG("TAF Logging test '%s' started with index %d...", test_case.name,
         index);
 
-    taf_tui_set_current_test(index, test_case.name);
+    if (!headless) {
+        taf_tui_set_current_test(index, test_case.name);
+    }
 
     test_index = index - 1;
     current = test_case;
@@ -538,6 +552,10 @@ void taf_log_test_started(int index, test_case_t test_case) {
         malloc(sizeof(*test->failure_reasons) * raw_log_test_failure_cap);
     test->failure_reasons_count = 0;
 
+    if (headless) {
+        taf_headless_test_started(test);
+    }
+
     LOG("Successfully TAF logged starting of a test.");
 }
 
@@ -548,7 +566,9 @@ void taf_log_test_passed(int index, test_case_t test_case) {
     char time_str[TS_LEN];
     get_date_time_now(time_str);
 
-    taf_tui_test_passed(time_str);
+    if (!headless) {
+        taf_tui_test_passed(time_str);
+    }
 
     if (!no_logs) {
         fprintf(output_log_file, "[%s][%s]: Test %d Passed.\n\n", time_str,
@@ -559,6 +579,10 @@ void taf_log_test_passed(int index, test_case_t test_case) {
     raw_log_test_t *test = &raw_log->tests[index - 1];
     test->finished = strdup(time_str);
     test->status = "passed";
+
+    if (headless) {
+        taf_headless_test_passed(test);
+    }
 
     LOG("Successfully TAF logged passing of a test.");
 }
@@ -594,8 +618,13 @@ void taf_log_test_failed(int index, test_case_t test_case, const char *msg,
         test->failure_reasons_count++;
     }
 
-    taf_tui_test_failed(time_str, test->failure_reasons,
-                        test->failure_reasons_count);
+    if (!headless) {
+        taf_tui_test_failed(time_str, test->failure_reasons,
+                            test->failure_reasons_count);
+    }
+    if (headless) {
+        taf_headless_test_failed(test);
+    }
 
     if (!no_logs) {
         fprintf(output_log_file, "[%s][%s]: Test %d Failed.\n\n", time_str,
@@ -625,7 +654,12 @@ void taf_log_defer_queue_started() {
     test->teardown_errors = malloc(sizeof(*test->teardown_errors) *
                                    raw_log_test_teardown_errors_cap);
 
-    taf_tui_defer_queue_started(time);
+    if (!headless) {
+        taf_tui_defer_queue_started(time);
+    }
+    if (headless) {
+        taf_headless_defer_queue_started(test);
+    }
 
     if (!no_logs) {
         fprintf(output_log_file, "[%s][%s]: Defer Queue Started.\n\n", time,
@@ -646,7 +680,12 @@ void taf_log_defer_queue_finished() {
     char time[TS_LEN];
     get_date_time_now(time);
 
-    taf_tui_defer_queue_finished(time);
+    if (!headless) {
+        taf_tui_defer_queue_finished(time);
+    }
+    if (headless) {
+        taf_headless_defer_queue_finished(test);
+    }
 
     if (!no_logs) {
         fprintf(output_log_file, "[%s][%s]: Defer Queue Finished.\n\n", time,
@@ -665,7 +704,9 @@ void taf_log_defer_failed(const char *trace, const char *file, int line) {
     char time[TS_LEN];
     get_date_time_now(time);
 
-    taf_tui_defer_failed(time, trace, file, line);
+    if (!headless) {
+        taf_tui_defer_failed(time, trace, file, line);
+    }
 
     if (!no_logs) {
         fprintf(output_log_file,
@@ -690,6 +731,10 @@ void taf_log_defer_failed(const char *trace, const char *file, int line) {
     teardown_err->line = line;
     teardown_err->file = strdup(file);
     test->teardown_errors_count++;
+
+    if (headless) {
+        taf_headless_defer_queue_failed(teardown_err);
+    }
 
     LOG("Successfully TAF logged defer failure.");
 }
@@ -766,6 +811,10 @@ void taf_log_tests_finalize() {
     get_date_time_now(time_str);
 
     raw_log->finished = strdup(time_str);
+
+    if (headless) {
+        taf_headless_finalize();
+    }
 
     if (!no_logs) {
         json_object *raw_log_root = taf_raw_log_to_json(raw_log);
