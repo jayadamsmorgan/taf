@@ -440,7 +440,7 @@ void taf_log_test(taf_log_level level, const char *file, int line,
     char ts[TS_LEN];
     get_date_time_now(ts);
 
-    if (headless) {
+    if (!headless) {
         taf_tui_log(ts, level, file, line, buffer, buffer_len);
     }
 
