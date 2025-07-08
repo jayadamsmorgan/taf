@@ -13,13 +13,13 @@ M.low = proc
 --- | '"stdout"'
 --- | '"stderr"'
 
---- @alias proc_read_func fun(self:proc_handle, want: integer?, stream:proc_output_stream?):string
+--- @alias proc_read_func fun(self:proc_handle, stream:proc_output_stream?, want: integer?):string
 --- @alias proc_write_func fun(self:proc_handle, buf:string):integer
 --- @alias proc_wait_func fun(self:proc_handle):integer?
 --- @alias proc_kill_func fun(self:proc_handle)
 
 --- @class proc_handle
---- @field read proc_read_func read stdout/stderr from the spawned process. must not be called after `kill` (`want`: amount of bytes expected (4096 default), `stream`: which stream to read (stdout default))
+--- @field read proc_read_func read stdout/stderr from the spawned process. must not be called after `kill` (`stream`: which stream to read (stdout default), `want`: amount of bytes expected (4096 default))
 --- @field write proc_write_func write buffer to stdin to the spawned process if it is still alive (`buf`: buffer to write, returns amount of bytes written)
 --- @field wait proc_wait_func nonblocking function to check on current status of process (nil if still running)
 --- @field kill proc_kill_func send SIGINT signal to process if it's still running
@@ -62,8 +62,8 @@ M.run = function(opts, timeout, sleepinterval)
 			status = handle:wait()
 		end
 	end
-	local stdout = handle:read()
-	local stderr = handle:read(nil, "stderr")
+	local stdout = handle:read("stdout", nil)
+	local stderr = handle:read("stderr", nil)
 	handle:kill()
 	return {
 		stdout = stdout,

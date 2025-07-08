@@ -182,11 +182,11 @@ int l_module_proc_read(lua_State *L) {
     l_module_proc_t *proc = luaL_checkudata(L, s, "taf-proc");
     LOG("Proc pointer: %p", (void *)proc);
 
-    lua_Integer want = luaL_optinteger(L, s + 1, 4096);
+    const char *which = luaL_optstring(L, s + 1, "stdout");
+
+    lua_Integer want = luaL_optinteger(L, s + 2, 4096);
     if (want <= 0)
         want = 4096;
-
-    const char *which = luaL_optstring(L, s + 2, "stdout");
 
     LOG("Stream = %s , want = %lld", which, want);
 

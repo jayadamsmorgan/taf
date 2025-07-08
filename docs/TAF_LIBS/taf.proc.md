@@ -105,13 +105,13 @@ end)
 
 The `proc_handle` object is returned by `taf.proc.spawn()` and provides methods for controlling a running process.
 
-#### `handle:read(want, stream)`
+#### `handle:read(stream, want)`
 
 Reads from the process's standard output or standard error stream.
 
 **Parameters:**
-*   `want` (`integer`, optional): The maximum number of bytes to read. Defaults to `4096`.
 *   `stream` (`proc_output_stream`, optional): The stream to read from. Defaults to `"stdout"`.
+*   `want` (`integer`, optional): The maximum number of bytes to read. Defaults to `4096`.
 
 **Returns:**
 *   (`string`): The data read from the stream.
