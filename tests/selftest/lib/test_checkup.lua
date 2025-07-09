@@ -38,90 +38,90 @@ local util = require("util")
 --- @param expected_status status_t
 M.check_test = function(test, expected_name, expected_status)
 	if test == nil then
-		taf.log_error(expected_name .. " test is nil")
+		taf.log_error(("Test '%s': %s"):format(expected_name, "test is nil"))
 		return
 	end
 
 	if test.name == nil then
-		taf.log_error(expected_name .. " test.name is nil")
+		taf.log_error(("Test '%s': %s"):format(expected_name, "test.name is nil"))
+		return
 	end
 	if test.name ~= expected_name then
-		taf.log_error(expected_name .. ("test.name is not expected: '%s'"):format(test.name))
+		taf.log_error(
+			("Test '%s': %s"):format(
+				expected_name,
+				("test.name is '%s', expected '%s"):format(test.name, expected_name)
+			)
+		)
+		return
 	end
 
-	if test.status == nil then
-		taf.log_error(expected_name .. "test.status is nil")
-	end
-	if test.status ~= expected_status then
-		taf.log_error(expected_name .. (" test.status is not expected: '%s'"):format(test.status))
-	end
+	util.error_if(
+		test.status ~= expected_status,
+		test,
+		("test.status is '%s', expected '%s'"):format(test.status, expected_status)
+	)
 	if test.status == "failed" and test.failure_reasons == nil then
-		taf.log_error(expected_name .. " test.status is 'failed' but test.failure_reasons is nil")
+		util.test_error(test, "test.status is 'failed' but test.failure_reasons is nil")
 	end
 	if test.status == "failed" and #test.failure_reasons == 0 then
-		taf.log_error(expected_name .. " test.status is 'failed' but test.failure_reasons is empty")
+		util.test_error(test, "test.status is 'failed' but test.failure_reasons is empty")
 	end
 
-	if test.output == nil then
-		taf.log_error(expected_name .. " test.output is nil")
-	end
+	util.error_if(test.output == nil, test, "test.output is nil")
+	util.error_if(
+		test.started == nil or util.is_valid_datetime(test.started) == false,
+		test,
+		"test.started is nil or not valid"
+	)
+	util.error_if(
+		test.finished == nil or util.is_valid_datetime(test.finished) == false,
+		test,
+		"test.finished is nil or not valid"
+	)
 
-	if test.started == nil then
-		taf.log_error(expected_name .. " test.started is nil")
-	end
-	if util.is_valid_datetime(test.started) == false then
-		taf.log_error(expected_name .. (" test.started is not a vaild datetime: '%s'"):format(test.started))
-	end
-	if test.finished == nil then
-		taf.log_error(expected_name .. " test.finished is nil")
-	end
-	if util.is_valid_datetime(test.finished) == false then
-		taf.log_error(expected_name .. (" test.finished is not a vaild datetime: '%s'"):format(test.finished))
-	end
-
-	if test.tags == nil then
-		taf.log_error(expected_name .. " test.tags is nil")
-	end
-
-	if test.teardown_output == nil then
-		taf.log_error(expected_name .. "test.teardown_output is nil")
-	end
-
-	if test.teardown_errors == nil then
-		taf.log_error(expected_name .. "test.teardown_errors is nil")
-	end
+	util.error_if(test.tags == nil, test, "test.tags is nil")
+	util.error_if(test.teardown_output == nil, test, "test.teardown_output is nil")
+	util.error_if(test.teardown_errors == nil, test, "test.teardown_errors is nil")
 end
 
+--- @param test test_t
 --- @param output output_t?
 --- @param expected_message string?
 --- @param expected_level log_level_t?
----
---- @return string?, output_t?
-M.check_output = function(output, expected_message, expected_level)
+--- @param contains boolean?
+M.check_output = function(test, output, expected_message, expected_level, contains)
+	contains = contains or false
 	if not output then
-		return "output is nil", nil
+		util.test_error(test, "output is nil")
+		return
 	end
 
-	if not output.date_time then
-		return "output.date_time is nil", nil
-	end
-
-	if not output.file then
-		return "output.file is nil", nil
-	end
-
-	if not output.level then
-		return "output.level is nil", nil
-	end
-	if expected_level and expected_level ~= output.level then
-		return ("output.level is not expected '%s'"):format(expected_level), nil
-	end
-
-	if output.msg == nil then
-		return "output.msg is nil", nil
-	end
-	if expected_message and expected_message ~= output.msg then
-		return ("output.msg is not expected '%s'"):format(expected_level), nil
+	util.error_if(
+		output.date_time == nil or util.is_valid_datetime(output.date_time) == false,
+		test,
+		"output.date_time is nil or not valid"
+	)
+	util.error_if(output.file == nil, test, "output.file is nil")
+	util.error_if(output.level == nil, test, "output.level is nil")
+	util.error_if(
+		output.level ~= expected_level,
+		test,
+		("output.level is '%s', expected '%s'"):format(output.level, expected_level)
+	)
+	util.error_if(output.msg == nil, test, "output.msg is nil")
+	if contains and expected_message then
+		util.error_if(
+			output.msg:find(expected_message) == nil,
+			test,
+			("\noutput.msg is:\n'%s\ndoes not contain:\n'%s'"):format(output.msg, expected_message)
+		)
+	else
+		util.error_if(
+			output.msg ~= expected_message,
+			test,
+			("output.msg is '%s', expected '%s'"):format(output.msg, expected_message)
+		)
 	end
 
 	return nil, output

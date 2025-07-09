@@ -52,22 +52,22 @@ taf.test("Test logging with 'critical' log level ('CRITICAL')", { "module-taf", 
 	taf.log("CRITICAL", str)
 end)
 
-taf.test("Test logging with 'critical' log ('critical')", { "module-taf", "logging" }, function()
+taf.test("Test logging with 'critical' log level ('critical')", { "module-taf", "logging" }, function()
 	local str = "Testing logging with CRITICAL log level."
 	taf.log("critical", str)
 end)
 
-taf.test("Test logging with 'critical' log ('C')", { "module-taf", "logging" }, function()
+taf.test("Test logging with 'critical' log level ('C')", { "module-taf", "logging" }, function()
 	local str = "Testing logging with CRITICAL log level."
 	taf.log("C", str)
 end)
 
-taf.test("Test logging with 'critical' log ('c')", { "module-taf", "logging" }, function()
+taf.test("Test logging with 'critical' log level ('c')", { "module-taf", "logging" }, function()
 	local str = "Testing logging with CRITICAL log level."
 	taf.log("c", str)
 end)
 
-taf.test("Test logging with 'critical' log ('taf.log_critical')", { "module-taf", "logging" }, function()
+taf.test("Test logging with 'critical' log level ('taf.log_critical')", { "module-taf", "logging" }, function()
 	local str = "Testing logging with CRITICAL log level."
 	taf.log_critical(str)
 end)
