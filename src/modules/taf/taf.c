@@ -189,13 +189,12 @@ static inline void log_helper(taf_log_level level, int n, int s, lua_State *L) {
     memcpy(copy, msg, mlen);
     copy[mlen] = '\0';
 
-    LOG("Final message string: %.*s", (int)mlen, copy); // Use copy for safety
+    LOG("Final message string: %.*s", (int)mlen, copy);
 
     const char *file = "(?)";
     int line = 0;
     lua_Debug ar;
 
-    // This logic seems fine.
     if (lua_getstack(L, 2, &ar) && lua_getinfo(L, "Sl", &ar) &&
         ar.currentline > 0) {
         LOG("Parent caller detected.");
@@ -209,23 +208,18 @@ static inline void log_helper(taf_log_level level, int n, int s, lua_State *L) {
     }
     LOG("File: %s, line: %d", file, line);
 
-    if (level == TAF_LOG_LEVEL_CRITICAL) {
-        LOG("Log level is critical, raising error...");
-        // luaL_error performs a longjmp, so 'copy' would be leaked.
-        // While hard to avoid, it's good to be aware of.
-        // The error message is now safely formatted.
-        luaL_error(L, "%s", copy);
-        free(copy); // This line will not be reached, but is good practice.
-        return;
-    }
-
-    // Now 'copy' is a proper C string and 'mlen' is its correct length (without
-    // null).
     taf_log_test(level, file, line, copy, mlen);
 
+    if (level == TAF_LOG_LEVEL_CRITICAL) {
+        LOG("Log level is critical, raising error...");
+        luaL_error(L, "%s", copy);
+        free(copy); // Doesn't get called so the `copy` will leak,
+                    // not so much we can do about it
+        return;
+    }
     free(copy);
 
-    lua_pop(L, 1); // pop message string
+    lua_pop(L, 1);
 }
 
 int l_module_taf_log(lua_State *L) {
