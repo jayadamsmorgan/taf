@@ -59,7 +59,7 @@ M.test_tags = function(tag_test, tag_array)
 		M.error_if(
 			tag_test.tags[i] ~= tag_array[i],
 			tag_test,
-			("Tags not match: expected '%s' but got '%s'"):format(tag_test.tags[i], tag_array[i])
+			("Tags not match: expected '%s' but got '%s'"):format(tag_array[i], tag_test.tags[i])
 		)
 	end
 end

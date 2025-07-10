@@ -103,6 +103,9 @@ M.check_output = function(test, output, expected_message, expected_level, contai
 		"output.date_time is nil or not valid"
 	)
 	util.error_if(output.file == nil, test, "output.file is nil")
+	util.error_if(#output.file == 0, test, "output.file is empty")
+	util.error_if(output.line == nil, test, "output.line is nil")
+	util.error_if(output.line == 0, test, "output.line is 0")
 	util.error_if(output.level == nil, test, "output.level is nil")
 	util.error_if(
 		output.level ~= expected_level,
@@ -116,7 +119,7 @@ M.check_output = function(test, output, expected_message, expected_level, contai
 			test,
 			("\noutput.msg is:\n'%s\ndoes not contain:\n'%s'"):format(output.msg, expected_message)
 		)
-	else
+	elseif expected_message then
 		util.error_if(
 			output.msg ~= expected_message,
 			test,

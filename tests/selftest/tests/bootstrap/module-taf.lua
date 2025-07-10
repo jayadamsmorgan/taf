@@ -87,17 +87,17 @@ taf.test("Test Lua's 'print' is forwarded to logging with INFO log level", { "mo
 	taf.print("Testing logging")
 end)
 
-taf.test("Test taf.sleep", { "module-taf" }, function()
-	taf.sleep(10)
+taf.test("Test taf.sleep", { "module-taf", "utils" }, function()
+	taf.sleep(1000)
 end)
 
-taf.test("Test taf.get_current_target", { "module-taf" }, function()
+taf.test("Test taf.get_current_target", { "module-taf", "utils" }, function()
 	local target = taf.get_current_target()
 	taf.log("INFO", target)
 	assert(target == "bootstrap")
 end)
 
-taf.test("Test taf.defer", { "module-taf" }, function()
+taf.test("Test taf.defer", { "module-taf", "utils" }, function()
 	-- Simple
 	taf.defer(function()
 		taf.log_info("defer 1")
@@ -124,7 +124,7 @@ taf.test("Test taf.defer", { "module-taf" }, function()
 	taf.defer(taf.log_info, "defer 5")
 end)
 
-taf.test("Test taf.millis", { "module-taf" }, function()
+taf.test("Test taf.millis", { "module-taf", "utils" }, function()
 	taf.log_info(taf.millis())
 	taf.sleep(10)
 	taf.log_info(taf.millis())

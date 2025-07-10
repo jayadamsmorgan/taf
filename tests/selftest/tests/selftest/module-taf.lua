@@ -102,3 +102,55 @@ taf.test("Test module-taf (logging)", { "module-taf", "logging" }, function()
 		check.check_output(test, test.output[i], "Testing logging", "INFO")
 	end
 end)
+
+taf.test("Test module-taf (utils)", { "module-taf", "utils" }, function()
+	local log_obj = util.load_log({ "test", "bootstrap", "-t", "utils", "-e" })
+
+	assert(log_obj.tags ~= nil)
+	assert(#log_obj.tags == 1)
+	assert(log_obj.tags[1] == "utils")
+
+	assert(log_obj.tests ~= nil)
+	assert(#log_obj.tests == 4, "Expected 4 tests, got " .. #log_obj.tests)
+
+	--- @type test_t
+	local test = log_obj.tests[1]
+	check.check_test(test, "Test taf.sleep", "passed")
+	util.test_tags(test, { "module-taf", "utils" })
+	util.error_if(test.finished == test.started, test, "No sleep")
+
+	test = log_obj.tests[2]
+	check.check_test(test, "Test taf.get_current_target", "passed")
+	util.test_tags(test, { "module-taf", "utils" })
+	util.error_if(#test.output ~= 1, test, "Outputs not match")
+	check.check_output(test, test.output[1], "bootstrap", "INFO")
+
+	test = log_obj.tests[3]
+	check.check_test(test, "Test taf.defer", "passed")
+	util.test_tags(test, { "module-taf", "utils" })
+	util.error_if(#test.output ~= 0, test, "Outputs not match")
+	util.error_if(#test.teardown_output ~= 5, test, "Outputs not match")
+	local j = 1
+	for i = 5, 1, -1 do
+		-- We check from last to first, so `j` should go up
+		check.check_output(test, test.teardown_output[i], "defer " .. j, "INFO")
+		j = j + 1
+	end
+	util.error_if(#test.teardown_errors ~= 1, test, "Outputs not match")
+	check.check_output(test, test.teardown_errors[1], "assertion failed", "CRITICAL", true)
+
+	test = log_obj.tests[4]
+	check.check_test(test, "Test taf.millis", "passed")
+	util.test_tags(test, { "module-taf", "utils" })
+	util.error_if(#test.output ~= 2, test, "Outputs not match")
+	check.check_output(test, test.output[1], nil, "INFO")
+	check.check_output(test, test.output[2], nil, "INFO")
+	local start_ms = tonumber(test.output[1].msg)
+	util.error_if(start_ms == nil, test, "start_ms is nil")
+	local end_ms = tonumber(test.output[2].msg)
+	util.error_if(end_ms == nil, test, "end_ms is nil")
+	if start_ms and end_ms then
+		local time = end_ms - start_ms
+		util.error_if(time < 10 or time > 20, test, "Incorrect millis " .. time)
+	end
+end)
