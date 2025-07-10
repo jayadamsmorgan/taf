@@ -760,6 +760,7 @@ void taf_raw_log_free(raw_log_t *log) {
     free(log->os_version);
     free(log->started);
     free(log->finished);
+    free(log->target);
 
     for (size_t i = 0; i < log->tags_count; ++i)
         free(log->tags[i]);
@@ -847,6 +848,7 @@ void taf_log_tests_finalize() {
     free(raw_log->finished);
     free(raw_log->os_version);
     free(raw_log->started);
+    free(raw_log->target);
     for (size_t i = 0; i < raw_log->tags_count; i++) {
         free(raw_log->tags[i]);
     }
