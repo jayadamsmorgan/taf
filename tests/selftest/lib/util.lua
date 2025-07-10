@@ -64,8 +64,17 @@ M.test_tags = function(tag_test, tag_array)
 	end
 end
 
+--- @class log_obj_t
+--- @field taf_version string
+--- @field os string
+--- @field os_version string
+--- @field started string
+--- @field finished string
+--- @field tags [string]
+--- @field tests [test_t]
+
 --- @param args [string]
---- @return table
+--- @return log_obj_t
 M.load_log = function(args)
 	local proc_handle = proc.spawn({
 		exe = "taf",

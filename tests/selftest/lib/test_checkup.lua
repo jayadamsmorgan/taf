@@ -115,7 +115,7 @@ M.check_output = function(test, output, expected_message, expected_level, contai
 	util.error_if(output.msg == nil, test, "output.msg is nil")
 	if contains and expected_message then
 		util.error_if(
-			output.msg:find(expected_message) == nil,
+			output.msg:find(expected_message, nil, true) == nil,
 			test,
 			("\noutput.msg is:\n'%s\ndoes not contain:\n'%s'"):format(output.msg, expected_message)
 		)

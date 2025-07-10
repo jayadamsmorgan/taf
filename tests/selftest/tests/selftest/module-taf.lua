@@ -13,7 +13,6 @@ taf.test("Test module-taf (common)", { "module-taf", "common" }, function()
 	assert(log_obj.tests ~= nil)
 	assert(#log_obj.tests == 1, "Expected 1 test, got " .. #log_obj.tests)
 
-	--- @type test_t
 	local test = log_obj.tests[1]
 
 	check.check_test(test, "Test common TAF test", "passed")
@@ -79,7 +78,6 @@ taf.test("Test module-taf (logging)", { "module-taf", "logging" }, function()
 	test_logging_tests(log_obj.tests[9], "CRITICAL", 1, "failed", " ('c')")
 	test_logging_tests(log_obj.tests[10], "CRITICAL", 1, "failed", " ('taf.log_critical')")
 
-	--- @type test_t
 	local test = log_obj.tests[11]
 	check.check_test(test, "Test logging with incorrect log level", "failed")
 	util.test_tags(test, { "module-taf", "logging" })
@@ -113,7 +111,6 @@ taf.test("Test module-taf (utils)", { "module-taf", "utils" }, function()
 	assert(log_obj.tests ~= nil)
 	assert(#log_obj.tests == 4, "Expected 4 tests, got " .. #log_obj.tests)
 
-	--- @type test_t
 	local test = log_obj.tests[1]
 	check.check_test(test, "Test taf.sleep", "passed")
 	util.test_tags(test, { "module-taf", "utils" })

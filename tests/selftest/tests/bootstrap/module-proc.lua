@@ -86,6 +86,6 @@ taf.test("Test proc:read() stderr", { "module-proc" }, function()
 		handle:kill()
 	end)
 	taf.sleep(100) -- just to make sure
-	local result = handle:read(4096, "stderr")
+	local result = handle:read("stderr")
 	taf.log_info(result)
 end)
