@@ -124,6 +124,10 @@ json_object *taf_raw_log_to_json(raw_log_t *log) {
                            json_object_new_string(log->started));
     json_object_object_add(root, "finished",
                            json_object_new_string(log->finished));
+    if (log->target) {
+        json_object_object_add(root, "target",
+                               json_object_new_string(log->target));
+    }
 
     json_object *tag_arr = json_object_new_array();
     for (size_t i = 0; i < log->tags_count; i++) {
@@ -182,6 +186,9 @@ raw_log_t *taf_json_to_raw_log(struct json_object *root) {
 
     if (json_object_object_get_ex(root, "finished", &o))
         log->finished = jdup_string(o);
+
+    if (json_object_object_get_ex(root, "target", &o))
+        log->target = jdup_string(o);
 
     if (json_object_object_get_ex(root, "tags", &o) &&
         json_object_is_type(o, json_type_array)) {
@@ -413,6 +420,11 @@ void taf_log_tests_create(int amount) {
     raw_log->tags = opts->tags;
     raw_log->started = strdup(time_str);
     raw_log->taf_version = TAF_VERSION;
+    if (opts->target) {
+        raw_log->target = strdup(opts->target);
+    } else {
+        raw_log->target = NULL;
+    }
 #if defined(__APPLE__)
     raw_log->os = "macos";
 #elif defined(__linux__)

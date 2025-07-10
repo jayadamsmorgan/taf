@@ -52,6 +52,7 @@ typedef struct {
     char *os_version;
     char *started;
     char *finished;
+    char *target;
 
     char **tags;
     size_t tags_count;

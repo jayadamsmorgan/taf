@@ -70,6 +70,7 @@ end
 --- @field os_version string
 --- @field started string
 --- @field finished string
+--- @field target string?
 --- @field tags [string]
 --- @field tests [test_t]
 
@@ -110,6 +111,8 @@ M.load_log = function(args)
 
 	assert(log_obj.finished ~= nil)
 	assert(M.is_valid_datetime(log_obj.finished))
+
+	assert(log_obj.target == "bootstrap") -- It should not be present on single target projects, but here we check it
 
 	return log_obj
 end
