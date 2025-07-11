@@ -66,6 +66,9 @@ int taf_logs_info() {
     printf("TAF test run started on %s\n", raw_log->started);
     printf("TAF version %s\n", raw_log->taf_version);
     printf("Test run performed on %s\n", raw_log->os_version);
+    if (raw_log->target) {
+        printf("Test target: '%s'\n", raw_log->target);
+    }
     if (raw_log->tags_count != 0) {
         printf("Test run performed with tags [");
         for (size_t i = 0; i < raw_log->tags_count; i++) {
@@ -83,7 +86,7 @@ int taf_logs_info() {
     for (size_t i = 0; i < raw_log->tests_count; i++) {
         raw_log_test_t *test = &raw_log->tests[i];
         printf("Test [%zu] '%s':\n", i + 1, test->name);
-        printf("    Tags: [ ");
+        printf("    Tags: [");
         for (size_t j = 0; j < test->tags_count; j++) {
             printf(" '%s'", test->tags[j]);
             if (j != test->tags_count - 1) {
@@ -106,14 +109,43 @@ int taf_logs_info() {
         }
         if (opts->include_outputs) {
             if (test->outputs_count == 0) {
-                printf("    No test outputs.\n\n");
-                continue;
+                printf("    No test outputs.\n");
+            } else {
+                printf("    Outputs:\n");
+                for (size_t j = 0; j < test->outputs_count; j++) {
+                    raw_log_test_output_t *output = &test->outputs[j];
+                    printf("---------\n");
+                    printf("        %zu: [%s][%s]:\n%s\n", j + 1,
+                           output->date_time,
+                           taf_log_level_to_str(output->level), output->msg);
+                    printf("---------\n");
+                }
             }
-            printf("    Outputs:\n");
-            for (size_t j = 0; j < test->outputs_count; j++) {
-                raw_log_test_output_t *output = &test->outputs[j];
-                printf("        %zu: [%s]: %s\n", j + 1,
-                       taf_log_level_to_str(output->level), output->msg);
+            if (test->teardown_outputs_count == 0) {
+                printf("    No teardown outputs.\n");
+            } else {
+                printf("    Teardown Outputs:\n");
+                for (size_t j = 0; j < test->teardown_outputs_count; j++) {
+                    raw_log_test_output_t *output = &test->teardown_outputs[j];
+                    printf("---------\n");
+                    printf("        %zu: [%s][%s]:\n%s\n", j + 1,
+                           output->date_time,
+                           taf_log_level_to_str(output->level), output->msg);
+                    printf("---------\n");
+                }
+            }
+            if (test->teardown_errors_count == 0) {
+                printf("    No teardown errors.\n");
+            } else {
+                printf("    Teardown errors:\n");
+                for (size_t j = 0; j < test->teardown_errors_count; j++) {
+                    raw_log_test_output_t *output = &test->teardown_errors[j];
+                    printf("---------\n");
+                    printf("        %zu: [%s][%s]:\n%s\n", j + 1,
+                           output->date_time,
+                           taf_log_level_to_str(output->level), output->msg);
+                    printf("---------\n");
+                }
             }
         }
         printf("\n");

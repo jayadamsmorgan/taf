@@ -291,8 +291,8 @@ raw_log_t *taf_json_to_raw_log(struct json_object *root) {
                 json_object_is_type(tmp, json_type_array)) {
 
                 t->teardown_outputs_count = jarray_len(tmp);
-                t->teardown_outputs = calloc(t->teardown_errors_count,
-                                             sizeof *t->teardown_errors);
+                t->teardown_outputs = calloc(t->teardown_outputs_count,
+                                             sizeof *t->teardown_outputs);
 
                 for (size_t k = 0; k < t->teardown_outputs_count; ++k) {
                     struct json_object *jo =
