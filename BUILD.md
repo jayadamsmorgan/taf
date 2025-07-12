@@ -11,7 +11,6 @@
     - lua5.4
     - libserialport
     - libssh2
-    - criterion (Optional, needed for unit testing)
 
 ### Linux
 
@@ -22,7 +21,7 @@ sudo dnf groupinstall "Development Tools"
 sudo dnf install meson pkgconf-pkg-config \
                  json-c-devel libcurl-devel \
                  notcurses-devel notcurses-static \
-                 lua-devel libserialport-devel libssh2-devel criterion
+                 lua-devel libserialport-devel libssh2-devel
 ```
 
 - Debian/Ubuntu:
@@ -32,20 +31,20 @@ sudo apt update
 sudo apt install build-essential meson pkg-config \
                  libjson-c-dev libcurl4-openssl-dev \
                  libnotcurses-dev libnotcurses-core-dev \
-                 liblua5.4-dev libserialport-dev libssh2-1-dev criterion
+                 liblua5.4-dev libserialport-dev libssh2-1-dev
 ```
 
 - Arch/Manjaro
 
 ```
 sudo pacman -Sy --needed base-devel meson \
-     json-c curl notcurses lua libserialport libssh2 criterion
+     json-c curl notcurses lua libserialport libssh2
 ```
 
 ### Homebrew (macOS / Linux)
 
 ```
-brew install meson json-c curl notcurses lua libserialport libssh2 criterion
+brew install meson json-c curl notcurses lua libserialport libssh2
 ```
 
 ### Windows

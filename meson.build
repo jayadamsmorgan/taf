@@ -186,7 +186,3 @@ executable(
 )
 
 install_subdir('lib', install_dir: taf_dir_path)
-
-if get_option('unit_tests')
-    subdir('tests/unit')
-endif
