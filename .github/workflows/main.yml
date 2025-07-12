@@ -5,13 +5,13 @@ on:
     branches: [ "master", "gh_actions" ]
 
 jobs:
-  build:
+  build-and-test:
     name: Build for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [macos-latest, ubuntu-latest]
 
-    runs-on: ${{ matrix.runsOn }}
 
     steps:
       - name: Check out
