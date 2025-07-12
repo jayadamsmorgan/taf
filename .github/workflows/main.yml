@@ -1,0 +1,40 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [ "master", "gh_actions" ]
+
+jobs:
+  build:
+    name: Build for ${{ matrix.arch }}
+    strategy:
+      matrix:
+        include:
+          - runsOn: macos-latest       
+          - runsOn: ubuntu-latest
+    runs-on: ${{ matrix.runsOn }}
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Install Homebrew (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+
+      - name: Install dependencies
+        run: |
+          brew install meson json-c curl notcurses lua libserialport libssh2
+
+      - name: Build & Install
+        run: |
+          meson setup build
+          meson install -C build
+
+      - name: Self-Test
+        run: |
+          cd selftest
+          taf test selftest
+
