@@ -20,7 +20,9 @@ jobs:
       - name: Install Homebrew (Ubuntu)
         if: matrix.os == 'ubuntu-latest'
         run: |
-          sh -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          echo "/home/linuxbrew/.linuxbrew/bin"  >> "$GITHUB_PATH"
+          echo "/home/linuxbrew/.linuxbrew/sbin" >> "$GITHUB_PATH"
 
       - name: Install dependencies
         run: |
