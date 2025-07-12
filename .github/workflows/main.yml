@@ -6,12 +6,11 @@ on:
 
 jobs:
   build:
-    name: Build for ${{ matrix.arch }}
+    name: Build for ${{ matrix.os }}
     strategy:
       matrix:
-        include:
-          - runsOn: macos-latest       
-          - runsOn: ubuntu-latest
+        os: [macos-latest, ubuntu-latest]
+
     runs-on: ${{ matrix.runsOn }}
 
     steps:
