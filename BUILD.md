@@ -44,7 +44,7 @@ sudo pacman -Sy --needed base-devel meson \
 ### Homebrew (macOS / Linux)
 
 ```
-brew install meson json-c curl notcurses lua libserialport libssh2
+brew install meson json-c curl notcurses libunistring lua libserialport libssh2
 ```
 
 ### Windows
