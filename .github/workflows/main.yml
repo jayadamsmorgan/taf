@@ -22,15 +22,19 @@ jobs:
           /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           echo "/home/linuxbrew/.linuxbrew/bin"  >> "$GITHUB_PATH"
           echo "/home/linuxbrew/.linuxbrew/sbin" >> "$GITHUB_PATH"
-          prefix="$(brew --prefix)"
-          echo "PKG_CONFIG_PATH=$prefix/lib/pkgconfig:$prefix/share/pkgconfig" >> "$GITHUB_ENV"
 
       - name: Install dependencies
         run: |
           brew install meson json-c notcurses lua libserialport
 
-      - name: Build & Install
+      - name: Build & Install (macOS)
         run: |
+          meson setup build
+          meson install -C build
+
+      - name: Build & Install (Ubuntu)
+        run: |
+          export PKG_CONFIG_PATH="/home/linuxbrew/.linuxbrew/lib/pkgconfig:/home/linuxbrew/.linuxbrew/share/pkgconfig"
           meson setup build
           meson install -C build
 
