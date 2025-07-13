@@ -76,7 +76,7 @@ if is_linux
         static: true,
     )
     libgpm_dep = dependency(
-        'gpm',
+        'libgpm',
         method: 'pkg-config',
         required: false,
         static: true,
