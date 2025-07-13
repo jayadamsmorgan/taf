@@ -70,7 +70,7 @@ if is_macos_arm64
 endif
 if is_linux
     libunistring_dep = dependency(
-        'unistring',
+        'libunistring',
         method: 'pkg-config',
         required: true,
         static: true,
