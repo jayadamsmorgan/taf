@@ -68,6 +68,15 @@ if is_macos_arm64
     )
     opt_deps += [libunistring_dep, libncurses_dep]
 endif
+if is_linux
+    libqrcodegen = dependency(
+        'libqrcodegen',
+        method: pkg-config,
+        required: false,
+        static: true,
+    )
+    opt_deps += [libqrcodegen]
+endif
 #----------------------------------------------------------------------
 
 #--- Lua ---------------------------------------------------------------
