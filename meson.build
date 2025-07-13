@@ -70,7 +70,7 @@ if is_macos_arm64
 endif
 if is_linux
     libqrcodegen = dependency(
-        'libqrcodegen',
+        'qrcodegen',
         method: 'pkg-config',
         required: false,
         static: true,
