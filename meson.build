@@ -69,13 +69,19 @@ if is_macos_arm64
     opt_deps += [libunistring_dep, libncurses_dep]
 endif
 if is_linux
-    libqrcodegen = dependency(
+    libqrcodegen_dep = dependency(
         'qrcodegen',
         method: 'pkg-config',
         required: false,
         static: true,
     )
-    opt_deps += [libqrcodegen]
+    libgpm_dep = dependency(
+        'gpm',
+        method: 'pkg-config',
+        required: false,
+        static: true,
+    )
+    opt_deps += [libqrcodegen_dep, libgpm_dep]
 endif
 #----------------------------------------------------------------------
 
