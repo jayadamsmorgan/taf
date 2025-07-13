@@ -24,7 +24,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install meson json-c notcurses lua libserialport pkgconf
+          brew install meson json-c notcurses lua libserialport
+
+      - name: Link keg-only libs (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          # Temporary runner → safe to do
+          brew link --force libunistring
+          brew link --force ncurses
 
       - name: Build & Install
         run: |
