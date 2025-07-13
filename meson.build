@@ -71,7 +71,7 @@ endif
 if is_linux
     libqrcodegen = dependency(
         'libqrcodegen',
-        method: pkg-config,
+        method: 'pkg-config',
         required: false,
         static: true,
     )
