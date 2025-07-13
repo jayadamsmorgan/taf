@@ -41,5 +41,5 @@ jobs:
       - name: Self-Test
         run: |
           cd selftest
-          taf test selftest
+          taf test selftest -e
 
