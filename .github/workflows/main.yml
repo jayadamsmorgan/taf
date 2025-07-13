@@ -25,7 +25,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install meson curl json-c notcurses lua libserialport
+          brew install meson curl json-c notcurses lua libserialport libunistring
 
       - name: Build & Install (macOS)
         if: matrix.os == 'macos-latest'

@@ -68,6 +68,15 @@ if is_macos_arm64
     )
     opt_deps += [libunistring_dep, libncurses_dep]
 endif
+if is_linux
+    libunistring_dep = dependency(
+        'unistring',
+        method: 'pkg-config',
+        required: true,
+        static: true,
+    )
+    opt_deps += libunistring_dep
+endif
 #----------------------------------------------------------------------
 
 #--- Lua ---------------------------------------------------------------
