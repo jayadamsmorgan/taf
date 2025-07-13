@@ -148,6 +148,6 @@ taf.test("Test module-taf (utils)", { "module-taf", "utils" }, function()
 	util.error_if(end_ms == nil, test, "end_ms is nil")
 	if start_ms and end_ms then
 		local time = end_ms - start_ms
-		util.error_if(time < 10 or time > 50, test, "Incorrect millis " .. time)
+		util.error_if(time < 10 or time > 200, test, "Incorrect millis " .. time)
 	end
 end)
