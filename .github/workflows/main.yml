@@ -21,7 +21,7 @@ jobs:
         run: |
           sudo apt update
           sudo apt install build-essential meson pkg-config \
-                           libjson-c-dev libcurl4-openssl-dev \
+                           libjson-c-dev libcurl4-openssl-dev libunistring-dev \
                            libnotcurses-dev libdeflate-dev libnotcurses-core-dev \
                            liblua5.4-dev libserialport-dev libssh2-1-dev
 
