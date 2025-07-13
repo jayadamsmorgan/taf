@@ -24,7 +24,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install meson json-c curl notcurses libunistring lua libserialport libssh2
+          brew install meson json-c notcurses lua libserialport
 
       - name: Build & Install
         run: |

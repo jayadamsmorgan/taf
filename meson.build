@@ -47,6 +47,21 @@ libdeflate_dep = dependency(
     required: true,
     static: true,
 )
+if is_macos_arm64
+    libunistring_dep = declare_dependency(
+        link_args: ['/opt/homebrew/opt/libunistring/lib/libunistring.a'],
+        include_directories: include_directories(
+            '/opt/homebrew/opt/libunistring/include',
+        ),
+    )
+    libncurses_dep = declare_dependency(
+        link_args: ['/opt/homebrew/opt/ncurses/lib/libncurses.a'],
+        include_directories: include_directories(
+            '/opt/homebrew/opt/ncurses/include',
+        ),
+    )
+    opt_deps += [libunistring_dep, libncurses_dep]
+endif
 #----------------------------------------------------------------------
 
 #--- Lua ---------------------------------------------------------------
