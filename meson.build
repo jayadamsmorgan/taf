@@ -49,13 +49,19 @@ libdeflate_dep = dependency(
 )
 if is_macos_arm64
     libunistring_dep = declare_dependency(
-        link_args: ['/opt/homebrew/opt/libunistring/lib/libunistring.a'],
+        link_args: [
+            '-L/opt/homebrew/opt/libunistring/lib',
+            '-lunistring',
+        ],
         include_directories: include_directories(
             '/opt/homebrew/opt/libunistring/include',
         ),
     )
     libncurses_dep = declare_dependency(
-        link_args: ['/opt/homebrew/opt/ncurses/lib/libncurses.a'],
+        link_args: [
+            '-L/opt/homebrew/opt/ncurses/lib',
+            '-lncurses',
+        ],
         include_directories: include_directories(
             '/opt/homebrew/opt/ncurses/include',
         ),
