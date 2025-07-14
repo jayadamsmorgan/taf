@@ -13,7 +13,7 @@ jobs:
       - name: Check out
         uses: actions/checkout@v4
 
-      - name: Install Homebrew & deps
+      - name: Install Homebrew
         run: |
           /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           echo "/home/linuxbrew/.linuxbrew/bin"  >> "$GITHUB_PATH"
@@ -37,7 +37,6 @@ jobs:
       - name: Self-Tests
         id: run_test
         run: |
-          export PATH="/home/runner/work/taf/taf/chrome-linux64:/home/runner/work/taf/taf/chromedriver-linux64:$PATH"
           cd selftest
           set +e
           modules=(http json proc taf webdriver)
