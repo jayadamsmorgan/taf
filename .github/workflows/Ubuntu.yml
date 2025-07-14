@@ -38,6 +38,7 @@ jobs:
         id: run_test
         continue-on-error: true
         run: |
+          export PATH="/home/runner/work/taf/taf/chrome-linux64:/home/runner/work/taf/taf/chromedriver-linux64:$PATH"
           cd selftest
           set +e
           modules=(http json proc taf webdriver)
