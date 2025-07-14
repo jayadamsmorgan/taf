@@ -29,13 +29,14 @@ jobs:
 
       - name: Build & Install
         run: |
+          export PATH="/home/linuxbrew/.linuxbrew/bin:/home/runner/work/taf/taf/chrome-linux64:/home/runner/work/taf/taf/chromedriver-linux64:$PATH"
           export PKG_CONFIG_PATH="/home/linuxbrew/.linuxbrew/lib/pkgconfig:/home/linuxbrew/.linuxbrew/share/pkgconfig"
           meson setup build
           meson install -C build
 
       - name: Self-Test
         run: |
-          export PATH="/home/linuxbrew/.linuxbrew/bin:/home/runner/work/taf/taf/chrome-linux64:/home/runner/work/taf/taf/chromedriver-linux64:$PATH"
           cd selftest
+          taf test bootstrap -t module-webdriver -e
           taf test selftest -e
 
