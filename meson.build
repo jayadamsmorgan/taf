@@ -68,6 +68,17 @@ if is_macos_arm64
     )
     opt_deps += [libunistring_dep, libncurses_dep]
 endif
+if is_linux
+    libunistring_dep = declare_dependency(
+        link_args: [
+            '-L/home/linuxbrew/.linuxbrew/opt/libunistring/lib',
+            '-lunistring',
+        ],
+        include_directories: include_directories(
+            '/home/linuxbrew/.linuxbrew/opt/libunistring/include',
+        ),
+    )
+endif
 #----------------------------------------------------------------------
 
 #--- Lua ---------------------------------------------------------------
