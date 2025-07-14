@@ -27,16 +27,27 @@ jobs:
         continue-on-error: true
         run: |
           cd selftest
-          modules="http json proc taf webdriver"
-          for m in $modules; do
-            taf test selftest -t module-$m -e
-            mkdir -p logs/ci/bootstrap
-            mkdir -p logs/ci/selftest
-            cp logs/bootstrap/test_run_latest_raw.json logs/ci/bootstrap/$m-raw.json
-            cp logs/bootstrap/test_run_latest_output.log logs/ci/bootstrap/$m-output.log
-            cp logs/selftest/test_run_latest_raw.json logs/ci/selftest/$m-raw.json
-            cp logs/selftest/test_run_latest_output.log logs/ci/selftest/$m-output.log
+          set +e
+          modules=(http json proc taf webdriver)
+          FAILED=0
+
+          for m in "${modules[@]}"; do
+            echo "::group::module-$m"
+            taf test selftest -t module-"$m" -e
+            STATUS=$?
+            echo "::endgroup::"
+
+            mkdir -p logs/ci/bootstrap logs/ci/selftest
+            cp -L logs/bootstrap/test_run_latest_raw.json     logs/ci/bootstrap/${m}-raw.json     || true
+            cp -L logs/bootstrap/test_run_latest_output.log   logs/ci/bootstrap/${m}-output.log   || true
+            cp -L logs/selftest/test_run_latest_raw.json      logs/ci/selftest/${m}-raw.json      || true
+            cp -L logs/selftest/test_run_latest_output.log    logs/ci/selftest/${m}-output.log    || true
+
+            if [ $STATUS -ne 0 ]; then
+              FAILED=1
+            fi
           done
+          exit $FAILED
 
       - name: Upload logs
         if: always()
