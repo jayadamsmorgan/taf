@@ -29,7 +29,7 @@ jobs:
 
       - name: Build & Install
         run: |
-          export PATH="/home/linuxbrew/.linuxbrew/bin:/home/runner/work/taf/taf/chrome-linux64:/home/runner/work/taf/taf/chromedriver-linux64:$PATH"
+          export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
           export PKG_CONFIG_PATH="/home/linuxbrew/.linuxbrew/lib/pkgconfig:/home/linuxbrew/.linuxbrew/share/pkgconfig"
           meson setup build
           meson install -C build
@@ -39,6 +39,7 @@ jobs:
         continue-on-error: true
         run: |
           cd selftest
+          export PATH="/home/runner/work/taf/taf/chrome-linux64:/home/runner/work/taf/taf/chromedriver-linux64:$PATH"
           modules="http json proc taf webdriver"
           for m in $modules; do
             taf test selftest -t module-$m -e
