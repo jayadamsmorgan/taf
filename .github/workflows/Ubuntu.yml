@@ -33,12 +33,12 @@ jobs:
           export PKG_CONFIG_PATH="/home/linuxbrew/.linuxbrew/lib/pkgconfig:/home/linuxbrew/.linuxbrew/share/pkgconfig"
           meson setup build
           meson install -C build
-          cd selftest
 
       - name: Self-Tests
         id: run_test
         continue-on-error: true
         run: |
+          cd selftest
           modules="http json proc taf webdriver"
           for m in $modules; do
             taf test selftest -t module-$m -e
