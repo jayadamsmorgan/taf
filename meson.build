@@ -78,6 +78,7 @@ if is_linux
             '/home/linuxbrew/.linuxbrew/opt/libunistring/include',
         ),
     )
+    opt_deps += [libunistring_dep]
 endif
 #----------------------------------------------------------------------
 
