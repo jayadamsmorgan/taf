@@ -51,11 +51,10 @@ jobs:
           done
           
 
-      - name: Upload raw logs
+      - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
           name: selftest-logs
-          path: logs/ci
-          follow-symlinks: true
+          path: selftest/logs/ci
