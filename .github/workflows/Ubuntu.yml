@@ -13,7 +13,7 @@ jobs:
       - name: Check out
         uses: actions/checkout@v4
 
-      - name: Install Homebrew (Ubuntu)
+      - name: Install Homebrew
         run: |
           /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           echo "/home/linuxbrew/.linuxbrew/bin"  >> "$GITHUB_PATH"
@@ -22,17 +22,20 @@ jobs:
       - name: Install dependencies
         run: |
           brew install meson curl json-c notcurses lua libserialport libunistring
-          brew install --cask chromedriver
+          wget https://storage.googleapis.com/chrome-for-testing-public/140.0.7294.0/linux64/chrome-linux64.zip
+          wget https://storage.googleapis.com/chrome-for-testing-public/140.0.7294.0/linux64/chromedriver-linux64.zip
+          unzip chrome-linux64.zip
+          unzip chromedriver-linux64.zip
 
-      - name: Build & Install (Ubuntu)
+      - name: Build & Install
         run: |
           export PKG_CONFIG_PATH="/home/linuxbrew/.linuxbrew/lib/pkgconfig:/home/linuxbrew/.linuxbrew/share/pkgconfig"
-          export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
           meson setup build
           meson install -C build
 
       - name: Self-Test
         run: |
+          export PATH="/home/linuxbrew/.linuxbrew/bin:/home/runner/work/taf/taf/chrome-linux64:/home/runner/work/taf/taf/chromedriver-linux64:$PATH"
           cd selftest
           taf test selftest -e
 
