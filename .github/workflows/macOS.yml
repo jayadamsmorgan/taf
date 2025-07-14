@@ -36,6 +36,7 @@ jobs:
             cp logs/bootstrap/test_run_latest_output.log logs/ci/bootstrap/$m-output.log
             cp logs/selftest/test_run_latest_raw.json logs/ci/selftest/$m-raw.json
             cp logs/selftest/test_run_latest_output.log logs/ci/selftest/$m-raw.log
+          done
 
       - name: Upload raw logs
         if: always()
