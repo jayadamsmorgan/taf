@@ -16,22 +16,27 @@ jobs:
       - name: Check out
         uses: actions/checkout@v4
 
-      - name: Install dependencies (Ubuntu)
+      - name: Install Homebrew (Ubuntu)
         if: matrix.os == 'ubuntu-latest'
         run: |
-          sudo apt update
-          sudo apt install build-essential meson pkg-config \
-                           libjson-c-dev libcurl4-openssl-dev libunistring-dev \
-                           libqrcodegen-dev libdeflate-dev libgpm-dev libnotcurses-core-dev \
-                           liblua5.4-dev libserialport-dev libssh2-1-dev
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          echo "/home/linuxbrew/.linuxbrew/bin"  >> "$GITHUB_PATH"
+          echo "/home/linuxbrew/.linuxbrew/sbin" >> "$GITHUB_PATH"
 
-      - name: Install dependencies (macOS)
+      - name: Install dependencies
+        run: |
+          brew install meson curl json-c notcurses lua libserialport libunistring
+
+      - name: Build & Install (macOS)
         if: matrix.os == 'macos-latest'
         run: |
-          brew install meson json-c notcurses lua libserialport
+          meson setup build
+          meson install -C build
 
-      - name: Build & Install
+      - name: Build & Install (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
         run: |
+          export PKG_CONFIG_PATH="/home/linuxbrew/.linuxbrew/lib/pkgconfig:/home/linuxbrew/.linuxbrew/share/pkgconfig:PKG_CONFIG_PATH"
           meson setup build
           meson install -C build
 
