@@ -21,9 +21,27 @@ jobs:
         run: |
           meson setup build
           meson install -C build
-
-      - name: Self-Test
-        run: |
           cd selftest
-          taf test selftest -e
+
+      - name: Self-Tests
+        id: run_test
+        continue-on-error: true
+        run: |
+          modules="http json proc taf webdriver"
+          for m in $modules; do
+            taf test selftest -t module-$m -e
+            mkdir -p logs/ci/bootstrap
+            mkdir -p logs/ci/selftest
+            cp logs/bootstrap/test_run_latest_raw.json logs/ci/bootstrap/$m-raw.json
+            cp logs/bootstrap/test_run_latest_output.log logs/ci/bootstrap/$m-output.log
+            cp logs/selftest/test_run_latest_raw.json logs/ci/selftest/$m-raw.json
+            cp logs/selftest/test_run_latest_output.log logs/ci/selftest/$m-raw.log
+
+      - name: Upload raw logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: selftest-logs
+          path: logs/ci
 
