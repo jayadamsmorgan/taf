@@ -1,0 +1,68 @@
+name: Ubuntu
+
+on:
+  push:
+    branches: [ "master", "gh_actions" ]
+  pull_request:
+
+jobs:
+  build-and-test:
+    name: Build for Ubuntu
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Install Homebrew
+        run: |
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          echo "/home/linuxbrew/.linuxbrew/bin"  >> "$GITHUB_PATH"
+          echo "/home/linuxbrew/.linuxbrew/sbin" >> "$GITHUB_PATH"
+
+      - name: Install dependencies
+        run: |
+          brew install meson curl json-c notcurses lua libserialport libunistring
+          wget https://storage.googleapis.com/chrome-for-testing-public/140.0.7294.0/linux64/chrome-linux64.zip
+          wget https://storage.googleapis.com/chrome-for-testing-public/140.0.7294.0/linux64/chromedriver-linux64.zip
+          unzip chrome-linux64.zip
+          unzip chromedriver-linux64.zip
+
+      - name: Build & Install
+        run: |
+          export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
+          export PKG_CONFIG_PATH="/home/linuxbrew/.linuxbrew/lib/pkgconfig:/home/linuxbrew/.linuxbrew/share/pkgconfig"
+          meson setup build
+          meson install -C build
+
+      - name: Self-Tests
+        id: run_test
+        run: |
+          cd selftest
+          set +e
+          modules=(http json proc taf webdriver)
+          FAILED=0
+
+          for m in "${modules[@]}"; do
+            echo "::group::module-$m"
+            taf test selftest -t module-"$m" -e
+            STATUS=$?
+            echo "::endgroup::"
+
+            mkdir -p logs/ci/bootstrap logs/ci/selftest
+            cp -L logs/bootstrap/test_run_latest_raw.json     logs/ci/bootstrap/${m}-raw.json     || true
+            cp -L logs/bootstrap/test_run_latest_output.log   logs/ci/bootstrap/${m}-output.log   || true
+            cp -L logs/selftest/test_run_latest_raw.json      logs/ci/selftest/${m}-raw.json      || true
+            cp -L logs/selftest/test_run_latest_output.log    logs/ci/selftest/${m}-output.log    || true
+
+            if [ $STATUS -ne 0 ]; then
+              FAILED=1
+            fi
+          done
+          exit $FAILED
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selftest-logs
+          path: selftest/logs/ci

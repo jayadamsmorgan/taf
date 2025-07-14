@@ -1,0 +1,56 @@
+name: macOS
+
+on:
+  push:
+    branches: [ "master", "gh_actions" ]
+  pull_request:
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: macos-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          brew install meson json-c notcurses lua libserialport
+
+      - name: Build & Install
+        run: |
+          meson setup build
+          meson install -C build
+
+      - name: Self-Tests
+        id: run_test
+        run: |
+          cd selftest
+          set +e
+          modules=(http json proc taf webdriver)
+          FAILED=0
+
+          for m in "${modules[@]}"; do
+            echo "::group::module-$m"
+            taf test selftest -t module-"$m" -e
+            STATUS=$?
+            echo "::endgroup::"
+
+            mkdir -p logs/ci/bootstrap logs/ci/selftest
+            cp -L logs/bootstrap/test_run_latest_raw.json     logs/ci/bootstrap/${m}-raw.json     || true
+            cp -L logs/bootstrap/test_run_latest_output.log   logs/ci/bootstrap/${m}-output.log   || true
+            cp -L logs/selftest/test_run_latest_raw.json      logs/ci/selftest/${m}-raw.json      || true
+            cp -L logs/selftest/test_run_latest_output.log    logs/ci/selftest/${m}-output.log    || true
+
+            if [ $STATUS -ne 0 ]; then
+              FAILED=1
+            fi
+          done
+          exit $FAILED
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selftest-logs
+          path: selftest/logs/ci
