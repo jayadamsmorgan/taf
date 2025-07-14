@@ -76,10 +76,10 @@ if is_linux
         static: true,
     )
     libgpm_dep = dependency(
-        'libgpm',
+        'gpm',
         method: 'pkg-config',
         required: false,
-        static: true,
+        static: false,
     )
     opt_deps += [libqrcodegen_dep, libgpm_dep]
 endif
