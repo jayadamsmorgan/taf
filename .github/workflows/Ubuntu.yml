@@ -1,4 +1,4 @@
-name: Build & Test
+name: Ubuntu
 
 on:
   push:
@@ -7,17 +7,13 @@ on:
 
 jobs:
   build-and-test:
-    name: Build for ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [macos-latest, ubuntu-latest]
+    name: Build for Ubuntu
+    runs-on: ubuntu-latest
     steps:
       - name: Check out
         uses: actions/checkout@v4
 
       - name: Install Homebrew (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
         run: |
           /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           echo "/home/linuxbrew/.linuxbrew/bin"  >> "$GITHUB_PATH"
@@ -28,16 +24,10 @@ jobs:
           brew install meson curl json-c notcurses lua libserialport libunistring
           brew install --cask chromedriver
 
-      - name: Build & Install (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          meson setup build
-          meson install -C build
-
       - name: Build & Install (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
         run: |
-          export PKG_CONFIG_PATH="/home/linuxbrew/.linuxbrew/lib/pkgconfig:/home/linuxbrew/.linuxbrew/share/pkgconfig:PKG_CONFIG_PATH"
+          export PKG_CONFIG_PATH="/home/linuxbrew/.linuxbrew/lib/pkgconfig:/home/linuxbrew/.linuxbrew/share/pkgconfig"
+          export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
           meson setup build
           meson install -C build
 

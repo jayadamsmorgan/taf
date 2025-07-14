@@ -1,0 +1,29 @@
+name: macOS
+
+on:
+  push:
+    branches: [ "master", "gh_actions" ]
+  pull_request:
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: macos-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          brew install meson json-c notcurses lua libserialport
+
+      - name: Build & Install
+        run: |
+          meson setup build
+          meson install -C build
+
+      - name: Self-Test
+        run: |
+          cd selftest
+          taf test selftest -e
+
