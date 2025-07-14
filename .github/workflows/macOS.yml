@@ -24,7 +24,6 @@ jobs:
 
       - name: Self-Tests
         id: run_test
-        continue-on-error: true
         run: |
           cd selftest
           set +e
@@ -52,7 +51,6 @@ jobs:
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4
-        continue-on-error: true
         with:
           name: selftest-logs
           path: selftest/logs/ci

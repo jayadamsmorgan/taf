@@ -22,6 +22,10 @@ jobs:
       - name: Install dependencies
         run: |
           brew install meson curl json-c notcurses lua libserialport libunistring
+          wget https://storage.googleapis.com/chrome-for-testing-public/140.0.7294.0/linux64/chrome-linux64.zip
+          wget https://storage.googleapis.com/chrome-for-testing-public/140.0.7294.0/linux64/chromedriver-linux64.zip
+          unzip chrome-linux64.zip
+          unzip chromedriver-linux64.zip
 
       - name: Build & Install
         run: |
@@ -32,8 +36,8 @@ jobs:
 
       - name: Self-Tests
         id: run_test
-        continue-on-error: true
         run: |
+          export PATH="/home/runner/work/taf/taf/chrome-linux64:/home/runner/work/taf/taf/chromedriver-linux64:$PATH"
           cd selftest
           set +e
           modules=(http json proc taf webdriver)
@@ -60,7 +64,6 @@ jobs:
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4
-        continue-on-error: true
         with:
           name: selftest-logs
           path: selftest/logs/ci
