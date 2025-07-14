@@ -25,7 +25,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install meson curl json-c notcurses lua libserialport libunistring chromedriver
+          brew install meson curl json-c notcurses lua libserialport libunistring
+          brew install --cask chromedriver
 
       - name: Build & Install (macOS)
         if: matrix.os == 'macos-latest'
