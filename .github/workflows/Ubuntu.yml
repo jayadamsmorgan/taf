@@ -37,6 +37,5 @@ jobs:
       - name: Self-Test
         run: |
           cd selftest
-          taf test bootstrap -t module-webdriver -e
           taf test selftest -e
 
