@@ -170,12 +170,15 @@ void taf_tui_update() {
                           hist->name);
         if (hist->state == RUNNING) {
             char *file_str = ui.current_file;
-            size_t len = strlen(ui.current_file);
-            if (len > 40) {
-                file_str += len - 40;
+            if (file_str) {
+                size_t len = strlen(ui.current_file);
+                if (len > 40) {
+                    file_str += len - 40;
+                }
+                ncplane_printf(test_progress_plane, "...    [%s%s:%d]",
+                               len > 40 ? "..." : "", file_str,
+                               ui.current_line);
             }
-            ncplane_printf(test_progress_plane, "...    [%s%s:%d]",
-                           len > 40 ? "..." : "", file_str, ui.current_line);
         }
         offset++;
     }
@@ -470,6 +473,64 @@ void taf_tui_test_failed(char *time, raw_log_test_output_t *failure_reasons,
     if (ui.passed_tests + ui.failed_tests == ui.total_tests) {
         ui.total_elapsed_ms = millis_since_taf_start();
     }
+}
+
+void taf_tui_hooks_started(char *time) {
+    ncplane_move_rel(ui_plane, 2, 0);
+    ncplane_erase(ui_plane);
+    notcurses_render(nc);
+    ncplane_scrollup_child(notcurses_stdplane(nc), ui_plane);
+    ncplane_resize_simple(log_plane, ncplane_dim_y(log_plane) + 2, absx);
+    ncplane_printf_yx(log_plane, ncplane_dim_y(log_plane) - 2, 0, "%s ", time);
+    ncplane_set_fg_palindex(log_plane, 6);
+    ncplane_printf(log_plane, "Running TAF hooks...");
+    ncplane_set_fg_default(log_plane);
+    for (uint i = 0; i < ncplane_dim_x(log_plane); i++) {
+        ncplane_putstr_yx(log_plane, ncplane_dim_y(log_plane) - 1, i, "─");
+    }
+}
+
+void taf_tui_hooks_finished(char *time) {
+    ncplane_move_rel(ui_plane, 2, 0);
+    ncplane_erase(ui_plane);
+    notcurses_render(nc);
+    ncplane_scrollup_child(notcurses_stdplane(nc), ui_plane);
+    ncplane_resize_simple(log_plane, ncplane_dim_y(log_plane) + 2, absx);
+    ncplane_printf_yx(log_plane, ncplane_dim_y(log_plane) - 2, 0, "%s ", time);
+    ncplane_set_fg_palindex(log_plane, 2);
+    ncplane_printf(log_plane, "Finished running TAF hooks.");
+    ncplane_set_fg_default(log_plane);
+    for (uint i = 0; i < ncplane_dim_x(log_plane); i++) {
+        ncplane_putstr_yx(log_plane, ncplane_dim_y(log_plane) - 1, i, "─");
+    }
+}
+
+void taf_tui_hook_failed(char *time, const char *trace) {
+    size_t count;
+    size_t *indices = string_wrapped_lines(trace, absx, &count);
+    ncplane_move_rel(ui_plane, 2, 0);
+    ncplane_erase(ui_plane);
+    notcurses_render(nc);
+    ncplane_scrollup_child(notcurses_stdplane(nc), ui_plane);
+    ncplane_resize_simple(log_plane, ncplane_dim_y(log_plane) + 2, absx);
+    ncplane_printf_yx(log_plane, ncplane_dim_y(log_plane) - 2, 0, "%s ", time);
+    ncplane_set_fg_palindex(log_plane, 9);
+    ncplane_printf(log_plane, "TAF hook failed. Traceback:");
+    for (size_t i = 0; i < count; i++) {
+        ncplane_move_rel(ui_plane, 1, 0);
+        ncplane_erase(ui_plane);
+        notcurses_render(nc);
+        ncplane_scrollup_child(notcurses_stdplane(nc), ui_plane);
+        ncplane_putstr_aligned(log_plane, ncplane_dim_y(log_plane) - 1,
+                               NCALIGN_LEFT, &trace[indices[i]]);
+        ncplane_resize_simple(log_plane, ncplane_dim_y(log_plane) + 1, absx);
+    }
+    ncplane_set_fg_default(log_plane);
+    free(indices);
+    for (uint i = 0; i < ncplane_dim_x(log_plane); i++) {
+        ncplane_putstr_yx(log_plane, ncplane_dim_y(log_plane) - 1, i, "─");
+    }
+    taf_tui_update();
 }
 
 static void init_project_info() {

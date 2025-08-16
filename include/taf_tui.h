@@ -28,4 +28,8 @@ void taf_tui_defer_queue_finished(char *time);
 void taf_tui_defer_failed(char *time, const char *trace, const char *file,
                           int line);
 
+void taf_tui_hooks_started(char *time);
+void taf_tui_hooks_finished(char *time);
+void taf_tui_hook_failed(char *time, const char *trace);
+
 #endif // TAF_TUI_H

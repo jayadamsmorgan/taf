@@ -47,6 +47,7 @@ typedef struct {
 } raw_log_test_t;
 
 typedef struct {
+    char *project_name;
     char *taf_version;
     char *os;
     char *os_version;
@@ -60,6 +61,8 @@ typedef struct {
     raw_log_test_t *tests;
     size_t tests_count;
 } raw_log_t;
+
+int hooks_context_push(lua_State *L);
 
 taf_log_level taf_log_level_from_str(const char *str);
 const char *taf_log_level_to_str(taf_log_level level);

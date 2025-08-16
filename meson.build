@@ -49,19 +49,13 @@ libdeflate_dep = dependency(
 )
 if is_macos_arm64
     libunistring_dep = declare_dependency(
-        link_args: [
-            '-L/opt/homebrew/opt/libunistring/lib',
-            '-lunistring',
-        ],
+        link_args: ['-L/opt/homebrew/opt/libunistring/lib', '-lunistring'],
         include_directories: include_directories(
             '/opt/homebrew/opt/libunistring/include',
         ),
     )
     libncurses_dep = declare_dependency(
-        link_args: [
-            '-L/opt/homebrew/opt/ncurses/lib',
-            '-lncurses',
-        ],
+        link_args: ['-L/opt/homebrew/opt/ncurses/lib', '-lncurses'],
         include_directories: include_directories(
             '/opt/homebrew/opt/ncurses/include',
         ),
@@ -112,6 +106,7 @@ endif
 
 main_source = 'src/main.c'
 sources = [
+    'src/taf_hooks.c',
     'src/taf_init.c',
     'src/taf_logs.c',
     'src/taf_target.c',
@@ -128,6 +123,7 @@ sources = [
     'src/util/os.c',
     'src/util/string.c',
     'src/util/time.c',
+    'src/modules/hooks/taf-hooks.c',
     'src/modules/http/taf-http.c',
     'src/modules/json/taf-json.c',
     'src/modules/proc/taf-proc.c',

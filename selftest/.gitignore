@@ -1,4 +1,5 @@
 logs/
+hooks_output.json
 
 
 .DS_Store

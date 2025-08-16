@@ -34,6 +34,7 @@ M.webdriver = require("taf.webdriver")
 M.proc = require("taf.proc")
 M.json = require("taf.json")
 M.http = require("taf.http")
+M.hooks = require("taf.hooks")
 
 --- Get amount of milliseconds since test started
 ---
@@ -132,5 +133,41 @@ end
 M.sleep = function(ms)
 	tm:sleep(ms)
 end
+
+--- Context types for hooks:
+
+--- @class context_t
+--- @field test_run test_run_context_t
+--- @field test test_context_t
+--- @field log_dir string
+
+--- @class test_run_context_t
+--- @field project_name string
+--- @field taf_version string
+--- @field started string
+--- @field finished string?
+--- @field os string
+--- @field os_version string
+--- @field target string?
+--- @field tags [string]
+
+--- @class test_output_t
+--- @field file string
+--- @field line integer
+--- @field date_time string
+--- @field level "CRITICAL"|"ERROR"|"WARNING"|"INFO"|"DEBUG"|"TRACE"
+--- @field msg string
+
+--- @class test_context_t
+--- @field test_file string
+--- @field name string
+--- @field started string
+--- @field finished string?
+--- @field status "passed"|"failed"|?
+--- @field tags [string]
+--- @field output [test_output_t]
+--- @field failure_reasons [test_output_t]
+--- @field teardown_output [test_output_t]
+--- @field teardown_errors [test_output_t]
 
 return M
