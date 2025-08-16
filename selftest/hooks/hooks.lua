@@ -7,7 +7,6 @@ local tests_ran = 0
 
 --- @param context context_t
 hooks.test_run_started(function(context)
-	assert(false)
 	output.run_started_ctx = context
 	output.test_started_ctxs = {}
 	output.test_finished_ctxs = {}
