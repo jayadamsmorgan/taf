@@ -6,6 +6,7 @@
 #include "cmd_parser.h"
 #include "modules/http/taf-http.h"
 #include "project_parser.h"
+#include "taf_hooks.h"
 #include "taf_tui.h"
 #include "test_case.h"
 #include "test_logs.h"
@@ -36,6 +37,7 @@ static char *module_path = NULL;
 static char *test_dir_path = NULL;
 static char *test_common_dir_path = NULL;
 static char *lib_dir_path = NULL;
+static char *hooks_dir_path = NULL;
 
 typedef struct line_cache {
     char *path;
@@ -91,6 +93,12 @@ static void line_hook(lua_State *L, lua_Debug *ar) {
             src++;
 
         if (strncasecmp(module_path, src, strlen(module_path)) == 0) {
+            // Skip internal module lines
+            return;
+        }
+
+        if (strncasecmp(hooks_dir_path, src, strlen(hooks_dir_path)) == 0) {
+            // Skip hook lines
             return;
         }
 
@@ -204,6 +212,7 @@ static int run_all_tests(lua_State *L) {
     test_case_t *tests = test_case_get_all(&amount);
     LOG("Test amount: %zu", amount);
     taf_log_tests_create(amount);
+    taf_hooks_run(L, TAF_HOOK_FN_TEST_RUN_STARTED, hooks_context_push);
     reset_taf_start_millis();
 
     for (size_t i = 0; i < amount; ++i) {
@@ -211,6 +220,7 @@ static int run_all_tests(lua_State *L) {
         test_marked_failed = false;
 
         taf_log_test_started(i + 1, tests[i]);
+        taf_hooks_run(L, TAF_HOOK_FN_TEST_STARTED, hooks_context_push);
 
         LOG("Setting up error handler...");
         lua_pushcfunction(L, taf_errhandler);
@@ -273,8 +283,11 @@ static int run_all_tests(lua_State *L) {
         }
 
         run_deferred(L, rc == LUA_OK ? "passed" : "failed");
+
+        taf_hooks_run(L, TAF_HOOK_FN_TEST_FINISHED, hooks_context_push);
     }
 
+    taf_hooks_run(L, TAF_HOOK_FN_TEST_RUN_FINISHED, hooks_context_push);
     taf_log_tests_finalize();
 
     return passed == amount ? EXIT_SUCCESS : EXIT_FAILURE;
@@ -375,6 +388,7 @@ static void register_test_api(lua_State *L) {
     register_clua_module(L, "taf-main", l_module_taf_register_module);
     register_clua_module(L, "taf-proc", l_module_proc_register_module);
     register_clua_module(L, "taf-serial", l_module_serial_register_module);
+    register_clua_module(L, "taf-hooks", l_module_hooks_register_module);
 
     inject_modules_dir(L);
 
@@ -497,6 +511,7 @@ int taf_test() {
     }
 
     register_test_api(L);
+    taf_hooks_init();
 
     LOG("Project lib directory path: %s", lib_dir_path);
     if (load_lua_dir(lib_dir_path, L) == -2) {
@@ -510,10 +525,26 @@ int taf_test() {
         internal_logging_deinit();
         return EXIT_FAILURE;
     }
+
+    asprintf(&hooks_dir_path, "%s/hooks", proj->project_path);
+    if (load_lua_dir(hooks_dir_path, L) == -2) {
+        test_case_free_all(L);
+        lua_close(L);
+        free(hooks_dir_path);
+        free(module_path);
+        free(test_common_dir_path);
+        free(test_dir_path);
+        free(lib_dir_path);
+        project_parser_free();
+        internal_logging_deinit();
+        return EXIT_FAILURE;
+    }
+
     if (proj->multitarget) {
         if (load_lua_dir(test_common_dir_path, L) == -2) {
             test_case_free_all(L);
             lua_close(L);
+            free(hooks_dir_path);
             free(module_path);
             free(test_common_dir_path);
             free(test_dir_path);
@@ -526,6 +557,7 @@ int taf_test() {
     if (load_lua_dir(test_dir_path, L) == -2) {
         test_case_free_all(L);
         lua_close(L);
+        free(hooks_dir_path);
         free(module_path);
         free(test_common_dir_path);
         free(test_dir_path);
@@ -543,6 +575,7 @@ int taf_test() {
         fprintf(stderr, "No tests to execute.\n");
         test_case_free_all(L);
         lua_close(L);
+        free(hooks_dir_path);
         free(module_path);
         free(test_common_dir_path);
         free(test_dir_path);
@@ -555,6 +588,7 @@ int taf_test() {
     if (!opts->headless && taf_tui_init()) {
         test_case_free_all(L);
         lua_close(L);
+        free(hooks_dir_path);
         free(module_path);
         free(test_common_dir_path);
         free(test_dir_path);
@@ -589,7 +623,9 @@ int taf_test() {
     project_parser_free();
 
     internal_logging_deinit();
+    taf_hooks_deinit();
 
+    free(hooks_dir_path);
     free(module_path);
     free(test_common_dir_path);
     free(test_dir_path);

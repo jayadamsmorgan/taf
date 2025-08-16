@@ -31,7 +31,7 @@ static size_t raw_log_test_output_cap;
 static size_t raw_log_test_teardown_output_cap;
 static size_t raw_log_test_teardown_errors_cap;
 static size_t raw_log_test_failure_cap;
-static int test_index;
+static int test_index = -1;
 static bool is_teardown = false;
 
 static bool headless = false;
@@ -115,6 +115,8 @@ json_object *taf_raw_log_to_json(raw_log_t *log) {
     LOG("Converting raw log object to JSON...");
 
     json_object *root = json_object_new_object();
+    json_object_object_add(root, "project_name",
+                           json_object_new_string(log->project_name));
     json_object_object_add(root, "taf_version",
                            json_object_new_string(log->taf_version));
     json_object_object_add(root, "os", json_object_new_string(log->os));
@@ -171,6 +173,9 @@ raw_log_t *taf_json_to_raw_log(struct json_object *root) {
     }
 
     struct json_object *o = NULL;
+
+    if (json_object_object_get_ex(root, "project_name", &o))
+        log->project_name = jdup_string(o);
 
     if (json_object_object_get_ex(root, "taf_version", &o))
         log->taf_version = jdup_string(o);
@@ -369,9 +374,9 @@ void taf_log_tests_create(int amount) {
     char time_str[TS_LEN];
     get_date_time_now(time_str);
 
-    if (!no_logs) {
-        project_parsed_t *proj = get_parsed_project();
+    project_parsed_t *proj = get_parsed_project();
 
+    if (!no_logs) {
         if (proj->multitarget) {
             snprintf(logs_dir, PATH_MAX, "%s/logs/%s", proj->project_path,
                      opts->target);
@@ -414,6 +419,7 @@ void taf_log_tests_create(int amount) {
 
     LOG("Initializing raw log...");
     raw_log = calloc(1, sizeof *raw_log);
+    raw_log->project_name = strdup(proj->project_name);
     raw_log->tests = calloc(amount, sizeof(raw_log_test_t));
     raw_log->tests_count = amount;
     raw_log->tags_count = opts->tags_amount;
@@ -751,11 +757,123 @@ void taf_log_defer_failed(const char *trace, const char *file, int line) {
     LOG("Successfully TAF logged defer failure.");
 }
 
+static inline void push_string(lua_State *L, const char *key,
+                               const char *value) {
+    lua_pushstring(L, value);
+    lua_setfield(L, -2, key);
+}
+
+static inline void push_output(lua_State *L, const raw_log_test_output_t *o) {
+    lua_newtable(L);
+
+    push_string(L, "msg", o->msg);
+    push_string(L, "level", taf_log_level_to_str(o->level));
+    push_string(L, "date_time", o->date_time);
+    push_string(L, "file", o->file);
+
+    lua_pushinteger(L, (lua_Integer)o->line);
+    lua_setfield(L, -2, "line");
+}
+
+int hooks_context_push(lua_State *L) {
+    lua_newtable(L);
+
+    // context.test_run
+    lua_newtable(L); // [ context, test_run ]
+    push_string(L, "project_name", raw_log->project_name);
+    push_string(L, "taf_version", raw_log->taf_version);
+    push_string(L, "os", raw_log->os);
+    push_string(L, "os_version", raw_log->os_version);
+    if (raw_log->target)
+        push_string(L, "target", raw_log->target);
+    push_string(L, "started", raw_log->started);
+    if (raw_log->finished)
+        push_string(L, "finished", raw_log->finished);
+
+    // test_run.tags (array)
+    lua_newtable(L); // [ context, test_run, tags ]
+    for (size_t i = 0; i < raw_log->tags_count; i++) {
+        lua_pushstring(L, raw_log->tags[i]);   // [ ..., tags, str ]
+        lua_seti(L, -2, (lua_Integer)(i + 1)); // tags[i+1] = str
+    }
+    lua_setfield(L, -2, "tags"); // test_run.tags = tags
+
+    lua_setfield(L, -2, "test_run"); // context.test_run = test_run
+
+    // context.test
+    if (test_index != -1) {
+        raw_log_test_t *t = &raw_log->tests[test_index];
+
+        lua_newtable(L); // [ context, test ]
+        push_string(L, "name", t->name);
+        push_string(L, "started", t->started);
+        if (t->finished)
+            push_string(L, "finished", t->finished);
+        if (t->status)
+            push_string(L, "status", t->status);
+
+        // test.tags (array)
+        lua_newtable(L); // [ context, test, tags ]
+        for (size_t i = 0; i < t->tags_count; i++) {
+            lua_pushstring(L, t->tags[i]);
+            lua_seti(L, -2, (lua_Integer)(i + 1));
+        }
+        lua_setfield(L, -2, "tags"); // test.tags = tags
+
+        // test.outputs (array of objects)
+        lua_newtable(L); // [ context, test, outputs ]
+        for (size_t i = 0; i < t->outputs_count; i++) {
+            push_output(L, &t->outputs[i]);        // pushes elem
+            lua_seti(L, -2, (lua_Integer)(i + 1)); // outputs[i+1] = elem
+        }
+        lua_setfield(L, -2, "outputs");
+
+        // test.failure_reasons (array of objects)
+        lua_newtable(L); // [ context, test, failure_reasons ]
+        for (size_t i = 0; i < t->failure_reasons_count; i++) {
+            push_output(L, &t->failure_reasons[i]);
+            lua_seti(L, -2, (lua_Integer)(i + 1));
+        }
+        lua_setfield(L, -2, "failure_reasons");
+
+        if (t->teardown_start)
+            push_string(L, "teardown_start", t->teardown_start);
+
+        // test.teardown_outputs (array of objects)
+        lua_newtable(L); // [ context, test, teardown_outputs ]
+        for (size_t i = 0; i < t->teardown_outputs_count; i++) {
+            push_output(L, &t->teardown_outputs[i]);
+            lua_seti(L, -2, (lua_Integer)(i + 1));
+        }
+        lua_setfield(L, -2, "teardown_outputs");
+
+        // test.teardown_errors (array of objects)
+        lua_newtable(L); // [ context, test, teardown_errors ]
+        for (size_t i = 0; i < t->teardown_errors_count; i++) {
+            push_output(L, &t->teardown_errors[i]);
+            lua_seti(L, -2, (lua_Integer)(i + 1));
+        }
+        lua_setfield(L, -2, "teardown_errors");
+
+        lua_setfield(L, -2, "test"); // context.test = test
+    }
+
+    // context.logs
+    lua_newtable(L); // [ context, logs ]
+    push_string(L, "dir", logs_dir);
+    push_string(L, "raw_log_path", raw_log_file_path);
+    push_string(L, "output_log_path", output_log_file_path);
+    lua_setfield(L, -2, "logs"); // context.logs = logs
+
+    return 1; // context remains on the stack
+}
+
 void taf_raw_log_free(raw_log_t *log) {
     LOG("Freeing raw log object...");
     if (!log)
         return;
 
+    free(log->project_name);
     free(log->taf_version);
     free(log->os_version);
     free(log->started);
@@ -845,6 +963,7 @@ void taf_log_tests_finalize() {
 
     // Cleanup
     LOG("Freeing raw log object...");
+    free(raw_log->project_name);
     free(raw_log->finished);
     free(raw_log->os_version);
     free(raw_log->started);
