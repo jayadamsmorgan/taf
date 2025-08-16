@@ -147,6 +147,20 @@ end)
 -- > Closing resource with status: passed <-- First defer
 ```
 
+#### `taf.get_active_tags()`
+
+Returns array of currently active tags for the test run.
+
+**Returns:**
+*   (`[string]`): Active tags for the test run.
+
+#### `taf.get_active_test_tags()`
+
+Returns array of currently active tags for the currently running test.
+
+**Returns:**
+*   (`[string]`): Active tags for the currently running test.
+
 #### `taf.get_current_target()`
 
 Gets the name of current test target executing if project is multitarget. Otherwise returns an empty string.
