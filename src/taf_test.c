@@ -203,6 +203,13 @@ static bool test_marked_failed = false;
 
 void taf_mark_test_failed() { test_marked_failed = true; }
 
+static size_t current_test_index = 0;
+
+test_case_t *taf_test_get_current_test() {
+    test_case_t *tests = test_case_get_all(NULL);
+    return &tests[current_test_index];
+}
+
 static int run_all_tests(lua_State *L) {
     LOG("Running tests...");
 
@@ -218,6 +225,7 @@ static int run_all_tests(lua_State *L) {
     for (size_t i = 0; i < amount; ++i) {
 
         test_marked_failed = false;
+        current_test_index = i;
 
         taf_log_test_started(i + 1, tests[i]);
         taf_hooks_run(L, TAF_HOOK_FN_TEST_STARTED, hooks_context_push);

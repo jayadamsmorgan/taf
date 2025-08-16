@@ -129,3 +129,17 @@ taf.test("Test taf.millis", { "module-taf", "utils" }, function()
 	taf.sleep(10)
 	taf.log_info(taf.millis())
 end)
+
+taf.test("Test taf.get_active_tags", { "module-taf", "utils" }, function()
+	local tags = taf.get_active_tags()
+	for _, value in ipairs(tags) do
+		taf.log_info(value)
+	end
+end)
+
+taf.test("Test taf.get_active_test_tags", { "module-taf", "utils", "some-other-tag" }, function()
+	local tags = taf.get_active_test_tags()
+	for _, value in ipairs(tags) do
+		taf.log_info(value)
+	end
+end)

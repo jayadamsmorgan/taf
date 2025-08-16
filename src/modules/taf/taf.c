@@ -2,6 +2,7 @@
 
 #include "cmd_parser.h"
 #include "internal_logging.h"
+#include "taf_test.h"
 #include "test_case.h"
 #include "test_logs.h"
 #include "util/lua.h"
@@ -161,6 +162,46 @@ int l_module_taf_defer(lua_State *L) {
     return 0;
 }
 
+int l_module_taf_get_active_tags(lua_State *L) {
+    LOG("Getting active tags...");
+
+    cmd_test_options *opts = cmd_parser_get_test_options();
+
+    lua_newtable(L);
+    for (size_t i = 0; i < opts->tags_amount; i++) {
+        lua_pushstring(L, opts->tags[i]);
+        lua_rawseti(L, -2, i + 1);
+    }
+
+    LOG("Successfully got active tags.");
+
+    return 1;
+}
+
+int l_module_taf_get_active_test_tags(lua_State *L) {
+    LOG("Getting active test tags...");
+
+    cmd_test_options *opts = cmd_parser_get_test_options();
+    test_case_t *test = taf_test_get_current_test();
+
+    lua_newtable(L);
+    size_t index = 1;
+    for (size_t i = 0; i < opts->tags_amount; i++) {
+        for (size_t j = 0; j < test->tags.amount; j++) {
+            if (strcmp(opts->tags[i], test->tags.tags[j]) == 0) {
+                LOG("Active test tag: %s", opts->tags[i]);
+                lua_pushstring(L, opts->tags[i]);
+                lua_rawseti(L, -2, index++);
+                break;
+            }
+        }
+    }
+
+    LOG("Successfully got active test tags.");
+
+    return 1;
+}
+
 static inline void log_helper(taf_log_level level, int n, int s, lua_State *L) {
     LOG("Constructing log message buffer with %d arguments...", n);
     luaL_Buffer buf;
@@ -293,14 +334,16 @@ int l_module_taf_get_current_target(lua_State *L) {
 
 /*----------- registration ------------------------------------------*/
 static const luaL_Reg module_fns[] = {
-    {"defer", l_module_taf_defer},                           //
-    {"get_current_target", l_module_taf_get_current_target}, //
-    {"sleep", l_module_taf_sleep},                           //
-    {"millis", l_module_taf_millis},                         //
-    {"print", l_module_taf_print},                           //
-    {"log", l_module_taf_log},                               //
-    {"test", l_module_taf_register_test},                    //
-    {NULL, NULL},                                            //
+    {"defer", l_module_taf_defer},                               //
+    {"get_active_tags", l_module_taf_get_active_tags},           //
+    {"get_active_test_tags", l_module_taf_get_active_test_tags}, //
+    {"get_current_target", l_module_taf_get_current_target},     //
+    {"sleep", l_module_taf_sleep},                               //
+    {"millis", l_module_taf_millis},                             //
+    {"print", l_module_taf_print},                               //
+    {"log", l_module_taf_log},                                   //
+    {"test", l_module_taf_register_test},                        //
+    {NULL, NULL},                                                //
 };
 
 int l_module_taf_register_module(lua_State *L) {
