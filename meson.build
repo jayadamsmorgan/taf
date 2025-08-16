@@ -1,7 +1,7 @@
 project(
     'taf',
     'c',
-    version: '1.1.1',
+    version: '1.2.0',
     default_options: [
         'c_std=gnu2x',
         'warning_level=3',
