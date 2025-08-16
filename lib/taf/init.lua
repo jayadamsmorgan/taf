@@ -58,6 +58,20 @@ M.defer = function(defer_func, ...)
 	tm:defer(defer_func, ...)
 end
 
+--- Get currently active tags for the test run
+---
+--- @return [string] tags
+M.get_active_tags = function()
+	return tm:get_active_tags()
+end
+
+--- Get currently active tags for the current test only
+---
+--- @return [string] tags
+M.get_active_test_tags = function()
+	return tm:get_active_test_tags()
+end
+
 --- Get current target name if project is multitarget. Returns an empty string otherwise.
 ---
 --- @return string target

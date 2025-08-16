@@ -16,6 +16,12 @@ int l_module_taf_defer(lua_State *L);
 // taf:get_current_target() -> target: string
 int l_module_taf_get_current_target(lua_State *L);
 
+// taf:get_active_tags() -> tags: [string]
+int l_module_taf_get_active_tags(lua_State *L);
+
+// taf:get_active_test_tags() -> tags: [string]
+int l_module_taf_get_active_test_tags(lua_State *L);
+
 // taf:log(log_level: string, ...)
 int l_module_taf_log(lua_State *L);
 

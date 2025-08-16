@@ -102,14 +102,16 @@ taf.test("Test module-taf (logging)", { "module-taf", "logging" }, function()
 end)
 
 taf.test("Test module-taf (utils)", { "module-taf", "utils" }, function()
-	local log_obj = util.load_log({ "test", "bootstrap", "-t", "utils", "-e" })
+	local log_obj = util.load_log({ "test", "bootstrap", "-t", "utils,other-tag,some-other-tag", "-e" })
 
 	assert(log_obj.tags ~= nil)
-	assert(#log_obj.tags == 1)
+	assert(#log_obj.tags == 3)
 	assert(log_obj.tags[1] == "utils")
+	assert(log_obj.tags[2] == "other-tag")
+	assert(log_obj.tags[3] == "some-other-tag")
 
 	assert(log_obj.tests ~= nil)
-	assert(#log_obj.tests == 4, "Expected 4 tests, got " .. #log_obj.tests)
+	assert(#log_obj.tests == 6, "Expected 6 tests, got " .. #log_obj.tests)
 
 	local test = log_obj.tests[1]
 	check.check_test(test, "Test taf.sleep", "passed")
@@ -150,4 +152,19 @@ taf.test("Test module-taf (utils)", { "module-taf", "utils" }, function()
 		local time = end_ms - start_ms
 		util.error_if(time < 10 or time > 200, test, "Incorrect millis " .. time)
 	end
+
+	test = log_obj.tests[5]
+	check.check_test(test, "Test taf.get_active_tags", "passed")
+	util.test_tags(test, { "module-taf", "utils" })
+	util.error_if(#test.output ~= 3, test, "Outputs not match")
+	check.check_output(test, test.output[1], "utils", "INFO")
+	check.check_output(test, test.output[2], "other-tag", "INFO")
+	check.check_output(test, test.output[3], "some-other-tag", "INFO")
+
+	test = log_obj.tests[6]
+	check.check_test(test, "Test taf.get_active_test_tags", "passed")
+	util.test_tags(test, { "module-taf", "utils", "some-other-tag" })
+	util.error_if(#test.output ~= 2, test, "Outputs not match")
+	check.check_output(test, test.output[1], "utils", "INFO")
+	check.check_output(test, test.output[2], "some-other-tag", "INFO")
 end)
