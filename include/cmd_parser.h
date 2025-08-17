@@ -30,8 +30,20 @@ typedef struct {
 } cmd_config_options;
 
 typedef struct {
+    char *name;
+    char *value;
+} cmd_var_t;
+
+typedef struct {
+    cmd_var_t *args;
+    size_t count;
+} cmd_var_list_t;
+
+typedef struct {
     char **tags;
     size_t tags_amount;
+
+    cmd_var_list_t vars;
 
     bool no_logs;
     taf_log_level log_level;

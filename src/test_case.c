@@ -17,6 +17,7 @@ void test_case_enqueue(test_case_t *tc) {
     for (size_t i = 0; i < tests_len; i++) {
         if (!strcmp(tc->name, tests[i].name)) {
             LOG("Overwriting test '%s'...", tc->name);
+            // TODO: memory leak, fix later
             memcpy(&tests[i], tc, sizeof(test_case_t));
             return;
         }

@@ -25,6 +25,7 @@ typedef struct {
 
 typedef struct {
     char *name;
+    char *description;
     char *started;
     char *finished;
     char *teardown_start;

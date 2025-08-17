@@ -43,13 +43,18 @@ M.millis = function()
 	return tm:millis()
 end
 
+--- @class taf_test_opts
+--- @field name string name of the test
+--- @field description string? description of the test, optional
+--- @field tags [string]? array of test tags, optional
+--- @field vars table?
+--- @field body fun() body of the test
+
 --- Register new test
 ---
---- @param test_name string name of the test
---- @param tags_or_body [string]|function either array of test tags or test body
---- @param body function|nil body of the test if previous argument is tags
-M.test = function(test_name, tags_or_body, body)
-	tm:test(test_name, tags_or_body, body)
+--- @param opts taf_test_opts
+M.test = function(opts)
+	tm.test(opts)
 end
 
 --- @param defer_func function function executed on defer
@@ -77,6 +82,15 @@ end
 --- @return string target
 M.get_current_target = function()
 	return tm:get_current_target()
+end
+
+--- Returns value of the predefined variable
+---
+--- @param var_name string
+---
+--- @return string
+M.get_var = function(var_name)
+	return tm:get_var(var_name)
 end
 
 --- Print something to logs & TUI. Same as default Lua `print()`. Both will use 'info' log level

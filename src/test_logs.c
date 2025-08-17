@@ -62,6 +62,8 @@ static json_object *raw_log_test_to_json(raw_log_test_t *test) {
     json_object *test_obj = json_object_new_object();
     json_object_object_add(test_obj, "name",
                            json_object_new_string(test->name));
+    json_object_object_add(test_obj, "description",
+                           json_object_new_string(test->description));
     json_object_object_add(test_obj, "started",
                            json_object_new_string(test->started));
     json_object_object_add(test_obj, "finished",
@@ -220,6 +222,8 @@ raw_log_t *taf_json_to_raw_log(struct json_object *root) {
             struct json_object *tmp;
             if (json_object_object_get_ex(jt, "name", &tmp))
                 t->name = jdup_string(tmp);
+            if (json_object_object_get_ex(jt, "description", &tmp))
+                t->description = jdup_string(tmp);
             if (json_object_object_get_ex(jt, "started", &tmp))
                 t->started = jdup_string(tmp);
             if (json_object_object_get_ex(jt, "finished", &tmp))
@@ -560,6 +564,7 @@ void taf_log_test_started(int index, test_case_t test_case) {
     test->tags_count = test_case.tags.amount;
 
     test->name = strdup(test_case.name);
+    test->description = strdup(test_case.desc);
     raw_log_test_output_cap = 2;
     test->outputs =
         malloc(sizeof(raw_log_test_output_t) * raw_log_test_output_cap);
@@ -888,6 +893,7 @@ void taf_raw_log_free(raw_log_t *log) {
         raw_log_test_t *t = &log->tests[i];
 
         free(t->name);
+        free(t->description);
         free(t->started);
         free(t->finished);
         free(t->status);
@@ -978,6 +984,7 @@ void taf_log_tests_finalize() {
         raw_log_test_t *test = &raw_log->tests[i];
         free(test->started);
         free(test->finished);
+        free(test->description);
         for (size_t j = 0; j < test->failure_reasons_count; j++) {
             free(test->failure_reasons[j].msg);
             free(test->failure_reasons[j].date_time);

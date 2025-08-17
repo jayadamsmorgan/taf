@@ -11,9 +11,24 @@ typedef struct {
 } test_tags_t;
 
 typedef struct {
-    const char *name; /* test name             */
-    test_tags_t tags; /* test tags */
-    int ref;          /* reference to Lua fn   */
+    const char *name;
+    const char *default_value;
+    const char **values;
+    size_t values_amount;
+    bool any_value;
+} test_var_t;
+
+typedef struct {
+    test_var_t *var;
+    size_t var_amount;
+} test_vars_t;
+
+typedef struct {
+    const char *name; /* test name           */
+    const char *desc; /* test description    */
+    test_tags_t tags; /* test tags           */
+    test_vars_t vars; /* test vars           */
+    int ref;          /* reference to Lua fn */
 } test_case_t;
 
 void test_case_enqueue(test_case_t *tc);

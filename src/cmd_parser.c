@@ -303,6 +303,90 @@ static void set_test_tags(const char *arg) {
     }
 }
 
+static int parse_vars(const char *input, cmd_var_list_t *list) {
+    list->args = NULL;
+    list->count = 0;
+
+    char *copy = strdup(input);
+    if (!copy) {
+        fprintf(stderr, "parse_vars: strdup failed (out of memory)\n");
+        return -2;
+    }
+
+    char *token = strtok(copy, ",");
+    while (token) {
+        char *eq = strchr(token, '=');
+        if (!eq || *(eq + 1) == '\0') {
+            fprintf(stderr,
+                    "parse_vars: malformed argument '%s' "
+                    "(missing '=' or value)\n",
+                    token);
+
+            free(copy);
+            for (size_t i = 0; i < list->count; i++) {
+                free(list->args[i].name);
+                free(list->args[i].value);
+            }
+            free(list->args);
+            list->args = NULL;
+            list->count = 0;
+            return -1;
+        }
+
+        *eq = '\0'; // split argname and value
+
+        cmd_var_t *new_args =
+            realloc(list->args, (list->count + 1) * sizeof(cmd_var_t));
+        if (!new_args) {
+            fprintf(stderr, "parse_vars: realloc failed (out of memory)\n");
+
+            free(copy);
+            for (size_t i = 0; i < list->count; i++) {
+                free(list->args[i].name);
+                free(list->args[i].value);
+            }
+            free(list->args);
+            return -2;
+        }
+        list->args = new_args;
+
+        list->args[list->count].name = strdup(token);
+        list->args[list->count].value = strdup(eq + 1);
+
+        if (!list->args[list->count].name || !list->args[list->count].value) {
+            fprintf(stderr,
+                    "parse_vars: strdup failed while duplicating '%s'\n",
+                    token);
+            free(copy);
+            return -2;
+        }
+
+        list->count++;
+        token = strtok(NULL, ",");
+    }
+
+    free(copy);
+    return 0;
+}
+
+static void set_test_vars(const char *arg) {
+    if (parse_vars(arg, &test_opts.vars)) {
+        exit(EXIT_FAILURE);
+    }
+    for (size_t i = 0; i < test_opts.vars.count; i++) {
+        for (size_t j = 0; j < test_opts.vars.count; j++) {
+            if (i == j)
+                continue;
+            if (strcmp(test_opts.vars.args[i].name,
+                       test_opts.vars.args[j].name) == 0) {
+                fprintf(stderr, "Error: Duplicate variable '%s'\n",
+                        test_opts.vars.args[i].name);
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
+}
+
 static void set_test_no_logs(const char *) {
     //
     test_opts.no_logs = true;
@@ -337,6 +421,7 @@ static cmd_option all_test_options[] = {
     {"--no-logs", "-n", false, set_test_no_logs},
     {"--taf-lib-path", "-p", true, set_test_taf_lib_path},
     {"--tags", "-t", true, set_test_tags},
+    {"--vars", "-v", true, set_test_vars},
     {"--internal-log", "-i", false, set_internal_logging},
     {"--headless", "-e", false, set_test_headless},
     {"--help", "-h", false, get_test_help},
@@ -353,6 +438,8 @@ static cmd_category parse_test_options(int argc, char **argv) {
     test_opts.internal_logging = false;
     test_opts.custom_taf_lib_path = NULL;
     test_opts.headless = NULL;
+    test_opts.vars.args = NULL;
+    test_opts.vars.count = 0;
 
     if (argc <= 2) {
         return CMD_TEST;

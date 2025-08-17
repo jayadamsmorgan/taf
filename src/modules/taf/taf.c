@@ -29,100 +29,140 @@ int l_module_taf_sleep(lua_State *L) {
     return 0; /* no Lua return values */
 }
 
+static void read_string_array(lua_State *L, int idx, char ***out,
+                              size_t *out_n) {
+    luaL_checktype(L, idx, LUA_TTABLE);
+    lua_Integer n = luaL_len(L, idx);
+    if (n < 0)
+        n = 0;
+
+    char **arr = malloc(n * sizeof(char *));
+
+    for (lua_Integer i = 1; i <= n; ++i) {
+        lua_rawgeti(L, idx, i);
+        const char *s = luaL_checkstring(L, -1);
+        arr[i - 1] = strdup(s);
+        lua_pop(L, 1);
+    }
+
+    *out = arr;
+    *out_n = (size_t)n;
+}
+
+static void read_values_array(lua_State *L, int idx, const char ***out,
+                              size_t *out_n) {
+    luaL_checktype(L, idx, LUA_TTABLE);
+
+    lua_Integer n = luaL_len(L, idx);
+    if (n < 0)
+        n = 0;
+
+    const char **vals = NULL;
+    size_t count = (size_t)n;
+    if (count > 0) {
+        vals = malloc(count * sizeof(const char *));
+        for (lua_Integer i = 1; i <= n; ++i) {
+            lua_rawgeti(L, idx, i);
+            const char *s = luaL_checkstring(L, -1);
+            vals[i - 1] = strdup(s);
+            lua_pop(L, 1);
+        }
+    }
+
+    *out = vals;
+    *out_n = count;
+}
+
 int l_module_taf_register_test(lua_State *L) {
     LOG("Registering new test...");
 
-    int s = selfshift(L);
+    luaL_checktype(L, 1, LUA_TTABLE);
 
-    const char *name = luaL_checkstring(L, s);
-    LOG("Test name: '%s'", name);
-    int body_index;
+    lua_getfield(L, 1, "name");
+    const char *name = luaL_checkstring(L, -1);
+    char *name_copy = strdup(name);
+    lua_pop(L, 1);
 
-    cmd_test_options *opts = cmd_parser_get_test_options();
-    bool register_test = false;
-    if (opts->tags_amount == 0) {
-        register_test = true;
+    lua_getfield(L, 1, "body");
+    luaL_argcheck(L, lua_isfunction(L, -1), 1, "`body` must be a function");
+    int body_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+
+    test_case_t *tc = malloc(sizeof(test_case_t));
+    memset(tc, 0, sizeof(*tc));
+    tc->ref = body_ref;
+    tc->name = name_copy;
+
+    lua_getfield(L, 1, "description");
+    if (!lua_isnil(L, -1)) {
+        luaL_argcheck(L, lua_isstring(L, -1), 1,
+                      "`description` must be string");
+        tc->desc = strdup(lua_tostring(L, -1));
     }
+    lua_pop(L, 1);
 
-    test_tags_t tags = {.tags = NULL, .amount = 0};
-
-    switch (lua_type(L, s + 1)) {
-    case LUA_TFUNCTION: {
-        LOG("Second argument is test body, skipping third argument...");
-        body_index = 1;
-        break;
+    lua_getfield(L, 1, "tags");
+    if (!lua_isnil(L, -1)) {
+        luaL_argcheck(L, lua_istable(L, -1), 1,
+                      "`tags` must be array of strings");
+        read_string_array(L, lua_gettop(L), &tc->tags.tags, &tc->tags.amount);
     }
-    case LUA_TTABLE: {
-        // Got tags, check them & test body
-        lua_Integer max;
-        int is_array = lua_table_is_array(L, s + 1, &max);
-        if (!is_array) {
-            LOG("Second argument is table but not an array, throwing error...");
-            luaL_error(L, "Tags are supposed to be an array of strings, e.g.: "
-                          "{\"tag1\", \"tag2\"}");
-            return 0;
+    lua_pop(L, 1);
+
+    lua_getfield(L, 1, "vars");
+    if (!lua_isnil(L, -1)) {
+        luaL_argcheck(L, lua_istable(L, -1), 1, "`vars` must be a table");
+
+        size_t count = 0;
+        lua_pushnil(L);
+        while (lua_next(L, -2)) {
+            lua_pop(L, 1);
+            ++count;
         }
 
-        tags.amount = max;
-        tags.tags = malloc(sizeof(*tags.tags) * tags.amount);
+        if (count > 0) {
+            tc->vars.var = malloc(count * sizeof(test_var_t));
+            memset(tc->vars.var, 0, count * sizeof(test_var_t));
+            tc->vars.var_amount = count;
 
-        for (lua_Integer i = 1; i <= max; ++i) {
-            lua_rawgeti(L, s + 1, i); // push tags[i]
+            size_t idx = 0;
+            lua_pushnil(L);
+            while (lua_next(L, -2)) {
+                luaL_argcheck(L, lua_isstring(L, -2), 1,
+                              "`vars` key must be string");
+                luaL_argcheck(L, lua_istable(L, -1), 1,
+                              "`vars` entry must be table");
 
-            if (!lua_isstring(L, -1)) {
-                LOG("One of the tags is not a string, throwing error...");
-                luaL_error(L, "Tag #%lld is not a string (got %s)",
-                           (long long)i, luaL_typename(L, -1));
-                return 0;
-            }
+                test_var_t *v = &tc->vars.var[idx];
+                memset(v, 0, sizeof(*v));
 
-            const char *tag = lua_tostring(L, -1);
-            LOG("Adding test tag %s", tag);
-            tags.tags[i - 1] = strdup(tag);
+                v->name = strdup(lua_tostring(L, -2));
 
-            for (size_t i = 0; i < opts->tags_amount; i++) {
-                if (!strcmp(tag, opts->tags[i])) {
-                    LOG("Found tags match with test run.");
-                    register_test = true;
+                lua_getfield(L, -1, "default");
+                if (!lua_isnil(L, -1)) {
+                    luaL_argcheck(L, lua_isstring(L, -1), 1,
+                                  "`default` must be string");
+                    v->default_value = strdup(lua_tostring(L, -1));
                 }
+                lua_pop(L, 1);
+
+                lua_Integer n = luaL_len(L, -1);
+                if (n == 0) {
+                    v->any_value = true;
+                } else {
+                    read_values_array(L, lua_gettop(L), &v->values,
+                                      &v->values_amount);
+                }
+
+                lua_pop(L, 1);
+                ++idx;
             }
-
-            lua_pop(L, 1); // pop tags[i]
         }
-
-        LOG("Successfully added test tags.");
-
-        body_index = 2;
-        luaL_checktype(L, s + 2, LUA_TFUNCTION);
-        break;
     }
-    default: {
-        const char *typename = lua_typename(L, s + 1);
-        LOG("Wrong argument type for second argument: %s", typename);
-        luaL_error(
-            L,
-            "Expected test body or array of tags for second argument, got %s.",
-            typename);
-        return 0;
-    }
-    }
+    lua_pop(L, 1);
 
-    if (!register_test) {
-        LOG("Skipping test registering: test does not containg required tags.");
-        return 0;
-    }
+    test_case_enqueue(tc);
 
-    lua_pushvalue(L, s + body_index);         /* duplicate fn -> top */
-    int ref = luaL_ref(L, LUA_REGISTRYINDEX); /* pop & ref */
-
-    test_case_t test_case = {.name = strdup(name), .tags = tags, .ref = ref};
-
-    LOG("Creating test case with name %s,  reference %d", test_case.name,
-        test_case.ref);
-
-    test_case_enqueue(&test_case);
-
-    LOG("Successfully registered new test '%s'", test_case.name);
+    LOG("Successfully registered new test %s", tc->name);
 
     return 0;
 }
@@ -200,6 +240,70 @@ int l_module_taf_get_active_test_tags(lua_State *L) {
     LOG("Successfully got active test tags.");
 
     return 1;
+}
+
+int l_module_taf_get_var(lua_State *L) {
+    LOG("Getting var...");
+
+    int s = selfshift(L);
+    const char *var_name = luaL_checkstring(L, s);
+
+    LOG("Getting var '%s'", var_name);
+
+    cmd_test_options *opts = cmd_parser_get_test_options();
+
+    test_case_t *test = taf_test_get_current_test();
+    if (test->vars.var_amount == 0) {
+        luaL_error(L, "Var '%s' was not found for test '%s'", var_name,
+                   test->name);
+        return 0;
+    }
+
+    for (size_t i = 0; i < test->vars.var_amount; i++) {
+        test_var_t *var = &test->vars.var[i];
+        if (strcmp(var->name, var_name) == 0) {
+            LOG("Found var in test declaration");
+            cmd_var_t *found = NULL;
+            for (size_t j = 0; j < opts->vars.count; j++) {
+                if (strcmp(opts->vars.args[j].name, var->name) == 0) {
+                    found = &opts->vars.args[j];
+                    break;
+                }
+            }
+            if (!found && !var->default_value) {
+                luaL_error(L,
+                           "No default value for variable '%s' specified. "
+                           "Use '-v %s=value' or add default.",
+                           var_name, var_name);
+                return 0;
+            }
+            if (!found && var->default_value) {
+                LOG("Using default value for variable %s", var_name);
+                lua_pushstring(L, var->default_value);
+                return 1;
+            }
+            if (var->any_value) {
+                lua_pushstring(L, found->value);
+                return 1;
+            }
+
+            for (size_t j = 0; j < var->values_amount; j++) {
+                if (strcmp(var->values[j], found->value) == 0) {
+                    LOG("Found value for variable %s", var->name);
+                    lua_pushstring(L, found->value);
+                    return 1;
+                }
+            }
+
+            luaL_error(L, "'%s' is not a declared value in variable '%s'",
+                       found->value, var_name);
+            return 0;
+        }
+    }
+
+    LOG("Have not found variable %s", var_name);
+    luaL_error(L, "Have not found variable %s in test declaration", var_name);
+    return 0;
 }
 
 static inline void log_helper(taf_log_level level, int n, int s, lua_State *L) {
@@ -338,6 +442,7 @@ static const luaL_Reg module_fns[] = {
     {"get_active_tags", l_module_taf_get_active_tags},           //
     {"get_active_test_tags", l_module_taf_get_active_test_tags}, //
     {"get_current_target", l_module_taf_get_current_target},     //
+    {"get_var", l_module_taf_get_var},                           //
     {"sleep", l_module_taf_sleep},                               //
     {"millis", l_module_taf_millis},                             //
     {"print", l_module_taf_print},                               //
