@@ -4,9 +4,6 @@ local json = taf.json
 taf.test({
 	name = "json serialization",
 	body = function()
-		print("var1: " .. taf.get_var("var1"))
-		print("var2: " .. taf.get_var("var2"))
-		print("var3: " .. taf.get_var("var3"))
 		local test_obj = {
 			testint = 1,
 			teststr = "test",
