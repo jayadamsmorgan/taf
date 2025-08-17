@@ -27,23 +27,30 @@ local ELEM_KEY = "element-6066-11e4-a52e-4f735466cecf"
 --- @class wd_session_opts
 --- @field port integer
 --- @field url string? webdriver url (optional, defaults to `http://localhost`)
---- @field headless webdriver? open selected webdriver in headless state
+--- @field request_object table? optionally provide full body for the webdriver session request
+--- @field headless boolean? create webdriver session in headless state. Defaults to 'false'
+--- @field headless_implementation webdriver? specify implementation for creating headless session if supported. Defaults to "chromedriver"|"operadriver"
 
---- @class session
+--- @class wd_session
 --- @field base_url string
 --- @field port integer
---- @field id string
+--- @field id string webdriver session id
+--- @field headless boolean true if the session was created in headless mode with opts.headless = true
+
+--- @class wd_spawn_opts
+--- @field webdriver string|webdriver path or name of the webdriver executable. default: "chromedriver"
+--- @field port integer port to open webdriver with
+--- @field extraflags [string]? optional array of additional arguments passed to webdriver executable
 
 --- Spawn webdriver instance
 ---
---- @param webdriver string|webdriver path or name of the webdriver executable
---- @param port integer port to open webdriver with
---- @param extraflags [string]? optional array of additional arguments passed to webdriver
+--- @param opts wd_spawn_opts
 ---
 --- @return proc_handle process handle for the spawned webdriver
-M.spawn_webdriver = function(webdriver, port, extraflags)
-	local args = extraflags or {}
-	table.insert(args, "--port=" .. port)
+M.spawn_webdriver = function(opts)
+	local args = opts.extraflags or {}
+	local webdriver = opts.webdriver or "chromedriver"
+	table.insert(args, "--port=" .. assert(opts.port, "opts.port is required"))
 	local handle = proc.spawn({
 		exe = webdriver,
 		args = args,
@@ -149,71 +156,109 @@ end
 ---
 --- @param opts wd_session_opts opts to open session with
 ---
---- @return session
+--- @return wd_session
 M.session_start = function(opts)
 	opts.url = opts.url or "http://localhost"
-	opts.port = assert(opts.port, "opts.port is required")
+	assert(opts.port, "opts.port is required")
 
-	local always = {}
-	local args = nil
+	-- Start from user body or empty
+	local body = opts.request_object or {}
 
-	if opts.headless == "chromedriver" or opts.headless == "operadriver" then
-		always.browserName = "chrome"
-		args = { "--headless=new", "--disable-gpu" }
+	-- Normalize into W3C shape: body.capabilities.{alwaysMatch, firstMatch}
+	body.capabilities = body.capabilities or {}
 
-		-- Chromedriver & Operadriver both use goog:chromeOptions
-		always["goog:chromeOptions"] = { args = args }
-	elseif opts.headless == "geckodriver" then
-		always.browserName = "firefox"
-		args = { "-headless" }
-		always["moz:firefoxOptions"] = { args = args }
-	elseif opts.headless == "msedgedriver" then
-		always.browserName = "MicrosoftEdge"
-		args = { "--headless=new", "--disable-gpu" }
-		always["ms:edgeOptions"] = { args = args }
-	elseif opts.headless ~= nil then
-		error(("Headless mode not supported for %s"):format(opts.headless))
+	-- If caller used legacy top-level fields, merge them into capabilities
+	local legacy_always = body.alwaysMatch or {}
+	local legacy_first = body.firstMatch or body["firstMatch"] or {}
+
+	-- Ensure existence
+	body.capabilities.alwaysMatch = body.capabilities.alwaysMatch or {}
+	body.capabilities.firstMatch = body.capabilities.firstMatch or (next(legacy_first) and legacy_first or { {} })
+
+	-- Merge legacy alwaysMatch into capabilities.alwaysMatch (without overwriting user keys)
+	for k, v in pairs(legacy_always) do
+		if body.capabilities.alwaysMatch[k] == nil then
+			body.capabilities.alwaysMatch[k] = v
+		end
 	end
 
-	if not next(always) and opts.headless == nil then
-		always.browserName = "chrome" -- reasonable default
+	-- Keep legacy desiredCapabilities if user provided (helps older drivers)
+	body.desiredCapabilities = body.desiredCapabilities or body["desiredCapabilities"]
+
+	opts.headless = opts.headless or false
+
+	-- Convenience handle into caps
+	local caps = body.capabilities
+	local am = caps.alwaysMatch
+
+	if opts.headless then
+		opts.headless_implementation = opts.headless_implementation or "chromedriver"
+		if opts.headless_implementation == "chromedriver" or opts.headless_implementation == "operadriver" then
+			am.browserName = am.browserName or "chrome"
+			am["goog:chromeOptions"] = am["goog:chromeOptions"] or {}
+			am["goog:chromeOptions"].args = am["goog:chromeOptions"].args or {}
+			table.insert(am["goog:chromeOptions"].args, "--headless=new")
+			table.insert(am["goog:chromeOptions"].args, "--disable-gpu")
+		elseif opts.headless_implementation == "geckodriver" then
+			am.browserName = am.browserName or "firefox"
+			am["moz:firefoxOptions"] = am["moz:firefoxOptions"] or {}
+			am["moz:firefoxOptions"].args = am["moz:firefoxOptions"].args or {}
+			table.insert(am["moz:firefoxOptions"].args, "-headless")
+		elseif opts.headless_implementation == "msedgedriver" then
+			-- Microsoft Edge (Chromium)
+			am.browserName = am.browserName or "MicrosoftEdge"
+			am["ms:edgeOptions"] = am["ms:edgeOptions"] or {}
+			am["ms:edgeOptions"].args = am["ms:edgeOptions"].args or {}
+			table.insert(am["ms:edgeOptions"].args, "--headless=new")
+			table.insert(am["ms:edgeOptions"].args, "--disable-gpu")
+		else
+			error(
+				("No default headless implementation for %s, modify opts.request_object instead"):format(
+					tostring(opts.headless_implementation)
+				)
+			)
+		end
 	end
 
-	local body_obj = {
-		capabilities = {
-			alwaysMatch = always,
-			firstMatch = { {} },
-		},
-		desiredCapabilities = {},
-	}
+	-- Default browser if none chosen by user or headless path
+	am.browserName = am.browserName or "chrome"
 
-	local body = json.serialize(body_obj)
+	-- Serialize and send
+	local body_str = json.serialize(body)
 	local url = ("%s:%d/session"):format(opts.url, opts.port)
+	local result = wd_post_json(url, body_str)
 
-	local result = wd_post_json(url, body)
-	if result == "" then
+	if result == "" or result == nil then
 		error("Unable to start a session: empty result from server")
 	end
 
-	local obj = json.deserialize(result).value
-	if not obj then
+	-- Try to tolerate different response shapes
+	local decoded = json.deserialize(result)
+	local value = decoded and decoded.value or decoded
+
+	if not value then
 		error("Unable to start a session: no `value` field in response")
 	end
-	if obj.error then
-		error("Unable to start a session: " .. tostring(obj.message))
+
+	-- If an error surfaced, surface its message (some drivers return {value={error=..., message=...}})
+	if value.error then
+		error("Unable to start a session: " .. (tostring(value.message) or tostring(value.error)))
 	end
-	if not obj.sessionId then
+
+	local sessionId = value.sessionId or decoded.sessionId
+	if not sessionId then
 		error("Unable to start a session: sessionId is not present")
 	end
 
 	return {
 		base_url = opts.url,
 		port = opts.port,
-		id = obj.sessionId,
+		id = sessionId,
+		headless = opts.headless,
 	}
 end
 
---- @param session session
+--- @param session wd_session
 --- @param url string
 ---
 --- @return table result
@@ -226,7 +271,7 @@ M.open_url = function(session, url)
 end
 
 --- Go back in history.
---- @param session session
+--- @param session wd_session
 ---
 --- @return table result
 M.go_back = function(session)
@@ -235,7 +280,7 @@ M.go_back = function(session)
 end
 
 --- Go forward in history.
---- @param session session
+--- @param session wd_session
 ---
 --- @return table result
 M.go_forward = function(session)
@@ -244,7 +289,7 @@ M.go_forward = function(session)
 end
 
 --- Reload the page.
---- @param session session
+--- @param session wd_session
 ---
 --- @return table result
 M.refresh = function(session)
@@ -253,7 +298,7 @@ M.refresh = function(session)
 end
 
 --- Get the current URL.
---- @param session session
+--- @param session wd_session
 ---
 --- @return table result
 M.get_current_url = function(session)
@@ -271,7 +316,7 @@ end
 
 --- Find the first element matching a selector.
 ---
---- @param session session
+--- @param session wd_session
 --- @param using string   e.g. "css selector", "xpath"
 --- @param value string
 ---
@@ -285,7 +330,7 @@ M.find_element = function(session, using, value)
 end
 
 --- Find *all* elements matching a selector.
---- @param session session
+--- @param session wd_session
 --- @param using string   e.g. "css selector", "xpath"
 --- @param value string
 ---
@@ -304,7 +349,7 @@ end
 
 --- Click on an element.
 ---
---- @param session session
+--- @param session wd_session
 --- @param element_id string
 --- @return table result
 M.click = function(session, element_id)
@@ -314,7 +359,7 @@ end
 
 --- Send keystrokes to an element.
 ---
---- @param session session
+--- @param session wd_session
 --- @param element_id string
 --- @param text string
 ---
@@ -332,7 +377,7 @@ end
 
 --- Retrieve the visible text of an element.
 ---
---- @param session session
+--- @param session wd_session
 --- @param element_id string
 ---
 --- @return string text
@@ -343,7 +388,7 @@ end
 
 --- Execute synchronous JavaScript in the page.
 ---
---- @param session session
+--- @param session wd_session
 --- @param script string JS source
 --- @param args table? array of arguments
 ---
@@ -355,7 +400,7 @@ end
 
 --- Take a full-page screenshot.
 ---
---- @param session session
+--- @param session wd_session
 ---
 --- @return string? base64_png
 M.screenshot = function(session)
@@ -365,7 +410,7 @@ end
 
 --- Drag-and-drop. Uses W3C Actions (§17) with a single mouse pointer device.
 ---
---- @param session session
+--- @param session wd_session
 --- @param source_id string element to grab
 --- @param target_id string element to drop on
 ---
@@ -393,7 +438,7 @@ end
 
 --- Input text
 ---
---- @param session session
+--- @param session wd_session
 --- @param element_id string
 --- @param text string
 --- @param clear_first boolean? (default: true)
@@ -409,7 +454,7 @@ end
 -- Wait until element *visible*.
 -- Polls `/displayed` endpoint until it returns true or timeout.
 --
---- @param session session
+--- @param session wd_session
 --- @param using string   selector strategy   (css selector, xpath…)
 --- @param value string   selector
 --- @param timeout integer? milliseconds (default 5000)
@@ -440,7 +485,7 @@ end
 
 --- Scroll element into view
 ---
---- @param session session
+--- @param session wd_session
 --- @param element_id string
 ---
 --- @return table raw WebDriver response
@@ -451,7 +496,7 @@ end
 
 --- Low level helper
 ---
---- @param session session
+--- @param session wd_session
 --- @param method api_method
 --- @param endpoint string
 --- @param payload table? payload if method is "post" or "put"
@@ -483,7 +528,7 @@ end
 
 --- End webdriver session
 ---
---- @param session session
+--- @param session wd_session
 M.session_end = function(session)
 	local url = session.base_url .. ":" .. session.port .. "/session/" .. session.id
 	wd_delete_json(url)
