@@ -62,8 +62,10 @@ static json_object *raw_log_test_to_json(raw_log_test_t *test) {
     json_object *test_obj = json_object_new_object();
     json_object_object_add(test_obj, "name",
                            json_object_new_string(test->name));
-    json_object_object_add(test_obj, "description",
-                           json_object_new_string(test->description));
+    if (test->description) {
+        json_object_object_add(test_obj, "description",
+                               json_object_new_string(test->description));
+    }
     json_object_object_add(test_obj, "started",
                            json_object_new_string(test->started));
     json_object_object_add(test_obj, "finished",
@@ -564,7 +566,9 @@ void taf_log_test_started(int index, test_case_t test_case) {
     test->tags_count = test_case.tags.amount;
 
     test->name = strdup(test_case.name);
-    test->description = strdup(test_case.desc);
+    if (test->description) {
+        test->description = strdup(test_case.desc);
+    }
     raw_log_test_output_cap = 2;
     test->outputs =
         malloc(sizeof(raw_log_test_output_t) * raw_log_test_output_cap);
