@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include <lauxlib.h>
+#include <stdbool.h>
 
 typedef struct {
     char **tags;
