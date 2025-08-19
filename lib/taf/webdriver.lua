@@ -322,11 +322,14 @@ end
 ---
 --- @return string element_id
 M.find_element = function(session, using, value)
-	local res = M.session_cmd(session, "POST", "element", {
-		using = using,
-		value = value,
-	})
-	return res.value.ELEMENT
+  local res = M.session_cmd(session, "POST", "element", {
+    using = using,
+    value = value,
+  })
+  local v = res and res.value
+  if not v then error("find_element: no value in response") end
+  -- Prefer W3C key; fall back to legacy JSON Wire
+  return v[ELEM_KEY] or v.ELEMENT
 end
 
 --- Find *all* elements matching a selector.
@@ -336,16 +339,35 @@ end
 ---
 --- @return string[] element_ids
 M.find_elements = function(session, using, value)
-	local res = M.session_cmd(session, "POST", "elements", {
-		using = using,
-		value = value,
-	})
-	local out = {}
-	for i, entry in ipairs(res.value) do
-		out[i] = entry.ELEMENT
-	end
-	return out
+  local res = M.session_cmd(session, "POST", "elements", {
+    using = using,
+    value = value,
+  })
+  local arr = res and res.value
+  if type(arr) ~= "table" then error("find_elements: value is not an array") end
+  local out = {}
+  for i, entry in ipairs(arr) do
+    out[i] = entry[ELEM_KEY] or entry.ELEMENT
+  end
+  return out
 end
+--- @param session wd_session
+--- @param width number|nil
+--- @param height number|nil
+--- @return table result
+M.resize_window = function(session, width, height)
+    local res
+    if width and height then
+        res = M.session_cmd(session, "POST", "window/rect", {width=width, height=height})
+    else
+        res = M.session_cmd(session, "POST", "window/maximize", {})
+    end
+    if res.value ~= nil and res.value.error then
+        error("resize failed: " .. tostring(res.value.message))
+    end
+    return res
+end
+
 
 --- Click on an element.
 ---
@@ -353,10 +375,12 @@ end
 --- @param element_id string
 --- @return table result
 M.click = function(session, element_id)
-	local res = M.session_cmd(session, "POST", ("element/%s/click"):format(element_id), {})
-	return res
+  local res = M.session_cmd(session, "POST", ("element/%s/click"):format(element_id), {})
+  if res.value ~= nil and res.value.error then
+    error("click failed: " .. tostring(res.value.message))
+  end
+  return res
 end
-
 --- Send keystrokes to an element.
 ---
 --- @param session wd_session
@@ -365,14 +389,21 @@ end
 ---
 --- @return table result
 M.send_keys = function(session, element_id, text)
-	-- W3C needs an array of characters:
-	local chars = {}
-	for i = 1, #text do
-		chars[i] = text:sub(i, i)
-	end
+  -- W3C: prefer "text"; keep "value" for legacy drivers
+  local chars = {}
+  for i = 1, #text do
+    chars[i] = text:sub(i, i)
+  end
 
-	local res = M.session_cmd(session, "POST", ("element/%s/value"):format(element_id), { value = chars })
-	return res
+  local payload = { text = text, value = chars }
+  local res = M.session_cmd(session, "POST", ("element/%s/value"):format(element_id), payload)
+
+  -- Surface driver errors (some return {value={error=..., message=...}})
+  local v = res and res.value
+  if v and v.error then
+    error("send_keys failed: " .. tostring(v.message))
+  end
+  return res
 end
 
 --- Retrieve the visible text of an element.
