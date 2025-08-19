@@ -25,10 +25,13 @@ int l_module_taf_get_active_test_tags(lua_State *L);
 // taf:get_var(var_name:string) -> value:string
 int l_module_taf_get_var(lua_State *L);
 
+// taf:get_vars() -> [table<string, string>]
+int l_module_taf_get_vars(lua_State *L);
+
 // taf:log(log_level: string, ...)
 int l_module_taf_log(lua_State *L);
 
-// taf:millis() -> ms: number
+// taf:millis() -> ms:integer
 int l_module_taf_millis(lua_State *L);
 
 // taf:print(...)
@@ -43,6 +46,13 @@ int l_module_taf_print(lua_State *L);
 //
 // taf:test(opts: reg_opts)
 int l_module_taf_register_test(lua_State *L);
+
+// taf_var:
+// - values: [string]?
+// - default: string?
+//
+// taf:register_vars(vars: table<string, taf_var>)
+int l_module_taf_register_vars(lua_State *L);
 
 // taf:sleep(ms: number)
 int l_module_taf_sleep(lua_State *L);

@@ -112,6 +112,7 @@ sources = [
     'src/taf_target.c',
     'src/taf_test.c',
     'src/taf_tui.c',
+    'src/taf_vars.c',
     'src/headless.c',
     'src/cmd_parser.c',
     'src/internal_logging.c',

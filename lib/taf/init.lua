@@ -47,7 +47,6 @@ end
 --- @field name string name of the test
 --- @field description string? description of the test, optional
 --- @field tags [string]? array of test tags, optional
---- @field vars table?
 --- @field body fun() body of the test
 
 --- Register new test
@@ -82,6 +81,24 @@ end
 --- @return string target
 M.get_current_target = function()
 	return tm:get_current_target()
+end
+
+--- @class taf_var
+--- @field accepted [string]?
+--- @field default string?
+
+--- Register variables
+---
+--- @param vars table<string, taf_var|string>
+M.register_vars = function(vars)
+	return tm.register_vars(vars)
+end
+
+--- Returns all the predefined variables
+---
+--- @return [table<string, string>]
+M.get_vars = function()
+	return tm:get_vars()
 end
 
 --- Returns value of the predefined variable
