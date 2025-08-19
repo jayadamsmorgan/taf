@@ -84,7 +84,7 @@ M.get_current_target = function()
 end
 
 --- @class taf_var
---- @field accepted [string]?
+--- @field values [string]?
 --- @field default string?
 
 --- Register variables
