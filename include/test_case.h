@@ -28,7 +28,6 @@ typedef struct {
     const char *name; /* test name           */
     const char *desc; /* test description    */
     test_tags_t tags; /* test tags           */
-    test_vars_t vars; /* test vars           */
     int ref;          /* reference to Lua fn */
 } test_case_t;
 

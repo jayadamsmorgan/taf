@@ -3,6 +3,7 @@
 #include "cmd_parser.h"
 #include "internal_logging.h"
 #include "taf_test.h"
+#include "taf_vars.h"
 #include "test_case.h"
 #include "test_logs.h"
 #include "util/lua.h"
@@ -47,30 +48,6 @@ static void read_string_array(lua_State *L, int idx, char ***out,
 
     *out = arr;
     *out_n = (size_t)n;
-}
-
-static void read_values_array(lua_State *L, int idx, const char ***out,
-                              size_t *out_n) {
-    luaL_checktype(L, idx, LUA_TTABLE);
-
-    lua_Integer n = luaL_len(L, idx);
-    if (n < 0)
-        n = 0;
-
-    const char **vals = NULL;
-    size_t count = (size_t)n;
-    if (count > 0) {
-        vals = malloc(count * sizeof(const char *));
-        for (lua_Integer i = 1; i <= n; ++i) {
-            lua_rawgeti(L, idx, i);
-            const char *s = luaL_checkstring(L, -1);
-            vals[i - 1] = strdup(s);
-            lua_pop(L, 1);
-        }
-    }
-
-    *out = vals;
-    *out_n = count;
 }
 
 int l_module_taf_register_test(lua_State *L) {
@@ -123,58 +100,6 @@ int l_module_taf_register_test(lua_State *L) {
             LOG("Skipping test '%s', no tag found.", tc->name);
             // TODO: Fix leak
             return 0;
-        }
-    }
-    lua_pop(L, 1);
-
-    lua_getfield(L, 1, "vars");
-    if (!lua_isnil(L, -1)) {
-        luaL_argcheck(L, lua_istable(L, -1), 1, "`vars` must be a table");
-
-        size_t count = 0;
-        lua_pushnil(L);
-        while (lua_next(L, -2)) {
-            lua_pop(L, 1);
-            ++count;
-        }
-
-        if (count > 0) {
-            tc->vars.var = malloc(count * sizeof(test_var_t));
-            memset(tc->vars.var, 0, count * sizeof(test_var_t));
-            tc->vars.var_amount = count;
-
-            size_t idx = 0;
-            lua_pushnil(L);
-            while (lua_next(L, -2)) {
-                luaL_argcheck(L, lua_isstring(L, -2), 1,
-                              "`vars` key must be string");
-                luaL_argcheck(L, lua_istable(L, -1), 1,
-                              "`vars` entry must be table");
-
-                test_var_t *v = &tc->vars.var[idx];
-                memset(v, 0, sizeof(*v));
-
-                v->name = strdup(lua_tostring(L, -2));
-
-                lua_getfield(L, -1, "default");
-                if (!lua_isnil(L, -1)) {
-                    luaL_argcheck(L, lua_isstring(L, -1), 1,
-                                  "`default` must be string");
-                    v->default_value = strdup(lua_tostring(L, -1));
-                }
-                lua_pop(L, 1);
-
-                lua_Integer n = luaL_len(L, -1);
-                if (n == 0) {
-                    v->any_value = true;
-                } else {
-                    read_values_array(L, lua_gettop(L), &v->values,
-                                      &v->values_amount);
-                }
-
-                lua_pop(L, 1);
-                ++idx;
-            }
         }
     }
     lua_pop(L, 1);
@@ -261,68 +186,146 @@ int l_module_taf_get_active_test_tags(lua_State *L) {
     return 1;
 }
 
+int l_module_taf_register_vars(lua_State *L) {
+    LOG("Registering TAF variables...");
+
+    luaL_checktype(L, 1, LUA_TTABLE);
+
+    size_t count = 0;
+    lua_pushnil(L);
+    while (lua_next(L, 1) != 0) {
+        lua_pop(L, 1);
+        ++count;
+    }
+
+    taf_var_map_t *map = malloc(sizeof(taf_var_map_t));
+    memset(map, 0, sizeof(*map));
+    map->count = count;
+    if (count > 0) {
+        map->entries = malloc(count * sizeof(taf_var_entry_t));
+        memset(map->entries, 0, count * sizeof(taf_var_entry_t));
+    }
+
+    size_t idx = 0;
+    lua_pushnil(L);
+    while (lua_next(L, 1) != 0) {
+        if (!lua_isstring(L, -2)) {
+            lua_pop(L, 1);
+            luaL_error(L, "taf_vars keys must be strings");
+        }
+
+        taf_var_entry_t *e = &map->entries[idx];
+        memset(e, 0, sizeof(*e));
+        e->name = strdup(lua_tostring(L, -2));
+
+        if (lua_type(L, -1) == LUA_TSTRING) {
+            e->is_scalar = true;
+            e->scalar = strdup(lua_tostring(L, -1));
+        } else if (lua_type(L, -1) == LUA_TTABLE) {
+            e->is_scalar = false;
+
+            lua_getfield(L, -1, "values");
+            if (!lua_isnil(L, -1)) {
+                luaL_argcheck(L, lua_istable(L, -1), 1,
+                              "`values` must be array of strings");
+                read_string_array(L, lua_gettop(L), &e->values,
+                                  &e->values_amount);
+            }
+            lua_pop(L, 1);
+
+            lua_getfield(L, -1, "default");
+            if (!lua_isnil(L, -1)) {
+                luaL_argcheck(L, lua_isstring(L, -1), 1,
+                              "`default` must be string");
+                e->def_value = strdup(lua_tostring(L, -1));
+                bool found = false;
+                for (size_t i = 0; i < e->values_amount; i++) {
+                    if (strcmp(e->def_value, e->values[i]) == 0) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found && e->values_amount > 0) {
+                    lua_pop(L, 1);
+                    luaL_error(L,
+                               "Error parsing var '%s': Default value "
+                               "'%s' is not an allowed value.",
+                               e->name, e->def_value);
+                }
+            }
+            lua_pop(L, 1);
+        } else {
+            lua_pop(L, 1);
+            luaL_error(L,
+                       "Error parsing value for var '%s': value must be string "
+                       "or table",
+                       e->name);
+        }
+
+        lua_pop(L, 1);
+        ++idx;
+    }
+
+    taf_register_vars(map);
+
+    return 0;
+}
+
 int l_module_taf_get_var(lua_State *L) {
     LOG("Getting var...");
 
     int s = selfshift(L);
     const char *var_name = luaL_checkstring(L, s);
 
-    LOG("Getting var '%s'", var_name);
+    LOG("Variable name: '%s'", var_name);
 
-    cmd_test_options *opts = cmd_parser_get_test_options();
-
-    test_case_t *test = taf_test_get_current_test();
-    if (test->vars.var_amount == 0) {
-        luaL_error(L, "Var '%s' was not found for test '%s'", var_name,
-                   test->name);
-        return 0;
-    }
-
-    for (size_t i = 0; i < test->vars.var_amount; i++) {
-        test_var_t *var = &test->vars.var[i];
-        if (strcmp(var->name, var_name) == 0) {
-            LOG("Found var in test declaration");
-            cmd_var_t *found = NULL;
-            for (size_t j = 0; j < opts->vars.count; j++) {
-                if (strcmp(opts->vars.args[j].name, var->name) == 0) {
-                    found = &opts->vars.args[j];
-                    break;
+    taf_var_map_t *map = taf_get_vars();
+    if (map) {
+        for (size_t i = 0; i < map->count; i++) {
+            if (strcmp(var_name, map->entries[i].name) == 0) {
+                if (!map->entries[i].final_value) {
+                    luaL_error(L,
+                               "Unknown error occured, cannot get value for "
+                               "variable '%s'",
+                               var_name);
+                    return 0;
                 }
-            }
-            if (!found && !var->default_value) {
-                luaL_error(L,
-                           "No default value for variable '%s' specified. "
-                           "Use '-v %s=value' or add default.",
-                           var_name, var_name);
-                return 0;
-            }
-            if (!found && var->default_value) {
-                LOG("Using default value for variable %s", var_name);
-                lua_pushstring(L, var->default_value);
+                lua_pushstring(L, map->entries[i].final_value);
                 return 1;
             }
-            if (var->any_value) {
-                lua_pushstring(L, found->value);
-                return 1;
-            }
-
-            for (size_t j = 0; j < var->values_amount; j++) {
-                if (strcmp(var->values[j], found->value) == 0) {
-                    LOG("Found value for variable %s", var->name);
-                    lua_pushstring(L, found->value);
-                    return 1;
-                }
-            }
-
-            luaL_error(L, "'%s' is not a declared value in variable '%s'",
-                       found->value, var_name);
-            return 0;
         }
     }
 
-    LOG("Have not found variable %s", var_name);
-    luaL_error(L, "Have not found variable %s in test declaration", var_name);
+    LOG("No variable '%s'", var_name);
+    luaL_error(L, "No variable '%s'", var_name);
     return 0;
+}
+
+int l_module_taf_get_vars(lua_State *L) {
+    LOG("Getting all variables...");
+
+    lua_newtable(L);
+
+    taf_var_map_t *map = taf_get_vars();
+    if (!map) {
+        return 1;
+    }
+
+    for (size_t i = 0; i < map->count; i++) {
+        const char *name = map->entries[i].name;
+        const char *value = map->entries[i].final_value;
+
+        if (!value) {
+            luaL_error(
+                L, "Unknown error occured, cannot get value for variable '%s'",
+                name);
+            return 0;
+        }
+        lua_pushstring(L, value);
+        lua_setfield(L, -2, name);
+    }
+
+    return 1;
 }
 
 static inline void log_helper(taf_log_level level, int n, int s, lua_State *L) {
@@ -462,11 +465,13 @@ static const luaL_Reg module_fns[] = {
     {"get_active_test_tags", l_module_taf_get_active_test_tags}, //
     {"get_current_target", l_module_taf_get_current_target},     //
     {"get_var", l_module_taf_get_var},                           //
+    {"get_vars", l_module_taf_get_vars},                         //
     {"sleep", l_module_taf_sleep},                               //
     {"millis", l_module_taf_millis},                             //
     {"print", l_module_taf_print},                               //
     {"log", l_module_taf_log},                                   //
     {"test", l_module_taf_register_test},                        //
+    {"register_vars", l_module_taf_register_vars},               //
     {NULL, NULL},                                                //
 };
 

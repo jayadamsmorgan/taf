@@ -8,6 +8,7 @@
 #include "project_parser.h"
 #include "taf_hooks.h"
 #include "taf_tui.h"
+#include "taf_vars.h"
 #include "test_case.h"
 #include "test_logs.h"
 #include "version.h"
@@ -563,6 +564,19 @@ int taf_test() {
         }
     }
     if (load_lua_dir(test_dir_path, L) == -2) {
+        test_case_free_all(L);
+        lua_close(L);
+        free(hooks_dir_path);
+        free(module_path);
+        free(test_common_dir_path);
+        free(test_dir_path);
+        free(lib_dir_path);
+        project_parser_free();
+        internal_logging_deinit();
+        return EXIT_FAILURE;
+    }
+
+    if (taf_parse_vars()) {
         test_case_free_all(L);
         lua_close(L);
         free(hooks_dir_path);

@@ -1,16 +1,20 @@
 #ifndef VERSION_H
 #define VERSION_H
 
+#include "git_version.h"
+
 #define _STR(x) #x
 #define STR(x) _STR(x)
 
-#define TAF_VERSION_MAJOR 1
-#define TAF_VERSION_MINOR 2
-#define TAF_VERSION_PATCH 0
+#define TAF_VERSION_MAJOR @TAF_VERSION_MAJOR@
+#define TAF_VERSION_MINOR @TAF_VERSION_MINOR@
+#define TAF_VERSION_PATCH @TAF_VERSION_PATCH@
 
-#define TAF_VERSION                                                            \
-    STR(TAF_VERSION_MAJOR)                                                     \
-    "." STR(TAF_VERSION_MINOR) "." STR(TAF_VERSION_PATCH)
+#if TAF_IS_RELEASE == 1
+#define TAF_VERSION @TAF_VERSION@
+#else
+#define TAF_VERSION @TAF_VERSION@ "-" TAF_GIT_BRANCH "@" TAF_GIT_VERSION
+#endif // TAF_IS_RELEASE
 
 #define TAF_VERSION_NUM(MAJOR, MINOR, PATCH)                                   \
     ((MAJOR) * 1000 + (MINOR) * 100 + (PATCH))
