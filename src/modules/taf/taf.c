@@ -280,17 +280,19 @@ int l_module_taf_get_var(lua_State *L) {
     LOG("Variable name: '%s'", var_name);
 
     taf_var_map_t *map = taf_get_vars();
-    for (size_t i = 0; i < map->count; i++) {
-        if (strcmp(var_name, map->entries[i].name) == 0) {
-            if (!map->entries[i].final_value) {
-                luaL_error(
-                    L,
-                    "Unknown error occured, cannot get value for variable '%s'",
-                    var_name);
-                return 0;
+    if (map) {
+        for (size_t i = 0; i < map->count; i++) {
+            if (strcmp(var_name, map->entries[i].name) == 0) {
+                if (!map->entries[i].final_value) {
+                    luaL_error(L,
+                               "Unknown error occured, cannot get value for "
+                               "variable '%s'",
+                               var_name);
+                    return 0;
+                }
+                lua_pushstring(L, map->entries[i].final_value);
+                return 1;
             }
-            lua_pushstring(L, map->entries[i].final_value);
-            return 1;
         }
     }
 
@@ -305,6 +307,10 @@ int l_module_taf_get_vars(lua_State *L) {
     lua_newtable(L);
 
     taf_var_map_t *map = taf_get_vars();
+    if (!map) {
+        return 1;
+    }
+
     for (size_t i = 0; i < map->count; i++) {
         const char *name = map->entries[i].name;
         const char *value = map->entries[i].final_value;
