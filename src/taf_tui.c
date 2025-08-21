@@ -175,17 +175,16 @@ void taf_tui_log(char *time, taf_log_level log_level, const char *, int,
     sanitize_inplace(tmp, buffer_len);
    
     // Write logs header 
-    pico_set_colors(ui, PICO_COLOR_BLUE, -1);
+    pico_set_colors(ui, PICO_COLOR_WHITE, -1);
     pico_printf(ui, "%s:", time);
     pico_set_colors(ui, log_level_to_palindex_map[log_level], -1);
     pico_printf(ui, "[%s]", taf_log_level_to_str(log_level));
-    pico_set_colors(ui, PICO_COLOR_BLUE, -1);
+    pico_set_colors(ui, log_level_to_palindex_map[log_level], -1);
     pico_printf(ui, ":");
 
     // Write logs body 
     pico_set_colors(ui, PICO_COLOR_WHITE, -1);
     pico_print_block(ui, tmp);
-    
     free(tmp);
 
     taf_tui_update();
