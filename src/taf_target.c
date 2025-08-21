@@ -5,8 +5,9 @@
 #include "cmd_parser.h"
 #include "project_parser.h"
 #include "util/files.h"
-
+#define _GNU_SOURCE
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 static int convert_project_to_multitarget(project_parsed_t *proj) {
