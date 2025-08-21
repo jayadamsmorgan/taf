@@ -12,4 +12,6 @@ char *string_join(char *items[], size_t count);
 
 char *string_strip(const char *s);
 
+bool string_has_prefix(const char *str, const char *prefix);
+
 #endif // UTIL_STRING_H

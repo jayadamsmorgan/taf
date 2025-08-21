@@ -19,12 +19,15 @@
 #include "modules/taf/taf.h"
 
 #include "util/files.h"
+#include "util/line_cache.h"
+#include "util/string.h"
 #include "util/time.h"
 
 #include <lauxlib.h>
 #include <lua.h>
 #include <lualib.h>
 
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -34,56 +37,21 @@ static int g_first = 0;
 static int g_last = 0;
 
 static char *module_path = NULL;
-
 static char *test_dir_path = NULL;
 static char *test_common_dir_path = NULL;
 static char *lib_dir_path = NULL;
 static char *hooks_dir_path = NULL;
 
-typedef struct line_cache {
-    char *path;
-    char **lines;
-    struct line_cache *next;
-} line_cache_t;
+static bool test_marked_failed = false;
+static size_t current_test_index = 0;
 
-static line_cache_t *cache_head = NULL;
+void taf_mark_test_failed() { test_marked_failed = true; }
 
-static bool headless = false;
-
-static char *get_line_text(const char *path, int lineno) {
-
-    for (line_cache_t *c = cache_head; c; c = c->next) {
-        if (strcmp(c->path, path) == 0) {
-            return c->lines[lineno - 1]; // lineno is 1-based
-        }
-    }
-
-    FILE *fp = fopen(path, "r");
-    if (!fp)
-        return NULL;
-
-    line_cache_t *c = malloc(sizeof *c);
-    c->path = strdup(path);
-    c->lines = NULL;
-    c->next = cache_head;
-    cache_head = c;
-
-    size_t cap = 0, n = 0;
-    char *line = NULL;
-    size_t len = 0;
-
-    while (getline(&line, &len, fp) > 0) {
-        if (n == cap) {
-            cap = cap ? cap * 2 : 128;
-            c->lines = realloc(c->lines, sizeof(char *) * (cap + 1));
-        }
-        c->lines[n++] = strdup(line);
-    }
-    free(line);
-    c->lines[n] = NULL;
-    fclose(fp);
-
-    return (lineno > 0 && lineno <= (int)n) ? c->lines[lineno - 1] : NULL;
+test_case_t *taf_test_get_current_test() {
+    size_t count;
+    test_case_t *tests = test_case_get_all(&count);
+    assert(current_test_index < count);
+    return &tests[current_test_index];
 }
 
 static void line_hook(lua_State *L, lua_Debug *ar) {
@@ -93,13 +61,9 @@ static void line_hook(lua_State *L, lua_Debug *ar) {
         if (src[0] == '@')
             src++;
 
-        if (strncasecmp(module_path, src, strlen(module_path)) == 0) {
-            // Skip internal module lines
-            return;
-        }
-
-        if (strncasecmp(hooks_dir_path, src, strlen(hooks_dir_path)) == 0) {
-            // Skip hook lines
+        if (string_has_prefix(src, module_path) ||
+            string_has_prefix(src, hooks_dir_path)) {
+            // Skip internal module lines and hook lines
             return;
         }
 
@@ -108,10 +72,13 @@ static void line_hook(lua_State *L, lua_Debug *ar) {
         taf_tui_set_current_line(src, ar->currentline,
                                  text ? text : "(source unavailable)");
 
-        int div = g_last - g_first;
-        double progress;
-        progress = div == 0 ? 0 : (double)(ar->currentline - g_first) / div;
-        taf_tui_set_test_progress(progress);
+        if (string_has_prefix(src, test_dir_path) ||
+            string_has_prefix(src, test_common_dir_path)) {
+            int div = g_last - g_first;
+            double progress;
+            progress = div == 0 ? 0 : (double)(ar->currentline - g_first) / div;
+            taf_tui_set_test_progress(progress);
+        }
 
         taf_tui_update();
     }
@@ -198,17 +165,6 @@ static void run_deferred(lua_State *L, const char *status) {
     LOG("Defer list cleared.");
 
     LOG("Finished running defer queue.");
-}
-
-static bool test_marked_failed = false;
-
-void taf_mark_test_failed() { test_marked_failed = true; }
-
-static size_t current_test_index = 0;
-
-test_case_t *taf_test_get_current_test() {
-    test_case_t *tests = test_case_get_all(NULL);
-    return &tests[current_test_index];
 }
 
 static int run_all_tests(lua_State *L) {
@@ -522,71 +478,29 @@ int taf_test() {
     register_test_api(L);
     taf_hooks_init();
 
+    int exitcode = EXIT_FAILURE;
+
     LOG("Project lib directory path: %s", lib_dir_path);
     if (load_lua_dir(lib_dir_path, L) == -2) {
-        test_case_free_all(L);
-        lua_close(L);
-        free(module_path);
-        free(test_common_dir_path);
-        free(test_dir_path);
-        free(lib_dir_path);
-        project_parser_free();
-        internal_logging_deinit();
-        return EXIT_FAILURE;
+        goto deinit;
     }
 
     asprintf(&hooks_dir_path, "%s/hooks", proj->project_path);
     if (load_lua_dir(hooks_dir_path, L) == -2) {
-        test_case_free_all(L);
-        lua_close(L);
-        free(hooks_dir_path);
-        free(module_path);
-        free(test_common_dir_path);
-        free(test_dir_path);
-        free(lib_dir_path);
-        project_parser_free();
-        internal_logging_deinit();
-        return EXIT_FAILURE;
+        goto deinit;
     }
 
     if (proj->multitarget) {
         if (load_lua_dir(test_common_dir_path, L) == -2) {
-            test_case_free_all(L);
-            lua_close(L);
-            free(hooks_dir_path);
-            free(module_path);
-            free(test_common_dir_path);
-            free(test_dir_path);
-            free(lib_dir_path);
-            project_parser_free();
-            internal_logging_deinit();
-            return EXIT_FAILURE;
+            goto deinit;
         }
     }
     if (load_lua_dir(test_dir_path, L) == -2) {
-        test_case_free_all(L);
-        lua_close(L);
-        free(hooks_dir_path);
-        free(module_path);
-        free(test_common_dir_path);
-        free(test_dir_path);
-        free(lib_dir_path);
-        project_parser_free();
-        internal_logging_deinit();
-        return EXIT_FAILURE;
+        goto deinit;
     }
 
     if (taf_parse_vars()) {
-        test_case_free_all(L);
-        lua_close(L);
-        free(hooks_dir_path);
-        free(module_path);
-        free(test_common_dir_path);
-        free(test_dir_path);
-        free(lib_dir_path);
-        project_parser_free();
-        internal_logging_deinit();
-        return EXIT_FAILURE;
+        goto deinit;
     }
 
     size_t amount;
@@ -595,58 +509,36 @@ int taf_test() {
     if (amount == 0) {
         LOG("No tests found.");
         fprintf(stderr, "No tests to execute.\n");
-        test_case_free_all(L);
-        lua_close(L);
-        free(hooks_dir_path);
-        free(module_path);
-        free(test_common_dir_path);
-        free(test_dir_path);
-        free(lib_dir_path);
-        project_parser_free();
-        internal_logging_deinit();
-        return EXIT_FAILURE;
+        goto deinit;
     }
 
     if (!opts->headless && taf_tui_init()) {
-        test_case_free_all(L);
-        lua_close(L);
-        free(hooks_dir_path);
-        free(module_path);
-        free(test_common_dir_path);
-        free(test_dir_path);
-        free(lib_dir_path);
-        project_parser_free();
-        internal_logging_deinit();
-        return EXIT_FAILURE;
+        goto deinit;
     }
-    headless = opts->headless;
 
     if (opts->headless) {
         taf_headless_init();
     }
+
     if (!opts->headless) {
         LOG("Enabling line hook...");
         lua_sethook(L, line_hook, LUA_MASKLINE, 0);
     }
 
-    int exitcode = run_all_tests(L);
+    exitcode = run_all_tests(L);
+
+deinit:
 
     LOG("Tidying up...");
 
     if (!opts->headless) {
         taf_tui_deinit();
     }
-
     test_case_free_all(L);
-
-    LOG("Closing Lua state...");
     lua_close(L);
-
     project_parser_free();
-
     internal_logging_deinit();
     taf_hooks_deinit();
-
     free(hooks_dir_path);
     free(module_path);
     free(test_common_dir_path);

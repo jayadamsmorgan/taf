@@ -129,3 +129,10 @@ char *string_join(char *items[], size_t count) {
     *dst = '\0';
     return out;
 }
+
+bool string_has_prefix(const char *str, const char *prefix) {
+    if (!str || !prefix) {
+        return false;
+    }
+    return strncasecmp(prefix, str, strlen(prefix)) == 0;
+}

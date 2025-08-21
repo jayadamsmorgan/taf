@@ -155,6 +155,7 @@ sources = [
   'src/util/os.c',
   'src/util/string.c',
   'src/util/time.c',
+  'src/util/line_cache.c',
   'src/modules/hooks/taf-hooks.c',
   'src/modules/http/taf-http.c',
   'src/modules/json/taf-json.c',

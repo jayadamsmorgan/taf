@@ -83,30 +83,16 @@ int l_module_taf_register_test(lua_State *L) {
                       "`tags` must be array of strings");
         read_string_array(L, lua_gettop(L), &tc->tags.tags, &tc->tags.amount);
     }
-    cmd_test_options *opts = cmd_parser_get_test_options();
-    if (opts->tags_amount > 0) {
-        bool has_tag = false;
-        for (size_t i = 0; i < opts->tags_amount; i++) {
-            for (size_t j = 0; j < tc->tags.amount; j++) {
-                if (strcmp(opts->tags[i], tc->tags.tags[j]) == 0) {
-                    has_tag = true;
-                    break;
-                }
-            }
-            if (has_tag)
-                break;
-        }
-        if (!has_tag) {
-            LOG("Skipping test '%s', no tag found.", tc->name);
-            // TODO: Fix leak
-            return 0;
-        }
-    }
     lua_pop(L, 1);
 
-    test_case_enqueue(tc);
-
-    LOG("Successfully registered new test %s", tc->name);
+    int res = test_case_enqueue(L, tc);
+    if (res == 0) {
+        LOG("Successfully registered new test %s", name);
+    } else if (res == 1) {
+        LOG("Skipping test %s", name);
+    } else {
+        LOG("Failed to register test %s: Error %d", name, res);
+    }
 
     return 0;
 }

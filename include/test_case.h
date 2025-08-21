@@ -31,7 +31,7 @@ typedef struct {
     int ref;          /* reference to Lua fn */
 } test_case_t;
 
-void test_case_enqueue(test_case_t *tc);
+int test_case_enqueue(lua_State *L, test_case_t *tc);
 
 test_case_t *test_case_get_all(size_t *amount);
 
