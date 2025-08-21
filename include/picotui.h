@@ -52,13 +52,21 @@ int pico_ui_rows(const pico_t *ui);
 int pico_cols(const pico_t *ui);
 
 /* UI-region writes */
-void pico_ui_puts(pico_t *ui, int rel_row, int col, const char *s);
+void pico_ui_puts_yx(pico_t *ui, int rel_row, int col, const char *s);
+void pico_ui_puts(pico_t *ui, const char *s);
+void pico_ui_printf_yx(pico_t *ui, int rel_row, int col, const char *fmt, ...)
+#ifdef __GNUC__
+    __attribute__((format(printf, 4, 5)))
+#endif
+;
 void pico_ui_clear_line(pico_t *ui, int rel_row);
 
 /* printf-style UI text at (rel_row, col) */
-void pico_ui_printf(pico_t *ui, int rel_row, int col, const char *fmt, ...)
-    __attribute__((format(printf, 4, 5)));
-
+void pico_ui_printf(pico_t *ui, const char *fmt, ...)
+#ifdef __GNUC__
+    __attribute__((format(printf, 2, 3)))
+#endif
+;
 /* 16-color palette indices for pico_set_colors() */
 #define PICO_COLOR_BLACK 0
 #define PICO_COLOR_RED 1

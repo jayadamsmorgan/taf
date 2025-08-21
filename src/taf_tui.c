@@ -4,6 +4,7 @@
 #include "project_parser.h"
 #include "version.h"
 
+#include "internal_logging.h"
 #include "util/string.h"
 #include "util/time.h"
 
@@ -99,6 +100,7 @@ static void init_project_info() {
     cmd_test_options *opts = cmd_parser_get_test_options();
     project_parsed_t *proj = get_parsed_project();
     ui_state.project_name = strdup(proj->project_name);
+
     if (proj->multitarget && opts->target) {
         ui_state.target = strdup(opts->target);
         project_info_dimy++;
@@ -181,6 +183,7 @@ void taf_tui_log(char *time, taf_log_level log_level, const char *, int,
     pico_printf(ui, ":");
 
     // Write logs body 
+    pico_set_colors(ui, PICO_COLOR_WHITE, -1);
     pico_print_block(ui, tmp);
     
     free(tmp);
@@ -231,34 +234,36 @@ void taf_tui_hook_failed(char *time, const char *trace) {
 static void render_ui(pico_t *ui, void *ud) {
     (void)ud;
 
-    pico_reset_colors(ui); // Better to do it
+    pico_reset_colors(ui); // better to do it
 
-    
     /* Line 0: Main title */
     pico_ui_clear_line(ui, 0);
-    pico_ui_puts(ui, 0, 0, "TAF v" TAF_VERSION " ");
+    pico_ui_puts_yx(ui, 0, 0, "TAF v" TAF_VERSION " ");
 
     /* Line 1: Project name */
-    pico_ui_clear_line(ui, 0);
-    pico_ui_printf(ui, 1, 0,  "Project: %s",ui_state.project_name);
+    pico_ui_clear_line(ui, 1);
+    pico_ui_printf_yx(ui, 1, 0,  "Project: %s",ui_state.project_name);
     
     /* Line 2: Target */
-    pico_ui_clear_line(ui, 0);
-    pico_ui_printf(ui, 2, 0,   "Target: %s", ui_state.target);
+    pico_ui_clear_line(ui, 2);
+    pico_ui_printf_yx(ui, 2, 0,   "Target: %s", ui_state.target);
     
     /* Line 3: Log level */
-    pico_ui_clear_line(ui, 0);
-    pico_ui_printf(ui, 3, 0,   "Log: ");
+    pico_ui_clear_line(ui, 3);
+    pico_ui_printf_yx(ui, 3, 0,   "Log: ");
     pico_set_colors(ui, log_level_to_palindex_map[ui_state.log_level], -1);
-    pico_ui_printf(ui, 3, 0, taf_log_level_to_str(ui_state.log_level));
+    pico_ui_printf_yx(ui, 3, 5, "%s",taf_log_level_to_str(ui_state.log_level));
 
     /* Line 4: Test Progress Title */
-    pico_ui_clear_line(ui, 0);
-    pico_ui_printf(ui, 4, 0,   "Test Progress");
+    pico_set_colors(ui, PICO_COLOR_WHITE, -1);
+    pico_ui_clear_line(ui, 4);
+    pico_ui_printf_yx(ui, 4, 0,   "Test Progress");
+
 }
 
 int taf_tui_init() {
 
+    LOG("Start TUI init");
     // Get project information 
     init_project_info();
     
@@ -266,14 +271,14 @@ int taf_tui_init() {
     ui_state.test_history = calloc(ui_state.test_history_cap, sizeof(*ui_state.test_history));
 
 
+
     // To  write Unicode
     setlocale(LC_ALL, "");
  
-
     // UI inintialization
     ui = pico_init(5, render_ui, NULL);
     if (!ui) return 1;
-
+    
     pico_attach(ui);
     pico_install_sigint_handler(ui);
     // Creste standart plane
@@ -291,6 +296,8 @@ int taf_tui_init() {
 
 void taf_tui_deinit() {
 
+    LOG("Start TUI deinit");
+    
     // Update UI last time
     taf_tui_update();
     

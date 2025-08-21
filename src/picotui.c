@@ -30,7 +30,13 @@ struct pico_t {
 
     pico_render_fn render;
     void *render_ud;
+    
+    const char *cap_sav;  /* save_cursor */
+    const char *cap_res;  /* restore_cursor */
 
+    int have_saved_cursor; /* 0/1: we have an active saved cursor position */
+    int have_saved_ui_cursor;  /* UI-region saved cursor anchor */
+    
     volatile sig_atomic_t resized;
 };
 
@@ -151,6 +157,17 @@ static void emit_el(pico_t *ui) {
     write_cstr("\x1b[K");
 }
 
+static void emit_save_cursor(pico_t *ui) {
+    if (ui->cap_sav) { write_cstr(ui->cap_sav); return; }
+    /* CSI s is widely supported; (DEC 7 is "\x1b7") */
+    write_cstr("\x1b[s");
+}
+
+static void emit_restore_cursor(pico_t *ui) {
+    if (ui->cap_res) { write_cstr(ui->cap_res); return; }
+    /* CSI u (DEC 8 would be "\x1b8") */
+    write_cstr("\x1b[u");
+}
 /* ---------- colors (16-color fg/bg) ---------- */
 static int clamp16(int v) { return v < 0 ? -1 : (v > 15 ? 15 : v); }
 
@@ -216,35 +233,31 @@ static void clear_ui_region(pico_t *ui) {
     }
 }
 
-void pico_ui_puts(pico_t *ui, int rel_row, int col, const char *s) {
+void pico_ui_puts_yx(pico_t *ui, int rel_row, int col, const char *s) {
     int base = ui->sz.rows - ui->ui_rows;
-    if (base < 0)
-        base = 0;
+    if (base < 0) base = 0;
     int r = base + (rel_row < 0 ? 0 : rel_row);
-    if (r >= ui->sz.rows)
-        return;
-    if (col < 0)
-        col = 0;
+    if (r >= ui->sz.rows) return;
+    if (col < 0) col = 0;
     emit_cup(ui, r, col);
-    write_cstr(s);
+    if (s && *s) write_cstr(s);
+    /* Save cursor so subsequent pico_ui_puts()/printf() continue from here */
+    emit_save_cursor(ui);
+    ui->have_saved_ui_cursor = 1;
 }
-
-void pico_ui_printf(pico_t *ui, int rel_row, int col, const char *fmt, ...) {
+void pico_ui_printf_yx(pico_t *ui, int rel_row, int col, const char *fmt, ...) {
     int base = ui->sz.rows - ui->ui_rows;
-    if (base < 0)
-        base = 0;
+    if (base < 0) base = 0;
     int r = base + (rel_row < 0 ? 0 : rel_row);
-    if (r >= ui->sz.rows)
-        return;
-    if (col < 0)
-        col = 0;
+    if (r >= ui->sz.rows) return;
+    if (col < 0) col = 0;
     emit_cup(ui, r, col);
-    va_list ap;
-    va_start(ap, fmt);
+    va_list ap; va_start(ap, fmt);
     write_vprintf(NULL, fmt, ap);
     va_end(ap);
+    emit_save_cursor(ui);
+    ui->have_saved_ui_cursor = 1;
 }
-
 void pico_ui_clear_line(pico_t *ui, int rel_row) {
     int base = ui->sz.rows - ui->ui_rows;
     if (base < 0)
@@ -254,12 +267,14 @@ void pico_ui_clear_line(pico_t *ui, int rel_row) {
         return;
     emit_cup(ui, r, 0);
     emit_el(ui);
+    ui->have_saved_ui_cursor = 0;
 }
 
 void pico_redraw_ui(pico_t *ui) {
     clear_ui_region(ui);
     if (ui->render)
         ui->render(ui, ui->render_ud);
+    ui->have_saved_ui_cursor = 0;
 }
 
 static void reprogram_region_and_redraw(pico_t *ui) {
@@ -277,6 +292,9 @@ static void reprogram_region_and_redraw(pico_t *ui) {
     set_scroll_region(ui, 0, bot);
     pico_redraw_ui(ui);
     move_to_bottom_scroll_line(ui);
+    
+    ui->have_saved_cursor = 0;
+    ui->have_saved_ui_cursor = 0;
 }
 
 static void handle_resize_if_needed(pico_t *ui) {
@@ -296,14 +314,15 @@ pico_t *pico_init(int ui_rows, pico_render_fn render, void *userdata) {
 
     ui->ut = unibi_from_env();
     if (ui->ut) {
-        ui->cap_cup = unibi_get_str(ui->ut, unibi_cursor_address);
-        ui->cap_csr = unibi_get_str(ui->ut, unibi_change_scroll_region);
-        ui->cap_el = unibi_get_str(ui->ut, unibi_clr_eol);
-        ui->cap_sgr0 = unibi_get_str(ui->ut, unibi_exit_attribute_mode);
+        ui->cap_cup   = unibi_get_str(ui->ut, unibi_cursor_address);
+        ui->cap_csr   = unibi_get_str(ui->ut, unibi_change_scroll_region);
+        ui->cap_el    = unibi_get_str(ui->ut, unibi_clr_eol);
+        ui->cap_sgr0  = unibi_get_str(ui->ut, unibi_exit_attribute_mode);
         ui->cap_setaf = unibi_get_str(ui->ut, unibi_set_a_foreground);
         ui->cap_setab = unibi_get_str(ui->ut, unibi_set_a_background);
+        ui->cap_sav   = unibi_get_str(ui->ut, unibi_save_cursor);
+        ui->cap_res   = unibi_get_str(ui->ut, unibi_restore_cursor);
     }
-
     ui->sz = get_term_size();
 
     g_ui_singleton = ui;
@@ -328,6 +347,9 @@ void pico_attach(pico_t *ui) {
         bot = 0;
     set_scroll_region(ui, 0, bot);
     move_to_bottom_scroll_line(ui);
+    
+    ui->have_saved_cursor = 0;
+    ui->have_saved_ui_cursor = 0;
 }
 
 void pico_set_ui_rows(pico_t *ui, int ui_rows) {
@@ -339,7 +361,8 @@ void pico_set_ui_rows(pico_t *ui, int ui_rows) {
         ui_rows = ui->sz.rows - 1;
     if (ui_rows == ui->ui_rows)
         return;
-
+    ui->have_saved_cursor = 0;
+    ui->have_saved_ui_cursor = 0;
     /* Release region, scroll to make room difference, then reapply */
     reset_scroll_region(ui);
 
@@ -354,28 +377,43 @@ void pico_set_ui_rows(pico_t *ui, int ui_rows) {
     }
 
     reprogram_region_and_redraw(ui);
+    ui->have_saved_cursor = 0;
+    ui->have_saved_ui_cursor = 0;
+}
+
+static void ensure_stream_anchor(pico_t *ui) {
+    if (!ui->have_saved_cursor) {
+        /* First time in a while: anchor at bottom-of-scroll line col 0 */
+        move_to_bottom_scroll_line(ui);
+        emit_save_cursor(ui);
+        ui->have_saved_cursor = 1;
+    }
 }
 
 void pico_print(pico_t *ui, const char *text) {
     handle_resize_if_needed(ui);
-    move_to_bottom_scroll_line(ui);
-    if (text && *text)
-        write_cstr(text);
-    if (ui->render)
-        ui->render(ui, ui->render_ud);
+    ensure_stream_anchor(ui);
+
+    /* Restore to last saved position, print, save at new end */
+    emit_restore_cursor(ui);
+    if (text && *text) write_cstr(text);
+    emit_save_cursor(ui);
+
+    if (ui->render) ui->render(ui, ui->render_ud);
 }
 
 void pico_printf(pico_t *ui, const char *fmt, ...) {
     handle_resize_if_needed(ui);
-    move_to_bottom_scroll_line(ui);
-    va_list ap;
-    va_start(ap, fmt);
+    ensure_stream_anchor(ui);
+
+    emit_restore_cursor(ui);
+    va_list ap; va_start(ap, fmt);
     write_vprintf(NULL, fmt, ap);
     va_end(ap);
-    if (ui->render)
-        ui->render(ui, ui->render_ud);
-}
+    emit_save_cursor(ui);
 
+    if (ui->render) ui->render(ui, ui->render_ud);
+}
 void pico_println(pico_t *ui, const char *line) {
     handle_resize_if_needed(ui);
     move_to_bottom_scroll_line(ui);
@@ -384,6 +422,7 @@ void pico_println(pico_t *ui, const char *line) {
     write_cstr("\r\n");
     if (ui->render)
         ui->render(ui, ui->render_ud);
+    ui->have_saved_cursor = 0;
 }
 
 void pico_printfln(pico_t *ui, const char *fmt, ...) {
@@ -396,6 +435,7 @@ void pico_printfln(pico_t *ui, const char *fmt, ...) {
     write_cstr("\r\n");
     if (ui->render)
         ui->render(ui, ui->render_ud);
+    ui->have_saved_cursor = 0;
 }
 
 void pico_print_block(pico_t *ui, const char *block) {
@@ -425,7 +465,32 @@ void pico_print_block(pico_t *ui, const char *block) {
         pico_println(ui, tmp);
     }
 }
+static void ensure_ui_anchor(pico_t *ui) {
+    if (!ui->have_saved_ui_cursor) {
+        int base = ui->sz.rows - ui->ui_rows;
+        if (base < 0) base = 0;
+        emit_cup(ui, base + 0, 0);  /* default anchor: UI row 0, col 0 */
+        emit_save_cursor(ui);
+        ui->have_saved_ui_cursor = 1;
+    }
+}
 
+void pico_ui_puts(pico_t *ui, const char *s) {
+    if (!s || !*s) return;
+    ensure_ui_anchor(ui);
+    emit_restore_cursor(ui);
+    write_cstr(s);
+    emit_save_cursor(ui);
+}
+
+void pico_ui_printf(pico_t *ui, const char *fmt, ...) {
+    ensure_ui_anchor(ui);
+    emit_restore_cursor(ui);
+    va_list ap; va_start(ap, fmt);
+    write_vprintf(NULL, fmt, ap);
+    va_end(ap);
+    emit_save_cursor(ui);
+}
 void pico_shutdown(pico_t *ui) {
     if (!ui)
         return;
