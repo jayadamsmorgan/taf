@@ -69,6 +69,7 @@ static ui_state_t ui_state = {0};
 
 static pico_t *ui = NULL;
 
+static ui_test_history_t *hist = NULL;
 
 
 
@@ -130,6 +131,7 @@ void taf_tui_set_current_line(const char *file, int line,
     ui_state.current_file = strdup(file);
     ui_state.current_line = line;
     ui_state.current_line_str = string_strip(line_str);
+    taf_tui_update();
 }
 
 static size_t sanitize_inplace(char *buf, size_t len) {
@@ -173,21 +175,21 @@ void taf_tui_log(char *time, taf_log_level log_level, const char *, int,
     memcpy(tmp, buffer, buffer_len);
     tmp[buffer_len] = '\0';
     sanitize_inplace(tmp, buffer_len);
-   
-    // Write logs header 
-    pico_set_colors(ui, PICO_COLOR_WHITE, -1);
-    pico_printf(ui, "%s:", time);
+  
+    // Wrie Log Level information for current run
     pico_set_colors(ui, log_level_to_palindex_map[log_level], -1);
     pico_printf(ui, "[%s]", taf_log_level_to_str(log_level));
-    pico_set_colors(ui, log_level_to_palindex_map[log_level], -1);
-    pico_printf(ui, ":");
-
+    pico_print(ui, "");
+    
+    // Write time form test start (time in format hh:mm:ss)
+    pico_set_colors(ui, PICO_COLOR_BRIGHT_MAGENTA, -1);
+    pico_printf(ui, "(%s)", time + 9);
+    pico_print(ui, " ");
+    
     // Write logs body 
-    pico_set_colors(ui, PICO_COLOR_WHITE, -1);
+    pico_reset_colors(ui);
     pico_print_block(ui, tmp);
     free(tmp);
-
-    taf_tui_update();
 }
 
 void taf_tui_set_current_test(int index, const char *test) {
@@ -198,10 +200,11 @@ void taf_tui_set_current_test(int index, const char *test) {
         ui_state.test_history = realloc(ui_state.test_history, sizeof(*ui_state.test_history) *
                                                        ui_state.test_history_cap);
     }
-    ui_test_history_t *hist = &ui_state.test_history[ui_state.test_history_size - 1];
+    hist = &ui_state.test_history[ui_state.test_history_size - 1];
     hist->name = strdup(test);
     hist->state = RUNNING;
     hist->elapsed = 0;
+    taf_tui_update();
 }
 
 void taf_tui_defer_queue_started(char *time) {
@@ -236,30 +239,100 @@ static void render_ui(pico_t *ui, void *ud) {
     pico_reset_colors(ui); // better to do it
 
     /* Line 0: Main title */
+    pico_set_colors(ui, PICO_COLOR_BRIGHT_CYAN, -1);
     pico_ui_clear_line(ui, 0);
-    pico_ui_puts_yx(ui, 0, 0, "TAF v" TAF_VERSION " ");
-
-    /* Line 1: Project name */
+    pico_ui_puts_yx(ui, 0, 0 ,"TAF v" TAF_VERSION);
+    
+    /* Line 1: | */
     pico_ui_clear_line(ui, 1);
-    pico_ui_printf_yx(ui, 1, 0,  "Project: %s",ui_state.project_name);
+    pico_ui_puts_yx(ui, 1, 0,  "│");
     
-    /* Line 2: Target */
+    /* Line 2: Project Information */
     pico_ui_clear_line(ui, 2);
-    pico_ui_printf_yx(ui, 2, 0,   "Target: %s", ui_state.target);
+    pico_ui_puts_yx(ui, 2, 0,  "├─ Project Information:");
     
-    /* Line 3: Log level */
+    /* Line 3: Project name */
     pico_ui_clear_line(ui, 3);
-    pico_ui_printf_yx(ui, 3, 0,   "Log: ");
-    pico_set_colors(ui, log_level_to_palindex_map[ui_state.log_level], -1);
-    pico_ui_printf_yx(ui, 3, 5, "%s",taf_log_level_to_str(ui_state.log_level));
-
-    /* Line 4: Test Progress Title */
-    pico_set_colors(ui, PICO_COLOR_WHITE, -1);
+    pico_ui_printf_yx(ui, 3, 0,  "│  ├─ Project: %s",ui_state.project_name);
+    
+    /* Line 4: Project name */
     pico_ui_clear_line(ui, 4);
-    pico_ui_printf_yx(ui, 4, 0,   "Test Progress");
+    pico_ui_printf_yx(ui, 4, 0,  "│  ├─ Target: %s", ui_state.target);
+    
+    /* Line 5: Project tags */
+    pico_ui_clear_line(ui, 5);
+    pico_ui_printf_yx(ui, 5, 0,  "│  ├─ Tags: %s", ui_state.tags);
+    
+    /* Line 6: Project vars */
+    pico_ui_clear_line(ui, 6);
+    pico_ui_printf_yx(ui, 6, 0,  "│  ├─ Vars: %s", ui_state.tags);
+    
+    /* Line 7: Project Log Level */
+    pico_ui_clear_line(ui, 7);
+    pico_ui_puts_yx(ui, 7, 0,  "│  └─ Log Level: ");
+    pico_set_colors(ui, log_level_to_palindex_map[ui_state.log_level], -1);
+    pico_ui_printf_yx(ui, 7, 17,  "%s", taf_log_level_to_str(ui_state.log_level));
+    
+    pico_set_colors(ui, PICO_COLOR_BRIGHT_CYAN, -1);
+    
+    /* Line 8: Test Progress */
+    pico_ui_clear_line(ui, 8);
+    pico_ui_puts_yx(ui, 8, 0,  "├─ Test Progress:");
+
+    /* Line 9: Test Name and millis from the start*/
+    pico_ui_clear_line(ui, 9);
+    if(hist) pico_ui_printf_yx(ui, 9, 0,  "│  ├─ Name: %s", hist->name);
+    
+    if(hist) pico_ui_printf_yx(ui, 9, strlen(hist->name)+13,  "[ %lums ]",
+                          hist->state == RUNNING ? millis_since_start()
+                                                 : hist->elapsed);
+
+    /* Line 10: Test Progress */
+    pico_ui_clear_line(ui, 10);
+    pico_ui_printf_yx(ui, 10, 0,  "│  ├─ Progress: %d",(unsigned int)(ui_state.current_test_progress*100));
+
+    /* Line 11: Current Line in Test */
+    if(hist){
+        if (hist->state == RUNNING) {
+            char *file_str = ui_state.current_file;
+            if (file_str) {
+                size_t len = strlen(ui_state.current_file);
+                if (len > 40) {
+                    file_str += len - 40;
+                }
+                pico_ui_clear_line(ui, 11);
+                pico_ui_printf_yx(ui, 11, 0,  "│  └─ Current Line: [%s%s:%d] %s",len > 40 ? "..." : "", file_str,ui_state.current_line, ui_state.current_line_str);
+            }
+        }
+    }
+
+    /* Line 12: Test Case Summary */
+    pico_ui_clear_line(ui, 12);
+    pico_ui_puts_yx(ui, 12, 0,  "└─ Summary:");
+
+    /* Line 13: Test Case Status */
+    pico_ui_clear_line(ui, 13);
+    pico_ui_printf_yx(ui, 13, 0,  "   ├─ Test Case Status: Total: %d | Passsed: %d | Failed: %d", ui_state.total_tests, ui_state.passed_tests, ui_state.failed_tests);
+
+    /* Line 13: Test Case Status */
+    pico_ui_clear_line(ui, 13);
+    pico_ui_printf_yx(ui, 13, 0,  "   ├─ Test Case Status: Total: %d | Passsed: %d | Failed: %d", ui_state.total_tests, ui_state.passed_tests, ui_state.failed_tests);
+
+    /* Line 13: Test Case Status */
+    uint64_t ms;
+    if (ui_state.passed_tests + ui_state.failed_tests == ui_state.total_tests) {
+        // Probably finished executing
+        ms = ui_state.total_elapsed_ms;
+    } else {
+        ms = millis_since_taf_start();
+    }
+    const unsigned long minutes = ms / 60000;
+    const unsigned long seconds = (ms / 1000) % 60;
+    const unsigned long millis = ms % 1000;
+    pico_ui_clear_line(ui, 14);
+    pico_ui_printf_yx(ui, 14, 0,  "   └─ Elapsed Time: %lum %lu.%03lus ", minutes, seconds, millis);
 
 }
-
 int taf_tui_init() {
 
     LOG("Start TUI init");
@@ -275,7 +348,7 @@ int taf_tui_init() {
     setlocale(LC_ALL, "");
  
     // UI inintialization
-    ui = pico_init(5, render_ui, NULL);
+    ui = pico_init(15, render_ui, NULL);
     if (!ui) return 1;
     
     pico_attach(ui);
