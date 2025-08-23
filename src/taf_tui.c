@@ -72,13 +72,6 @@ static pico_t *ui = NULL;
 static ui_test_history_t *hist = NULL;
 
 
-
-
-
-
-
-//
-
 static uint absy = 0, absx = 0;
 
 static uint project_info_dimy = 2;
@@ -92,8 +85,6 @@ static int test_state_to_palindex_map[] = {
     1,
     5,
 };
-
-
 
 /*------------------- Helper functions -------------------*/
 
@@ -213,15 +204,19 @@ void taf_tui_defer_queue_started(char *time) {
 void taf_tui_defer_queue_finished(char *time) {
 }
 
-void taf_tui_test_passed(char *time) {
-}
-
 void taf_tui_defer_failed(char *time, const char *trace, const char *file,
                           int line) {
 }
 
+void taf_tui_test_passed(char *time) {
+    ui_state.passed_tests++; 
+    taf_tui_update();
+}
+
 void taf_tui_test_failed(char *time, raw_log_test_output_t *failure_reasons,
                          size_t failure_reasons_count) {
+    ui_state.failed_tests++; 
+    taf_tui_update();
 }
 
 void taf_tui_hooks_started(char *time) {
@@ -318,7 +313,7 @@ static void render_ui(pico_t *ui, void *ud) {
     pico_ui_clear_line(ui, 13);
     pico_ui_printf_yx(ui, 13, 0,  "   ├─ Test Case Status: Total: %d | Passsed: %d | Failed: %d", ui_state.total_tests, ui_state.passed_tests, ui_state.failed_tests);
 
-    /* Line 13: Test Case Status */
+    /* Line 14: Test Elapsed Time */
     uint64_t ms;
     if (ui_state.passed_tests + ui_state.failed_tests == ui_state.total_tests) {
         // Probably finished executing
@@ -342,8 +337,6 @@ int taf_tui_init() {
     ui_state.test_history_cap = 10;
     ui_state.test_history = calloc(ui_state.test_history_cap, sizeof(*ui_state.test_history));
 
-
-
     // To  write Unicode
     setlocale(LC_ALL, "");
  
@@ -353,16 +346,6 @@ int taf_tui_init() {
     
     pico_attach(ui);
     pico_install_sigint_handler(ui);
-    // Creste standart plane
-    
-    // Check terminal size
-    
-    // Panel resize
-
-    // Progress bar plane init
-
-    // Update UI
-
     return 0;
 }
 
@@ -405,7 +388,6 @@ void taf_tui_deinit() {
 
 void taf_tui_update() {
     
-
     // UI panel update
     pico_redraw_ui(ui); 
     
