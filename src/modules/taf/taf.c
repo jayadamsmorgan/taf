@@ -2,10 +2,13 @@
 
 #include "cmd_parser.h"
 #include "internal_logging.h"
+#include "taf_secrets.h"
 #include "taf_test.h"
 #include "taf_vars.h"
 #include "test_case.h"
 #include "test_logs.h"
+
+#include "util/kv.h"
 #include "util/lua.h"
 #include "util/time.h"
 
@@ -30,24 +33,21 @@ int l_module_taf_sleep(lua_State *L) {
     return 0; /* no Lua return values */
 }
 
-static void read_string_array(lua_State *L, int idx, char ***out,
-                              size_t *out_n) {
+static void read_string_array(lua_State *L, int idx, da_t **out) {
     luaL_checktype(L, idx, LUA_TTABLE);
     lua_Integer n = luaL_len(L, idx);
     if (n < 0)
         n = 0;
 
-    char **arr = malloc(n * sizeof(char *));
+    *out = da_init(n ? n : 1, sizeof(char *));
 
     for (lua_Integer i = 1; i <= n; ++i) {
         lua_rawgeti(L, idx, i);
         const char *s = luaL_checkstring(L, -1);
-        arr[i - 1] = strdup(s);
+        char *str = strdup(s);
+        da_append(*out, &str);
         lua_pop(L, 1);
     }
-
-    *out = arr;
-    *out_n = (size_t)n;
 }
 
 int l_module_taf_register_test(lua_State *L) {
@@ -81,7 +81,7 @@ int l_module_taf_register_test(lua_State *L) {
     if (!lua_isnil(L, -1)) {
         luaL_argcheck(L, lua_istable(L, -1), 1,
                       "`tags` must be array of strings");
-        read_string_array(L, lua_gettop(L), &tc->tags.tags, &tc->tags.amount);
+        read_string_array(L, lua_gettop(L), &tc->tags);
     }
     lua_pop(L, 1);
 
@@ -138,8 +138,10 @@ int l_module_taf_get_active_tags(lua_State *L) {
     cmd_test_options *opts = cmd_parser_get_test_options();
 
     lua_newtable(L);
-    for (size_t i = 0; i < opts->tags_amount; i++) {
-        lua_pushstring(L, opts->tags[i]);
+    size_t tags_amount = da_size(opts->tags);
+    for (size_t i = 0; i < tags_amount; i++) {
+        char **tag = da_get(opts->tags, i);
+        lua_pushstring(L, *tag);
         lua_rawseti(L, -2, i + 1);
     }
 
@@ -156,11 +158,15 @@ int l_module_taf_get_active_test_tags(lua_State *L) {
 
     lua_newtable(L);
     size_t index = 1;
-    for (size_t i = 0; i < opts->tags_amount; i++) {
-        for (size_t j = 0; j < test->tags.amount; j++) {
-            if (strcmp(opts->tags[i], test->tags.tags[j]) == 0) {
-                LOG("Active test tag: %s", opts->tags[i]);
-                lua_pushstring(L, opts->tags[i]);
+    size_t opts_tags_amount = da_size(opts->tags);
+    size_t test_tags_amount = da_size(test->tags);
+    for (size_t i = 0; i < opts_tags_amount; i++) {
+        for (size_t j = 0; j < test_tags_amount; j++) {
+            char **opts_tag = da_get(opts->tags, i);
+            char **test_tag = da_get(test->tags, j);
+            if (strcmp(*opts_tag, *test_tag) == 0) {
+                LOG("Active test tag: %s", *opts_tag);
+                lua_pushstring(L, *opts_tag);
                 lua_rawseti(L, -2, index++);
                 break;
             }
@@ -177,22 +183,8 @@ int l_module_taf_register_vars(lua_State *L) {
 
     luaL_checktype(L, 1, LUA_TTABLE);
 
-    size_t count = 0;
-    lua_pushnil(L);
-    while (lua_next(L, 1) != 0) {
-        lua_pop(L, 1);
-        ++count;
-    }
+    da_t *vars = da_init(1, sizeof(taf_var_entry_t));
 
-    taf_var_map_t *map = malloc(sizeof(taf_var_map_t));
-    memset(map, 0, sizeof(*map));
-    map->count = count;
-    if (count > 0) {
-        map->entries = malloc(count * sizeof(taf_var_entry_t));
-        memset(map->entries, 0, count * sizeof(taf_var_entry_t));
-    }
-
-    size_t idx = 0;
     lua_pushnil(L);
     while (lua_next(L, 1) != 0) {
         if (!lua_isstring(L, -2)) {
@@ -200,22 +192,20 @@ int l_module_taf_register_vars(lua_State *L) {
             luaL_error(L, "taf_vars keys must be strings");
         }
 
-        taf_var_entry_t *e = &map->entries[idx];
-        memset(e, 0, sizeof(*e));
-        e->name = strdup(lua_tostring(L, -2));
+        taf_var_entry_t e = {0};
+        e.name = strdup(lua_tostring(L, -2));
 
         if (lua_type(L, -1) == LUA_TSTRING) {
-            e->is_scalar = true;
-            e->scalar = strdup(lua_tostring(L, -1));
+            e.is_scalar = true;
+            e.scalar = strdup(lua_tostring(L, -1));
         } else if (lua_type(L, -1) == LUA_TTABLE) {
-            e->is_scalar = false;
+            e.is_scalar = false;
 
             lua_getfield(L, -1, "values");
             if (!lua_isnil(L, -1)) {
                 luaL_argcheck(L, lua_istable(L, -1), 1,
                               "`values` must be array of strings");
-                read_string_array(L, lua_gettop(L), &e->values,
-                                  &e->values_amount);
+                read_string_array(L, lua_gettop(L), &e.values);
             }
             lua_pop(L, 1);
 
@@ -223,38 +213,66 @@ int l_module_taf_register_vars(lua_State *L) {
             if (!lua_isnil(L, -1)) {
                 luaL_argcheck(L, lua_isstring(L, -1), 1,
                               "`default` must be string");
-                e->def_value = strdup(lua_tostring(L, -1));
+                e.def_value = strdup(lua_tostring(L, -1));
                 bool found = false;
-                for (size_t i = 0; i < e->values_amount; i++) {
-                    if (strcmp(e->def_value, e->values[i]) == 0) {
+                size_t values_amount = da_size(e.values);
+                for (size_t i = 0; i < values_amount; i++) {
+                    char **value = da_get(e.values, i);
+                    if (strcmp(e.def_value, *value) == 0) {
                         found = true;
                         break;
                     }
                 }
-                if (!found && e->values_amount > 0) {
+                if (!found && values_amount > 0) {
                     lua_pop(L, 1);
                     luaL_error(L,
                                "Error parsing var '%s': Default value "
                                "'%s' is not an allowed value.",
-                               e->name, e->def_value);
+                               e.name, e.def_value);
                 }
             }
+
             lua_pop(L, 1);
         } else {
             lua_pop(L, 1);
             luaL_error(L,
                        "Error parsing value for var '%s': value must be string "
                        "or table",
-                       e->name);
+                       e.name);
         }
+        da_append(vars, &e);
 
         lua_pop(L, 1);
-        ++idx;
     }
 
-    taf_register_vars(map);
+    taf_register_vars(vars);
 
     return 0;
+}
+
+static taf_var_entry_t *find_var(const char *name, da_t *vars) {
+    if (!vars)
+        return NULL;
+
+    size_t vars_count = da_size(vars);
+    for (size_t i = 0; i < vars_count; ++i) {
+        taf_var_entry_t *e = da_get(vars, i);
+        if (strcmp(name, e->name) == 0) {
+            return e;
+        }
+    }
+
+    return NULL;
+}
+
+static void push_var(lua_State *L, taf_var_entry_t *e) {
+    lua_newtable(L);
+
+    lua_pushstring(L, e->name);
+    lua_setfield(L, -2, "name");
+
+    lua_pushstring(L, e->final_value);
+    lua_setfield(L, -2, "value");
 }
 
 int l_module_taf_get_var(lua_State *L) {
@@ -265,26 +283,18 @@ int l_module_taf_get_var(lua_State *L) {
 
     LOG("Variable name: '%s'", var_name);
 
-    taf_var_map_t *map = taf_get_vars();
-    if (map) {
-        for (size_t i = 0; i < map->count; i++) {
-            if (strcmp(var_name, map->entries[i].name) == 0) {
-                if (!map->entries[i].final_value) {
-                    luaL_error(L,
-                               "Unknown error occured, cannot get value for "
-                               "variable '%s'",
-                               var_name);
-                    return 0;
-                }
-                lua_pushstring(L, map->entries[i].final_value);
-                return 1;
-            }
-        }
+    da_t *vars = taf_get_vars();
+
+    taf_var_entry_t *e = find_var(var_name, vars);
+    if (!e) {
+        LOG("No variable '%s'", var_name);
+        luaL_error(L, "No variable '%s'", var_name);
+        return 0;
     }
 
-    LOG("No variable '%s'", var_name);
-    luaL_error(L, "No variable '%s'", var_name);
-    return 0;
+    push_var(L, e);
+
+    return 1;
 }
 
 int l_module_taf_get_vars(lua_State *L) {
@@ -292,26 +302,76 @@ int l_module_taf_get_vars(lua_State *L) {
 
     lua_newtable(L);
 
-    taf_var_map_t *map = taf_get_vars();
-    if (!map) {
+    da_t *vars = taf_get_vars();
+
+    if (!vars) {
         return 1;
     }
 
-    for (size_t i = 0; i < map->count; i++) {
-        const char *name = map->entries[i].name;
-        const char *value = map->entries[i].final_value;
+    size_t vars_count = da_size(vars);
 
-        if (!value) {
-            luaL_error(
-                L, "Unknown error occured, cannot get value for variable '%s'",
-                name);
-            return 0;
-        }
-        lua_pushstring(L, value);
-        lua_setfield(L, -2, name);
+    for (size_t i = 0; i < vars_count; ++i) {
+
+        taf_var_entry_t *e = da_get(vars, i);
+
+        push_var(L, e);
+
+        lua_pop(L, 1);
     }
 
     return 1;
+}
+
+int l_module_taf_register_secrets(lua_State *L) {
+
+    luaL_checktype(L, 1, LUA_TTABLE);
+
+    lua_Integer len = luaL_len(L, 1);
+
+    da_t *secrets = da_init((size_t)len, sizeof(char *));
+
+    for (lua_Integer i = 1; i <= len; i++) {
+        lua_rawgeti(L, 1, i);
+
+        if (!lua_isstring(L, -1)) {
+            luaL_error(L, "Secret name must be string.");
+            return 0;
+        }
+
+        char *secret_name = strdup(lua_tostring(L, -1));
+        da_append(secrets, &secret_name);
+    }
+
+    taf_register_secrets(secrets);
+
+    return 0;
+}
+
+int l_module_taf_get_secret(lua_State *L) {
+
+    int s = selfshift(L);
+    const char *secret_name = luaL_checkstring(L, s);
+
+    da_t *secrets = taf_get_secrets();
+
+    size_t secrets_count = da_size(secrets);
+    for (size_t i = 0; i < secrets_count; ++i) {
+        kv_pair_t *secret = da_get(secrets, i);
+        if (strcmp(secret->value, secret_name) == 0) {
+            lua_newtable(L);
+
+            lua_pushstring(L, secret->key);
+            lua_setfield(L, -2, "name");
+
+            lua_pushstring(L, secret->value);
+            lua_setfield(L, -2, "value");
+
+            return 1;
+        }
+    }
+
+    luaL_error(L, "Unable to find secret '%s'");
+    return 0;
 }
 
 static inline void log_helper(taf_log_level level, int n, int s, lua_State *L) {
@@ -452,12 +512,14 @@ static const luaL_Reg module_fns[] = {
     {"get_current_target", l_module_taf_get_current_target},     //
     {"get_var", l_module_taf_get_var},                           //
     {"get_vars", l_module_taf_get_vars},                         //
+    {"get_secret", l_module_taf_get_secret},                     //
     {"sleep", l_module_taf_sleep},                               //
     {"millis", l_module_taf_millis},                             //
     {"print", l_module_taf_print},                               //
     {"log", l_module_taf_log},                                   //
     {"test", l_module_taf_register_test},                        //
     {"register_vars", l_module_taf_register_vars},               //
+    {"register_secrets", l_module_taf_register_secrets},         //
     {NULL, NULL},                                                //
 };
 

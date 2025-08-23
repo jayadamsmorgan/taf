@@ -4,16 +4,41 @@
 #include <stdlib.h>
 #include <string.h>
 
-size_t string_split_by_delim(char *s, char *out[], const char *delim,
-                             size_t max_fields) {
-    size_t n = 0;
+da_t *string_split_by_delim(const char *s, const char *delim) {
+    if (!s || !delim)
+        return NULL;
+
+    da_t *out = da_init(4, sizeof(char *));
+    if (!out)
+        return NULL;
+
+    // Make a working copy since strtok_r modifies the string
+    char *copy = strdup(s);
+    if (!copy) {
+        da_free(out);
+        return NULL;
+    }
 
     char *save = NULL;
-    for (char *tok = strtok_r(s, delim, &save); tok && n < max_fields;
+    for (char *tok = strtok_r(copy, delim, &save); tok;
          tok = strtok_r(NULL, delim, &save)) {
-        out[n++] = tok;
+        char *dup = strdup(tok);
+        if (!dup) {
+            // cleanup on OOM
+            size_t n = da_size(out);
+            for (size_t i = 0; i < n; ++i) {
+                char **p = da_get(out, i);
+                free(*p);
+            }
+            da_free(out);
+            free(copy);
+            return NULL;
+        }
+        da_append(out, &dup);
     }
-    return n;
+
+    free(copy);
+    return out;
 }
 
 size_t *string_wrapped_lines(const char *text, size_t max_len, size_t *count) {

@@ -83,31 +83,55 @@ M.get_current_target = function()
 	return tm:get_current_target()
 end
 
---- @class taf_var
+--- @class taf_var_reg_t
 --- @field values [string]?
 --- @field default string?
 
 --- Register variables
 ---
---- @param vars table<string, taf_var|string>
+--- @param vars table<string, taf_var_reg_t|string>
 M.register_vars = function(vars)
-	return tm.register_vars(vars)
+	tm.register_vars(vars)
 end
 
---- Returns all the predefined variables
+--- @class taf_var_t
+--- @field name string
+--- @field value string
+
+--- Returns all registered variables
 ---
---- @return [table<string, string>]
+--- @return [taf_var_t]
 M.get_vars = function()
 	return tm:get_vars()
 end
 
---- Returns value of the predefined variable
+--- Returns variable with the specified name
 ---
 --- @param var_name string
 ---
---- @return string
+--- @return taf_var_t
 M.get_var = function(var_name)
 	return tm:get_var(var_name)
+end
+
+--- @class taf_secret_t
+--- @field name string
+--- @field value string
+
+--- Register secrets
+---
+--- @param secrets [string]
+M.register_secrets = function(secrets)
+	tm.register_secrets(secrets)
+end
+
+--- Returns secret variable with the specified name
+---
+--- @param secret_name string
+---
+--- @return taf_secret_t
+M.get_secret = function(secret_name)
+	return tm:get_secret(secret_name)
 end
 
 --- Print something to logs & TUI. Same as default Lua `print()`. Both will use 'info' log level

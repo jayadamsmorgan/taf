@@ -4,8 +4,9 @@
 
 #include "cmd_parser.h"
 #include "project_parser.h"
-#include "test_logs.h"
+#include "taf_state.h"
 
+#include "taf_vars.h"
 #include "util/files.h"
 
 #include <json.h>
@@ -54,8 +55,8 @@ int taf_logs_info() {
 
     LOG("Getting json object...");
     json_object *root = json_object_from_file(log_file_path);
-    raw_log_t *raw_log = taf_json_to_raw_log(root);
-    if (!raw_log || !raw_log->os || !raw_log->os_version) {
+    taf_state_t *taf_state = taf_state_from_json(root);
+    if (!taf_state || !taf_state->os || !taf_state->os_version) {
         LOG("Log file is incorrect or corrupt");
         fprintf(stderr, "Log file %s is either incorrect or corrupt.\n",
                 log_file_path);
@@ -63,17 +64,19 @@ int taf_logs_info() {
         return EXIT_FAILURE;
     }
 
-    printf("TAF test run started on %s\n", raw_log->started);
-    printf("TAF version %s\n", raw_log->taf_version);
-    printf("Test run performed on %s\n", raw_log->os_version);
-    if (raw_log->target) {
-        printf("Test target: '%s'\n", raw_log->target);
+    printf("TAF test run started on %s\n", taf_state->started);
+    printf("TAF version %s\n", taf_state->taf_version);
+    printf("Test run performed on %s\n", taf_state->os_version);
+    if (taf_state->target) {
+        printf("Test target: '%s'\n", taf_state->target);
     }
-    if (raw_log->tags_count != 0) {
+    size_t tags_count = da_size(taf_state->tags);
+    if (tags_count != 0) {
         printf("Test run performed with tags [");
-        for (size_t i = 0; i < raw_log->tags_count; i++) {
-            printf(" '%s'", raw_log->tags[i]);
-            if (i != raw_log->tags_count - 1) {
+        for (size_t i = 0; i < tags_count; i++) {
+            char **tag = da_get(taf_state->tags, i);
+            printf(" '%s'", *tag);
+            if (i != tags_count - 1) {
                 printf(",");
             }
         }
@@ -81,15 +84,24 @@ int taf_logs_info() {
     } else {
         printf("Test run performed with no tags\n");
     }
-    printf("Total tests perfomed: %zu\n\n", raw_log->tests_count);
-    size_t passed = 0;
-    for (size_t i = 0; i < raw_log->tests_count; i++) {
-        raw_log_test_t *test = &raw_log->tests[i];
+    size_t vars_count = da_size(taf_state->vars);
+    if (vars_count != 0) {
+        printf("Test run performed with variables:\n");
+        for (size_t i = 0; i < vars_count; i++) {
+            taf_var_entry_t *e = da_get(taf_state->vars, i);
+            printf("    '%s' = '%s'\n", e->name, e->final_value);
+        }
+    }
+    printf("Total tests perfomed: %zu\n\n", taf_state->total_amount);
+    for (size_t i = 0; i < taf_state->total_amount; i++) {
+        taf_state_test_t *test = &taf_state->tests[i];
         printf("Test [%zu] '%s':\n", i + 1, test->name);
         printf("    Tags: [");
-        for (size_t j = 0; j < test->tags_count; j++) {
-            printf(" '%s'", test->tags[j]);
-            if (j != test->tags_count - 1) {
+        size_t tags_count = da_size(test->tags);
+        for (size_t j = 0; j < tags_count; j++) {
+            char **tag = da_get(test->tags, j);
+            printf(" '%s'", *tag);
+            if (j != tags_count - 1) {
                 printf(",");
             }
         }
@@ -97,23 +109,24 @@ int taf_logs_info() {
         printf("    Started: %s\n", test->started);
         printf("    Finished: %s\n", test->finished);
         printf("    Status: %s\n", test->status);
-        if (!strcmp("passed", test->status)) {
-            passed++;
-        } else if (test->failure_reasons_count != 0) {
+        size_t failure_reasons_count = da_size(test->failure_reasons);
+        if (failure_reasons_count != 0) {
             printf("    Failure reasons:\n");
-            for (size_t j = 0; j < test->failure_reasons_count; j++) {
-                raw_log_test_output_t *failure = &test->failure_reasons[j];
+            for (size_t j = 0; j < failure_reasons_count; j++) {
+                taf_state_test_output_t *failure =
+                    da_get(test->failure_reasons, j);
                 printf("        %zu: [%s]: %s\n", j + 1,
                        taf_log_level_to_str(failure->level), failure->msg);
             }
         }
         if (opts->include_outputs) {
-            if (test->outputs_count == 0) {
+            size_t outputs_count = da_size(test->outputs);
+            if (outputs_count == 0) {
                 printf("    No test outputs.\n");
             } else {
                 printf("    Outputs:\n");
-                for (size_t j = 0; j < test->outputs_count; j++) {
-                    raw_log_test_output_t *output = &test->outputs[j];
+                for (size_t j = 0; j < outputs_count; j++) {
+                    taf_state_test_output_t *output = da_get(test->outputs, j);
                     printf("---------\n");
                     printf("        %zu: [%s][%s]:\n%s\n", j + 1,
                            output->date_time,
@@ -121,12 +134,14 @@ int taf_logs_info() {
                     printf("---------\n");
                 }
             }
-            if (test->teardown_outputs_count == 0) {
+            size_t teardown_outputs_count = da_size(test->teardown_outputs);
+            if (teardown_outputs_count == 0) {
                 printf("    No teardown outputs.\n");
             } else {
                 printf("    Teardown Outputs:\n");
-                for (size_t j = 0; j < test->teardown_outputs_count; j++) {
-                    raw_log_test_output_t *output = &test->teardown_outputs[j];
+                for (size_t j = 0; j < teardown_outputs_count; j++) {
+                    taf_state_test_output_t *output =
+                        da_get(test->teardown_outputs, j);
                     printf("---------\n");
                     printf("        %zu: [%s][%s]:\n%s\n", j + 1,
                            output->date_time,
@@ -134,12 +149,14 @@ int taf_logs_info() {
                     printf("---------\n");
                 }
             }
-            if (test->teardown_errors_count == 0) {
+            size_t teardown_errors_count = da_size(test->teardown_errors);
+            if (teardown_errors_count == 0) {
                 printf("    No teardown errors.\n");
             } else {
                 printf("    Teardown errors:\n");
-                for (size_t j = 0; j < test->teardown_errors_count; j++) {
-                    raw_log_test_output_t *output = &test->teardown_errors[j];
+                for (size_t j = 0; j < teardown_errors_count; j++) {
+                    taf_state_test_output_t *output =
+                        da_get(test->teardown_errors, j);
                     printf("---------\n");
                     printf("        %zu: [%s][%s]:\n%s\n", j + 1,
                            output->date_time,
@@ -151,9 +168,9 @@ int taf_logs_info() {
         printf("\n");
     }
 
-    printf("Total tests passed: %zu\n", passed);
-    printf("Total tests failed: %zu\n", raw_log->tests_count - passed);
-    printf("Test run finished on %s\n", raw_log->finished);
+    printf("Total tests passed: %zu\n", taf_state->passed_amount);
+    printf("Total tests failed: %zu\n", taf_state->failed_amount);
+    printf("Test run finished on %s\n", taf_state->finished);
 
     internal_logging_deinit();
 

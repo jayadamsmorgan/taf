@@ -1,5 +1,6 @@
 #include "cmd_parser.h"
 
+#include "util/kv.h"
 #include "version.h"
 
 #include "util/string.h"
@@ -273,7 +274,7 @@ static cmd_category parse_init_options(int argc, char **argv) {
         return CMD_HELP;
     }
 
-    init_opts.project_name = argv[2];
+    init_opts.project_name = strdup(argv[2]);
     init_opts.multitarget = false;
     init_opts.internal_logging = false;
 
@@ -283,34 +284,18 @@ static cmd_category parse_init_options(int argc, char **argv) {
 }
 
 static void set_test_tags(const char *arg) {
-    // This one has memory leak but it's fine, we should only
-    // call it once
-
-    char *copy = strdup(arg);
-    size_t sz = strlen(arg) / 2;
-    sz = sz == 0 ? 1 : sz;
-    // Amount of tags in any case should not be greater
-    // than half of amount of characters, e.g. worst case: "t,s,a,g,y,u"
-    char *tags[sz];
-    for (size_t i = 0; i < sz; i++) {
-        tags[i] = NULL;
-    }
-
-    test_opts.tags_amount = string_split_by_delim(copy, tags, ",", sz);
-    test_opts.tags = malloc(sizeof(char *) * test_opts.tags_amount);
-    for (size_t i = 0; i < test_opts.tags_amount; i++) {
-        test_opts.tags[i] = strdup(tags[i]);
+    test_opts.tags = string_split_by_delim(arg, ",");
+    if (!test_opts.tags) {
+        fprintf(stderr, "Unknown error: Unable to set test tags.");
+        exit(EXIT_FAILURE);
     }
 }
 
-static int parse_vars(const char *input, cmd_var_list_t *list) {
-    list->args = NULL;
-    list->count = 0;
-
-    char *copy = strdup(input);
+static void set_test_vars(const char *arg) {
+    char *copy = strdup(arg);
     if (!copy) {
         fprintf(stderr, "parse_vars: strdup failed (out of memory)\n");
-        return -2;
+        exit(EXIT_FAILURE);
     }
 
     char *token = strtok(copy, ",");
@@ -323,68 +308,21 @@ static int parse_vars(const char *input, cmd_var_list_t *list) {
                     token);
 
             free(copy);
-            for (size_t i = 0; i < list->count; i++) {
-                free(list->args[i].name);
-                free(list->args[i].value);
-            }
-            free(list->args);
-            list->args = NULL;
-            list->count = 0;
-            return -1;
+            exit(EXIT_FAILURE);
         }
 
         *eq = '\0'; // split argname and value
 
-        cmd_var_t *new_args =
-            realloc(list->args, (list->count + 1) * sizeof(cmd_var_t));
-        if (!new_args) {
-            fprintf(stderr, "parse_vars: realloc failed (out of memory)\n");
+        kv_pair_t pair = {
+            .key = strdup(token),
+            .value = strdup(eq + 1),
+        };
+        da_append(test_opts.vars, &pair);
 
-            free(copy);
-            for (size_t i = 0; i < list->count; i++) {
-                free(list->args[i].name);
-                free(list->args[i].value);
-            }
-            free(list->args);
-            return -2;
-        }
-        list->args = new_args;
-
-        list->args[list->count].name = strdup(token);
-        list->args[list->count].value = strdup(eq + 1);
-
-        if (!list->args[list->count].name || !list->args[list->count].value) {
-            fprintf(stderr,
-                    "parse_vars: strdup failed while duplicating '%s'\n",
-                    token);
-            free(copy);
-            return -2;
-        }
-
-        list->count++;
         token = strtok(NULL, ",");
     }
 
     free(copy);
-    return 0;
-}
-
-static void set_test_vars(const char *arg) {
-    if (parse_vars(arg, &test_opts.vars)) {
-        exit(EXIT_FAILURE);
-    }
-    for (size_t i = 0; i < test_opts.vars.count; i++) {
-        for (size_t j = 0; j < test_opts.vars.count; j++) {
-            if (i == j)
-                continue;
-            if (strcmp(test_opts.vars.args[i].name,
-                       test_opts.vars.args[j].name) == 0) {
-                fprintf(stderr, "Error: Duplicate variable '%s'\n",
-                        test_opts.vars.args[i].name);
-                exit(EXIT_FAILURE);
-            }
-        }
-    }
 }
 
 static void set_test_no_logs(const char *) {
@@ -430,16 +368,14 @@ static cmd_option all_test_options[] = {
 
 static cmd_category parse_test_options(int argc, char **argv) {
 
-    test_opts.tags = NULL;
+    test_opts.tags = da_init(1, sizeof(char *));
     test_opts.target = NULL;
-    test_opts.tags_amount = 0;
     test_opts.no_logs = false;
     test_opts.log_level = TAF_LOG_LEVEL_INFO;
     test_opts.internal_logging = false;
     test_opts.custom_taf_lib_path = NULL;
     test_opts.headless = NULL;
-    test_opts.vars.args = NULL;
-    test_opts.vars.count = 0;
+    test_opts.vars = da_init(1, sizeof(kv_pair_t));
 
     if (argc <= 2) {
         return CMD_TEST;
@@ -448,7 +384,7 @@ static cmd_category parse_test_options(int argc, char **argv) {
     int index;
     if (argv[2][0] != '-') {
         // Not an option, so must be a target
-        test_opts.target = argv[2];
+        test_opts.target = strdup(argv[2]);
         index = 3;
     } else {
         index = 2;
@@ -593,4 +529,27 @@ cmd_category cmd_parser_parse(int argc, char **argv) {
     fprintf(stderr, "Unknown option %s\n", argv[1]);
     print_help(stderr);
     return CMD_UNKNOWN;
+}
+
+void cmd_parser_free_init_options() {
+    //
+    free(init_opts.project_name);
+}
+
+void cmd_parser_free_test_options() {
+    size_t tag_count = da_size(test_opts.tags);
+    for (size_t i = 0; i < tag_count; ++i) {
+        char **tag = da_get(test_opts.tags, i);
+        free(*tag);
+    }
+    da_free(test_opts.tags);
+    free(test_opts.custom_taf_lib_path);
+    free(test_opts.target);
+    size_t vars_count = da_size(test_opts.vars);
+    for (size_t i = 0; i < vars_count; ++i) {
+        kv_pair_t *pair = da_get(test_opts.vars, i);
+        free(pair->value);
+        free(pair->key);
+    }
+    da_free(test_opts.vars);
 }

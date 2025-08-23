@@ -1,15 +1,12 @@
 #ifndef TESTS_H
 #define TESTS_H
 
+#include "util/da.h"
+
 #include <unistd.h>
 
 #include <lauxlib.h>
 #include <stdbool.h>
-
-typedef struct {
-    char **tags;
-    size_t amount;
-} test_tags_t;
 
 typedef struct {
     const char *name;
@@ -27,7 +24,7 @@ typedef struct {
 typedef struct {
     const char *name; /* test name           */
     const char *desc; /* test description    */
-    test_tags_t tags; /* test tags           */
+    da_t *tags;       /* test tags           */
     int ref;          /* reference to Lua fn */
 } test_case_t;
 

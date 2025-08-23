@@ -6,8 +6,14 @@
 #include "project_parser.h"
 #include "util/files.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef __APPLE__
+#include <sys/syslimits.h>
+#else
+#include <limits.h>
+#endif // __APPLE__
 
 static int convert_project_to_multitarget(project_parsed_t *proj) {
     char *dir_path;

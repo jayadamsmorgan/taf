@@ -13,10 +13,12 @@ static size_t tests_cap = 0;
 static void test_case_free(lua_State *L, test_case_t *tc) {
     free((char *)tc->name);
     free((char *)tc->desc);
-    for (size_t i = 0; i < tc->tags.amount; i++) {
-        free(tc->tags.tags[i]);
+    size_t tags_amount = da_size(tc->tags);
+    for (size_t i = 0; i < tags_amount; i++) {
+        char **tag = da_get(tc->tags, i);
+        free(*tag);
     }
-    free(tc->tags.tags);
+    da_free(tc->tags);
     luaL_unref(L, LUA_REGISTRYINDEX, tc->ref);
 }
 
@@ -26,11 +28,15 @@ int test_case_enqueue(lua_State *L, test_case_t *tc) {
         return -1;
     }
     cmd_test_options *opts = cmd_parser_get_test_options();
-    if (opts->tags_amount > 0) {
+    size_t opts_tags_amount = da_size(opts->tags);
+    size_t test_tags_amount = da_size(tc->tags);
+    if (opts_tags_amount > 0) {
         bool has_tag = false;
-        for (size_t i = 0; i < opts->tags_amount; i++) {
-            for (size_t j = 0; j < tc->tags.amount; j++) {
-                if (strcmp(opts->tags[i], tc->tags.tags[j]) == 0) {
+        for (size_t i = 0; i < opts_tags_amount; i++) {
+            for (size_t j = 0; j < test_tags_amount; j++) {
+                char **opts_tag = da_get(opts->tags, i);
+                char **test_tag = da_get(tc->tags, j);
+                if (strcmp(*opts_tag, *test_tag) == 0) {
                     has_tag = true;
                     break;
                 }

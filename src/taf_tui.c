@@ -406,8 +406,7 @@ void taf_tui_defer_failed(char *time, const char *trace, const char *file,
     taf_tui_update();
 }
 
-void taf_tui_test_failed(char *time, raw_log_test_output_t *failure_reasons,
-                         size_t failure_reasons_count) {
+void taf_tui_test_failed(char *time, da_t *failure_reasons) {
     ui_test_history_t *hist = &ui.test_history[ui.test_history_size - 1];
     hist->state = FAILED;
     hist->elapsed = millis_since_start();
@@ -423,6 +422,7 @@ void taf_tui_test_failed(char *time, raw_log_test_output_t *failure_reasons,
     ncplane_set_fg_palindex(log_plane, 1);
     ncplane_printf(log_plane, "Test '%s' FAILED:", hist->name);
 
+    size_t failure_reasons_count = da_size(failure_reasons);
     for (size_t j = 0; j < failure_reasons_count; j++) {
         ncplane_move_rel(ui_plane, 1, 0);
         ncplane_erase(ui_plane);
@@ -430,8 +430,9 @@ void taf_tui_test_failed(char *time, raw_log_test_output_t *failure_reasons,
         ncplane_scrollup_child(notcurses_stdplane(nc), ui_plane);
         ncplane_resize_simple(log_plane, ncplane_dim_y(log_plane) + 1, absx);
 
-        char *tmp = strdup(failure_reasons[j].msg);
-        sanitize_inplace(tmp, failure_reasons[j].msg_len);
+        taf_state_test_output_t *o = da_get(failure_reasons, j);
+        char *tmp = strdup(o->msg);
+        sanitize_inplace(tmp, o->msg_len);
 
         ncplane_move_rel(ui_plane, 1, 0);
         ncplane_erase(ui_plane);
@@ -441,8 +442,7 @@ void taf_tui_test_failed(char *time, raw_log_test_output_t *failure_reasons,
         ncplane_printf_yx(log_plane, ncplane_dim_y(log_plane) - 1, 0,
                           "Failure reason %zu: [", j + 1);
         ncplane_set_fg_palindex(log_plane, 1);
-        ncplane_printf(log_plane, "%s",
-                       taf_log_level_to_str(failure_reasons[j].level));
+        ncplane_printf(log_plane, "%s", taf_log_level_to_str(o->level));
         ncplane_set_fg_default(log_plane);
         ncplane_putstr(log_plane, "]:");
         ncplane_resize_simple(log_plane, ncplane_dim_y(log_plane) + 1, absx);
@@ -541,10 +541,10 @@ static void init_project_info() {
         ui.target = strdup(opts->target);
         project_info_dimy++;
     }
-    if (opts->tags_amount != 0) {
-        ui.tags = string_join(opts->tags, opts->tags_amount);
-        project_info_dimy++;
-    }
+    // if (opts->tags_amount != 0) {
+    //     ui.tags = string_join(opts->tags, opts->tags_amount);
+    //     project_info_dimy++;
+    // }
     ui.log_level = opts->log_level;
     ui.no_logs = opts->no_logs;
 }

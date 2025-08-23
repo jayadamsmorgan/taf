@@ -1,7 +1,9 @@
 #ifndef CMD_PARSER_H
 #define CMD_PARSER_H
 
-#include "test_logs.h"
+#include "taf_log_level.h"
+
+#include "util/da.h"
 
 #include <stdbool.h>
 
@@ -30,20 +32,9 @@ typedef struct {
 } cmd_config_options;
 
 typedef struct {
-    char *name;
-    char *value;
-} cmd_var_t;
+    da_t *tags;
 
-typedef struct {
-    cmd_var_t *args;
-    size_t count;
-} cmd_var_list_t;
-
-typedef struct {
-    char **tags;
-    size_t tags_amount;
-
-    cmd_var_list_t vars;
+    da_t *vars;
 
     bool no_logs;
     taf_log_level log_level;
@@ -83,5 +74,8 @@ cmd_test_options *cmd_parser_get_test_options();
 cmd_logs_info_options *cmd_parser_get_logs_info_options();
 cmd_target_add_options *cmd_parser_get_target_add_options();
 cmd_target_remove_options *cmd_parser_get_target_remove_options();
+
+void cmd_parser_free_init_options();
+void cmd_parser_free_test_options();
 
 #endif // CMD_PARSER_H

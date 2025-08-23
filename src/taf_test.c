@@ -1,18 +1,18 @@
 #include "taf_test.h"
 
+#include "cmd_parser.h"
 #include "headless.h"
 #include "internal_logging.h"
-
-#include "cmd_parser.h"
-#include "modules/http/taf-http.h"
 #include "project_parser.h"
 #include "taf_hooks.h"
+#include "taf_secrets.h"
 #include "taf_tui.h"
 #include "taf_vars.h"
 #include "test_case.h"
 #include "test_logs.h"
 #include "version.h"
 
+#include "modules/http/taf-http.h"
 #include "modules/json/taf-json.h"
 #include "modules/proc/taf-proc.h"
 #include "modules/serial/taf-serial.h"
@@ -176,7 +176,7 @@ static int run_all_tests(lua_State *L) {
     test_case_t *tests = test_case_get_all(&amount);
     LOG("Test amount: %zu", amount);
     taf_log_tests_create(amount);
-    taf_hooks_run(L, TAF_HOOK_FN_TEST_RUN_STARTED, hooks_context_push);
+    taf_hooks_run(L, TAF_HOOK_FN_TEST_RUN_STARTED);
     reset_taf_start_millis();
 
     for (size_t i = 0; i < amount; ++i) {
@@ -185,7 +185,7 @@ static int run_all_tests(lua_State *L) {
         current_test_index = i;
 
         taf_log_test_started(i + 1, tests[i]);
-        taf_hooks_run(L, TAF_HOOK_FN_TEST_STARTED, hooks_context_push);
+        taf_hooks_run(L, TAF_HOOK_FN_TEST_STARTED);
 
         LOG("Setting up error handler...");
         lua_pushcfunction(L, taf_errhandler);
@@ -249,10 +249,10 @@ static int run_all_tests(lua_State *L) {
 
         run_deferred(L, rc == LUA_OK ? "passed" : "failed");
 
-        taf_hooks_run(L, TAF_HOOK_FN_TEST_FINISHED, hooks_context_push);
+        taf_hooks_run(L, TAF_HOOK_FN_TEST_FINISHED);
     }
 
-    taf_hooks_run(L, TAF_HOOK_FN_TEST_RUN_FINISHED, hooks_context_push);
+    taf_hooks_run(L, TAF_HOOK_FN_TEST_RUN_FINISHED);
     taf_log_tests_finalize();
 
     return passed == amount ? EXIT_SUCCESS : EXIT_FAILURE;
@@ -503,6 +503,10 @@ int taf_test() {
         goto deinit;
     }
 
+    if (taf_parse_secrets()) {
+        goto deinit;
+    }
+
     size_t amount;
     test_case_get_all(&amount);
 
@@ -527,23 +531,27 @@ int taf_test() {
 
     exitcode = run_all_tests(L);
 
+    if (!opts->headless) {
+        taf_tui_deinit();
+    }
+
 deinit:
 
     LOG("Tidying up...");
 
-    if (!opts->headless) {
-        taf_tui_deinit();
-    }
     test_case_free_all(L);
     lua_close(L);
     project_parser_free();
     internal_logging_deinit();
     taf_hooks_deinit();
+    taf_free_vars();
+    taf_free_secrets();
     free(hooks_dir_path);
     free(module_path);
     free(test_common_dir_path);
     free(test_dir_path);
     free(lib_dir_path);
+    cmd_parser_free_test_options();
 
     return exitcode;
 }

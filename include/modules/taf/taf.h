@@ -54,6 +54,9 @@ int l_module_taf_register_test(lua_State *L);
 // taf:register_vars(vars: table<string, taf_var>)
 int l_module_taf_register_vars(lua_State *L);
 
+// taf:register_secrets(secrets: [string])
+int l_moduel_taf_register_secrets(lua_State *L);
+
 // taf:sleep(ms: number)
 int l_module_taf_sleep(lua_State *L);
 

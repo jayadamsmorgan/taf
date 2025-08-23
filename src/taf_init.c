@@ -19,6 +19,7 @@
 
 static const char *gitignore_contents = //
     "logs/\n"                           //
+    ".secrets\n"                        //
     "\n"                                //
     "\n"                                //
     ".DS_Store"                         //
