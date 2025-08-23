@@ -63,46 +63,12 @@ libcurl_dep = dependency(
   static: false,
 )
 
-#--- notcurses ---------------------------------------------------------------
-notcurses_dep = dependency(
-  'notcurses-core',
+picotui_dep = dependency(
+ 'unibilium',
   method: 'pkg-config',
   required: true,
   static: true,
 )
-libdeflate_dep = dependency(
-  'libdeflate',
-  method: 'pkg-config',
-  required: true,
-  static: true,
-)
-if is_macos_arm64
-  libunistring_dep = declare_dependency(
-    link_args: ['-L/opt/homebrew/opt/libunistring/lib', '-lunistring'],
-    include_directories: include_directories(
-      '/opt/homebrew/opt/libunistring/include',
-    ),
-  )
-  libncurses_dep = declare_dependency(
-    link_args: ['-L/opt/homebrew/opt/ncurses/lib', '-lncurses'],
-    include_directories: include_directories(
-      '/opt/homebrew/opt/ncurses/include',
-    ),
-  )
-  opt_deps += [libunistring_dep, libncurses_dep]
-endif
-if is_linux
-  libunistring_dep = declare_dependency(
-    link_args: [
-      '-L/home/linuxbrew/.linuxbrew/opt/libunistring/lib',
-      '-lunistring',
-    ],
-    include_directories: include_directories(
-      '/home/linuxbrew/.linuxbrew/opt/libunistring/include',
-    ),
-  )
-  opt_deps += [libunistring_dep]
-endif
 #----------------------------------------------------------------------
 
 #--- Lua ---------------------------------------------------------------
@@ -151,6 +117,7 @@ sources = [
   'src/cmd_parser.c',
   'src/internal_logging.c',
   'src/project_parser.c',
+  'src/picotui.c',
   'src/test_case.c',
   'src/test_logs.c',
   'src/util/da.c',
@@ -198,8 +165,7 @@ taf_lib = static_library(
     libcurl_dep,
     lua_dep,
     libsp_dep,
-    libdeflate_dep,
-    notcurses_dep,
+    picotui_dep,
   ],
   install: false,
 )
@@ -214,8 +180,7 @@ taf_dep = declare_dependency(
     libcurl_dep,
     lua_dep,
     libsp_dep,
-    libdeflate_dep,
-    notcurses_dep,
+    picotui_dep,
   ],
 )
 
@@ -231,8 +196,7 @@ executable(
     libcurl_dep,
     lua_dep,
     libsp_dep,
-    libdeflate_dep,
-    notcurses_dep,
+    picotui_dep,
   ],
   install: true,
   install_mode: taf_install_mode,
