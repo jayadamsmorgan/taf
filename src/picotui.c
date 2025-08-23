@@ -42,7 +42,10 @@ struct pico_t {
     int ui_anchor_set; /* 0/1: we have a known UI cursor */
     int ui_cur_row;    /* relative to UI top, 0..ui_rows-1 */
     int ui_cur_col;    /* 0..cols-1 */
-
+    
+    const char *cap_smul; /* enter_underline_mode */
+    const char *cap_rmul; /* exit_underline_mode */
+    
     volatile sig_atomic_t resized;
 };
 
@@ -491,6 +494,8 @@ pico_t *pico_init(int ui_rows, pico_render_fn render, void *userdata) {
         ui->cap_setab = unibi_get_str(ui->ut, unibi_set_a_background);
         ui->cap_sav = unibi_get_str(ui->ut, unibi_save_cursor);
         ui->cap_res = unibi_get_str(ui->ut, unibi_restore_cursor);
+        ui->cap_smul = unibi_get_str(ui->ut, unibi_enter_underline_mode);
+        ui->cap_rmul = unibi_get_str(ui->ut, unibi_exit_underline_mode);
     }
     ui->sz = get_term_size();
 
@@ -668,6 +673,26 @@ void pico_print_block(pico_t *ui, const char *block) {
     if (ui->render) ui->render(ui, ui->render_ud);
 
     pico_println(ui,"");
+}
+
+void pico_underline_on(pico_t *ui) {
+    (void)ui;
+    /* Prefer terminfo; fallback to SGR 4 */
+    if (ui && ui->cap_smul) {
+        write_cstr(ui->cap_smul);
+    } else {
+        write_cstr("\x1b[4m");  /* underline on */
+    }
+}
+
+void pico_underline_off(pico_t *ui) {
+    (void)ui;
+    /* Prefer terminfo; fallback to SGR 24 (underline off) */
+    if (ui && ui->cap_rmul) {
+        write_cstr(ui->cap_rmul);
+    } else {
+        write_cstr("\x1b[24m"); /* underline off */
+    }
 }
 /* ------------ shutdown/free ------------------------------------------------
  */

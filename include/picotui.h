@@ -101,4 +101,8 @@ static inline int pico_set_bg(pico_t *ui, int bg16) {
 
 void pico_reset_colors(pico_t *ui); /* resets attributes (SGR 0) */
 
+/* Turn underline attribute on/off for subsequent prints */
+void pico_underline_on(pico_t *ui);
+void pico_underline_off(pico_t *ui);
+
 #endif // PICOTUI_H
