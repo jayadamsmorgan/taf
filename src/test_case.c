@@ -6,9 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static test_case_t *tests = NULL;
-static size_t tests_len = 0;
-static size_t tests_cap = 0;
+static da_t *tests = NULL;
 
 static void test_case_free(lua_State *L, test_case_t *tc) {
     free((char *)tc->name);
@@ -51,39 +49,31 @@ int test_case_enqueue(lua_State *L, test_case_t *tc) {
             return 1;
         }
     }
-    for (size_t i = 0; i < tests_len; i++) {
-        if (!strcmp(tc->name, tests[i].name)) {
+    if (!tests) {
+        tests = da_init(1, sizeof(test_case_t));
+    }
+    size_t tests_count = da_size(tests);
+    for (size_t i = 0; i < tests_count; i++) {
+        test_case_t *registered = da_get(tests, i);
+        if (!strcmp(tc->name, registered->name)) {
             LOG("Overwriting test '%s'...", tc->name);
-            test_case_free(L, &tests[i]);
-
-            tests[i] = *tc;
+            test_case_free(L, registered);
+            registered->name = tc->name;
+            registered->desc = tc->desc;
+            registered->ref = tc->ref;
+            registered->tags = tc->tags;
             free(tc);
             return 0;
         }
     }
     LOG("Adding test '%s' to the queue", tc->name);
-    if (tests_len == tests_cap) { /* grow 2× */
-        LOG("Reallocating: cap: %zu, len: %zu", tests_cap, tests_len);
-        tests_cap = tests_cap ? tests_cap * 2 : 8;
-        tests = realloc(tests, tests_cap * sizeof(test_case_t));
-        if (!tests) {
-            perror("realloc");
-            exit(EXIT_FAILURE);
-        }
-    }
-    tests[tests_len] = *tc;
-    tests_len++;
+    da_append(tests, tc);
     free(tc);
 
     return 0;
 }
 
-test_case_t *test_case_get_all(size_t *amount) {
-    if (amount) {
-        *amount = tests_len;
-    }
-    return tests;
-}
+da_t *test_case_get_all() { return tests; }
 
 void test_case_free_all(lua_State *L) {
     LOG("Freeing test cases...");
@@ -91,13 +81,12 @@ void test_case_free_all(lua_State *L) {
         LOG("Tests are null.");
         return;
     }
-    for (size_t i = 0; i < tests_len; i++) {
-        LOG("Freeing test '%s'", tests[i].name);
-        test_case_free(L, &tests[i]);
+    size_t tests_count = da_size(tests);
+    for (size_t i = 0; i < tests_count; i++) {
+        test_case_t *tc = da_get(tests, i);
+        test_case_free(L, tc);
     }
-    free(tests);
+    da_free(tests);
     tests = NULL;
-    tests_len = 0;
-    tests_cap = 0;
     LOG("Freeing tests OK.");
 }

@@ -1,6 +1,5 @@
 #include "taf_hooks.h"
 
-#include "project_parser.h"
 #include "taf_tui.h"
 
 #include "cmd_parser.h"
@@ -41,6 +40,8 @@ static hook_da_t hooks_test_run_finished = {
 
 static bool headless = false;
 
+static taf_state_t *taf_state = NULL;
+
 static inline hook_da_t *taf_get_hooks(taf_hook_fn fn) {
     switch (fn) {
     case TAF_HOOK_FN_TEST_RUN_STARTED:
@@ -68,8 +69,10 @@ static void hook_da_append(hook_da_t *hook_da, taf_hook_t hook) {
     hook_da->count++;
 }
 
-void taf_hooks_init() {
+void taf_hooks_init(taf_state_t *state) {
     LOG("Initializing TAF hooks...");
+
+    taf_state = state;
 
     cmd_test_options *opts = cmd_parser_get_test_options();
     headless = opts->headless;
@@ -105,8 +108,6 @@ static inline void push_output(lua_State *L, const taf_state_test_output_t *o) {
 static int hooks_context_push(lua_State *L) {
     lua_newtable(L);
 
-    taf_state_t *taf_state = taf_log_get_state();
-
     // context.test_run
     lua_newtable(L); // [ context, test_run ]
     push_string(L, "project_name", taf_state->project_name);
@@ -132,9 +133,9 @@ static int hooks_context_push(lua_State *L) {
     lua_setfield(L, -2, "test_run"); // context.test_run = test_run
 
     // context.test
-    int test_index = taf_log_get_test_index();
-    if (test_index != -1) {
-        taf_state_test_t *t = &taf_state->tests[test_index];
+    size_t tests_count = da_size(taf_state->tests);
+    if (tests_count != 0) {
+        taf_state_test_t *t = da_get(taf_state->tests, tests_count - 1);
 
         lua_newtable(L); // [ context, test ]
         push_string(L, "name", t->name);
@@ -142,7 +143,7 @@ static int hooks_context_push(lua_State *L) {
         if (t->finished)
             push_string(L, "finished", t->finished);
         if (t->status)
-            push_string(L, "status", t->status);
+            push_string(L, "status", t->status_str);
 
         // test.tags (array)
         lua_newtable(L); // [ context, test, tags ]
@@ -241,7 +242,7 @@ void taf_hooks_run(lua_State *L, taf_hook_fn fn) {
             } else {
                 char ts[TS_LEN];
                 get_date_time_now(ts);
-                taf_tui_hook_failed(ts, err);
+                taf_tui_hook_failed();
             }
             continue;
         }

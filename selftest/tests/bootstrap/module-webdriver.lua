@@ -16,7 +16,7 @@ taf.test({
 		taf.sleep(5000) -- wait for the webdriver to start just to make sure
 		local session = wd.session_start({
 			port = port,
-			headless = true,
+			headless = false,
 		})
 		taf.defer(function()
 			wd.session_end(session)

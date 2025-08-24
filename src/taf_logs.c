@@ -93,8 +93,9 @@ int taf_logs_info() {
         }
     }
     printf("Total tests perfomed: %zu\n\n", taf_state->total_amount);
-    for (size_t i = 0; i < taf_state->total_amount; i++) {
-        taf_state_test_t *test = &taf_state->tests[i];
+    size_t tests_amount = da_size(taf_state->tests);
+    for (size_t i = 0; i < tests_amount; i++) {
+        taf_state_test_t *test = da_get(taf_state->tests, i);
         printf("Test [%zu] '%s':\n", i + 1, test->name);
         printf("    Tags: [");
         size_t tags_count = da_size(test->tags);
@@ -108,7 +109,7 @@ int taf_logs_info() {
         printf(" ]\n");
         printf("    Started: %s\n", test->started);
         printf("    Finished: %s\n", test->finished);
-        printf("    Status: %s\n", test->status);
+        printf("    Status: %s\n", test->status_str);
         size_t failure_reasons_count = da_size(test->failure_reasons);
         if (failure_reasons_count != 0) {
             printf("    Failure reasons:\n");

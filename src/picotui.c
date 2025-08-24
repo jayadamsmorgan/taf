@@ -36,16 +36,16 @@ struct pico_t {
     const char *cap_res; /* restore_cursor */
 
     /* Stream (top) anchor uses terminal save/restore slot */
-    int stream_anchor_set;  /* 0/1 */
-    int stream_cur_col;     /* current column on the bottom line */
-    
+    int stream_anchor_set; /* 0/1 */
+    int stream_cur_col;    /* current column on the bottom line */
+
     int ui_anchor_set; /* 0/1: we have a known UI cursor */
     int ui_cur_row;    /* relative to UI top, 0..ui_rows-1 */
     int ui_cur_col;    /* 0..cols-1 */
-    
+
     const char *cap_smul; /* enter_underline_mode */
     const char *cap_rmul; /* exit_underline_mode */
-    
+
     volatile sig_atomic_t resized;
 };
 
@@ -577,17 +577,20 @@ void pico_print(pico_t *ui, const char *text) {
 
     if (text && *text) {
         write_cstr(text);
-        ui->stream_cur_col = advance_col_text(ui->stream_cur_col, text, ui->sz.cols);
+        ui->stream_cur_col =
+            advance_col_text(ui->stream_cur_col, text, ui->sz.cols);
     }
 
-    if (ui->render) ui->render(ui, ui->render_ud);
+    if (ui->render)
+        ui->render(ui, ui->render_ud);
 }
 void pico_printf(pico_t *ui, const char *fmt, ...) {
     handle_resize_if_needed(ui);
     ensure_stream_anchor(ui);
 
     char stack[1024];
-    va_list ap1; va_start(ap1, fmt);
+    va_list ap1;
+    va_start(ap1, fmt);
     int n = vsnprintf(stack, sizeof(stack), fmt, ap1);
     va_end(ap1);
 
@@ -596,16 +599,23 @@ void pico_printf(pico_t *ui, const char *fmt, ...) {
 
     if (n >= 0 && (size_t)n < sizeof(stack)) {
         write_str(stack, (size_t)n);
-        ui->stream_cur_col = advance_col_text(ui->stream_cur_col, stack, ui->sz.cols);
-        if (ui->render) ui->render(ui, ui->render_ud);
+        ui->stream_cur_col =
+            advance_col_text(ui->stream_cur_col, stack, ui->sz.cols);
+        if (ui->render)
+            ui->render(ui, ui->render_ud);
         return;
     }
 
     size_t need = (n > 0 ? (size_t)n + 1 : 4096);
     char *buf = malloc(need);
-    if (!buf) { if (ui->render) ui->render(ui, ui->render_ud); return; }
+    if (!buf) {
+        if (ui->render)
+            ui->render(ui, ui->render_ud);
+        return;
+    }
 
-    va_list ap2; va_start(ap2, fmt);
+    va_list ap2;
+    va_start(ap2, fmt);
     vsnprintf(buf, need, fmt, ap2);
     va_end(ap2);
 
@@ -613,7 +623,8 @@ void pico_printf(pico_t *ui, const char *fmt, ...) {
     ui->stream_cur_col = advance_col_text(ui->stream_cur_col, buf, ui->sz.cols);
     free(buf);
 
-    if (ui->render) ui->render(ui, ui->render_ud);
+    if (ui->render)
+        ui->render(ui, ui->render_ud);
 }
 
 void pico_println(pico_t *ui, const char *line) {
@@ -621,13 +632,15 @@ void pico_println(pico_t *ui, const char *line) {
 
     int row = stream_bottom_row(ui);
     emit_cup(ui, row, 0);
-    if (line && *line) write_cstr(line);
+    if (line && *line)
+        write_cstr(line);
     write_cstr("\r\n");
 
     /* newline scrolls; next print should re-anchor at column 0 */
     ui->stream_anchor_set = 0;
 
-    if (ui->render) ui->render(ui, ui->render_ud);
+    if (ui->render)
+        ui->render(ui, ui->render_ud);
 }
 
 void pico_printfln(pico_t *ui, const char *fmt, ...) {
@@ -636,17 +649,20 @@ void pico_printfln(pico_t *ui, const char *fmt, ...) {
     int row = stream_bottom_row(ui);
     emit_cup(ui, row, 0);
 
-    va_list ap; va_start(ap, fmt);
+    va_list ap;
+    va_start(ap, fmt);
     write_vprintf(NULL, fmt, ap);
     va_end(ap);
     write_cstr("\r\n");
 
     ui->stream_anchor_set = 0;
 
-    if (ui->render) ui->render(ui, ui->render_ud);
+    if (ui->render)
+        ui->render(ui, ui->render_ud);
 }
 void pico_print_block(pico_t *ui, const char *block) {
-    if (!block || !*block) return;
+    if (!block)
+        return;
 
     handle_resize_if_needed(ui);
     ensure_stream_anchor(ui);
@@ -666,13 +682,15 @@ void pico_print_block(pico_t *ui, const char *block) {
     } else {
         const char *last_nl = strrchr(block, '\n');
         const char *tail = last_nl ? last_nl + 1 : block;
-        ui->stream_cur_col = advance_col_text(ui->stream_cur_col, tail, ui->sz.cols);
+        ui->stream_cur_col =
+            advance_col_text(ui->stream_cur_col, tail, ui->sz.cols);
         ui->stream_anchor_set = 1;
     }
 
-    if (ui->render) ui->render(ui, ui->render_ud);
+    if (ui->render)
+        ui->render(ui, ui->render_ud);
 
-    pico_println(ui,"");
+    pico_println(ui, "");
 }
 
 void pico_underline_on(pico_t *ui) {
@@ -681,7 +699,7 @@ void pico_underline_on(pico_t *ui) {
     if (ui && ui->cap_smul) {
         write_cstr(ui->cap_smul);
     } else {
-        write_cstr("\x1b[4m");  /* underline on */
+        write_cstr("\x1b[4m"); /* underline on */
     }
 }
 
@@ -738,4 +756,3 @@ void pico_install_sigint_handler(pico_t *ui) {
     sigemptyset(&sa.sa_mask);
     sigaction(SIGINT, &sa, NULL);
 }
-

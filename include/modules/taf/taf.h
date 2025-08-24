@@ -1,6 +1,8 @@
 #ifndef MODULE_TAF_H
 #define MODULE_TAF_H
 
+#include "taf_state.h"
+
 #include <lauxlib.h>
 #include <lua.h>
 #include <lualib.h>
@@ -64,5 +66,7 @@ int l_module_taf_sleep(lua_State *L);
 
 // Register "taf-main" module
 int l_module_taf_register_module(lua_State *L);
+
+void l_module_taf_init(taf_state_t *state);
 
 #endif // MODULE_TAF_H

@@ -2,13 +2,14 @@
 
 #include "cmd_parser.h"
 #include "project_parser.h"
+#include "taf_test.h"
 #include "taf_vars.h"
-#include "test_case.h"
-#include "util/time.h"
 #include "version.h"
 
 #include "util/os.h"
+#include "util/time.h"
 
+#include <assert.h>
 #include <string.h>
 
 static inline char *jdup_string(struct json_object *o) {
@@ -152,7 +153,7 @@ static json_object *taf_state_test_to_json(const taf_state_test_t *t) {
     add_string_if(o, "started", t->started);
     add_string_if(o, "finished", t->finished);
     add_string_if(o, "teardown_start", t->teardown_start);
-    add_string_if(o, "status", t->status);
+    add_string_if(o, "status", t->status_str);
 
     /* tags */
     json_object_object_add(o, "tags", da_strings_to_json_array(t->tags));
@@ -198,72 +199,76 @@ static json_object *taf_state_vars_to_json(da_t *vars) {
     return o;
 }
 
-static void taf_state_test_from_json(json_object *jt, taf_state_test_t *t) {
-    memset(t, 0, sizeof *t);
+static void taf_state_test_from_json(json_object *jt, da_t *tests) {
 
-    JGET_STR_DUP(jt, "name", t->name);
-    JGET_STR_DUP(jt, "description", t->description);
-    JGET_STR_DUP(jt, "started", t->started);
-    JGET_STR_DUP(jt, "finished", t->finished);
-    JGET_STR_DUP(jt, "teardown_start", t->teardown_start);
-    JGET_STR_DUP(jt, "status", t->status);
+    taf_state_test_t t = {0};
+
+    JGET_STR_DUP(jt, "name", t.name);
+    JGET_STR_DUP(jt, "description", t.description);
+    JGET_STR_DUP(jt, "started", t.started);
+    JGET_STR_DUP(jt, "finished", t.finished);
+    JGET_STR_DUP(jt, "teardown_start", t.teardown_start);
+    JGET_STR_DUP(jt, "status", t.status_str);
 
     json_object *tmp;
 
     if (json_object_object_get_ex(jt, "tags", &tmp))
-        t->tags = json_array_to_da_strings(tmp);
+        t.tags = json_array_to_da_strings(tmp);
 
     if (json_object_object_get_ex(jt, "failure_reasons", &tmp))
-        t->failure_reasons = json_array_to_da_outputs(tmp);
+        t.failure_reasons = json_array_to_da_outputs(tmp);
 
     if (json_object_object_get_ex(jt, "output", &tmp))
-        t->outputs = json_array_to_da_outputs(tmp);
+        t.outputs = json_array_to_da_outputs(tmp);
 
     if (json_object_object_get_ex(jt, "teardown_output", &tmp))
-        t->teardown_outputs = json_array_to_da_outputs(tmp);
+        t.teardown_outputs = json_array_to_da_outputs(tmp);
 
     if (json_object_object_get_ex(jt, "teardown_errors", &tmp))
-        t->teardown_errors = json_array_to_da_outputs(tmp);
+        t.teardown_errors = json_array_to_da_outputs(tmp);
+
+    da_append(tests, &t);
 }
 
 /* ----- state <-> json (public API) ------------------------------------- */
 
-json_object *taf_state_to_json(taf_state_t *log) {
-    if (!log)
+json_object *taf_state_to_json(taf_state_t *state) {
+    if (!state)
         return NULL;
 
     json_object *root = json_object_new_object();
 
-    add_string_if(root, "project_name", log->project_name);
-    add_string_if(root, "taf_version", log->taf_version);
-    add_string_if(root, "os", log->os);
-    add_string_if(root, "os_version", log->os_version);
-    add_string_if(root, "started", log->started);
-    add_string_if(root, "finished", log->finished);
-    add_string_if(root, "target", log->target);
+    add_string_if(root, "project_name", state->project_name);
+    add_string_if(root, "taf_version", state->taf_version);
+    add_string_if(root, "os", state->os);
+    add_string_if(root, "os_version", state->os_version);
+    add_string_if(root, "started", state->started);
+    add_string_if(root, "finished", state->finished);
+    add_string_if(root, "target", state->target);
 
     json_object_object_add(root, "variables",
-                           taf_state_vars_to_json(log->vars));
+                           taf_state_vars_to_json(state->vars));
 
     json_object_object_add(root, "tags",
-                           log->tags ? da_strings_to_json_array(log->tags)
-                                     : json_object_new_array());
+                           state->tags ? da_strings_to_json_array(state->tags)
+                                       : json_object_new_array());
 
     json_object *tests_arr = json_object_new_array();
-    for (size_t i = 0; i < log->total_amount; ++i) {
-        json_object_array_add(tests_arr,
-                              taf_state_test_to_json(&log->tests[i]));
+    size_t tests_count = da_size(state->tests);
+    for (size_t i = 0; i < tests_count; ++i) {
+        taf_state_test_t *test = da_get(state->tests, i);
+        json_object_array_add(tests_arr, taf_state_test_to_json(test));
     }
     json_object_object_add(root, "tests", tests_arr);
 
     json_object_object_add(root, "total_amount",
-                           json_object_new_int((int)log->total_amount));
+                           json_object_new_int((int)state->total_amount));
     json_object_object_add(root, "passed_amount",
-                           json_object_new_int((int)log->passed_amount));
+                           json_object_new_int((int)state->passed_amount));
     json_object_object_add(root, "failed_amount",
-                           json_object_new_int((int)log->failed_amount));
+                           json_object_new_int((int)state->failed_amount));
     json_object_object_add(root, "finished_amount",
-                           json_object_new_int((int)log->finished_amount));
+                           json_object_new_int((int)state->finished_amount));
 
     return root;
 }
@@ -272,59 +277,296 @@ taf_state_t *taf_state_from_json(json_object *root) {
     if (!root || !json_object_is_type(root, json_type_object))
         return NULL;
 
-    taf_state_t *log = (taf_state_t *)calloc(1, sizeof *log);
-    if (!log)
+    taf_state_t *state = (taf_state_t *)calloc(1, sizeof *state);
+    if (!state)
         return NULL;
 
-    JGET_STR_DUP(root, "project_name", log->project_name);
-    JGET_STR_DUP(root, "taf_version", log->taf_version);
-    JGET_STR_DUP(root, "os", log->os);
-    JGET_STR_DUP(root, "os_version", log->os_version);
-    JGET_STR_DUP(root, "started", log->started);
-    JGET_STR_DUP(root, "finished", log->finished);
-    JGET_STR_DUP(root, "target", log->target);
+    JGET_STR_DUP(root, "project_name", state->project_name);
+    JGET_STR_DUP(root, "taf_version", state->taf_version);
+    JGET_STR_DUP(root, "os", state->os);
+    JGET_STR_DUP(root, "os_version", state->os_version);
+    JGET_STR_DUP(root, "started", state->started);
+    JGET_STR_DUP(root, "finished", state->finished);
+    JGET_STR_DUP(root, "target", state->target);
 
     json_object *tmp;
 
     if (json_object_object_get_ex(root, "variables", &tmp))
-        log->vars = json_object_to_vars(tmp);
+        state->vars = json_object_to_vars(tmp);
 
     if (json_object_object_get_ex(root, "tags", &tmp))
-        log->tags = json_array_to_da_strings(tmp);
+        state->tags = json_array_to_da_strings(tmp);
 
     if (json_object_object_get_ex(root, "tests", &tmp) &&
         json_object_is_type(tmp, json_type_array)) {
 
         size_t n = (size_t)json_object_array_length(tmp);
-        log->total_amount = n;
-        log->tests = (taf_state_test_t *)calloc(n, sizeof *log->tests);
+        state->total_amount = n;
+        state->tests = da_init(n, sizeof(taf_state_test_t));
 
         for (size_t i = 0; i < n; ++i) {
             json_object *jt = json_object_array_get_idx(tmp, (int)i);
-            taf_state_test_from_json(jt, &log->tests[i]);
+            taf_state_test_from_json(jt, state->tests);
         }
     }
 
-    JGET_INT(root, "passed_amount", log->passed_amount);
-    JGET_INT(root, "failed_amount", log->failed_amount);
-    JGET_INT(root, "finished_amount", log->finished_amount);
+    JGET_INT(root, "passed_amount", state->passed_amount);
+    JGET_INT(root, "failed_amount", state->failed_amount);
+    JGET_INT(root, "finished_amount", state->finished_amount);
 
-    return log;
+    return state;
+}
+
+void taf_state_test_started(taf_state_t *state, test_case_t *test_case) {
+    char time[TS_LEN];
+    get_date_time_now(time);
+
+    taf_state_test_t test = {0};
+    test.started = strdup(time);
+    test.name = strdup(test_case->name);
+    test.description = test_case->desc ? strdup(test_case->desc) : NULL;
+    test.status = TEST_STATUS_RUNNING;
+    size_t tags_size = da_size(test_case->tags);
+    test.tags = da_init(tags_size, sizeof(char *));
+    for (size_t i = 0; i < tags_size; ++i) {
+        char **tag = da_get(test_case->tags, i);
+        char *cpy = strdup(*tag);
+        da_append(test.tags, &cpy);
+    }
+    test.outputs = da_init(1, sizeof(taf_state_test_output_t));
+    test.failure_reasons = da_init(1, sizeof(taf_state_test_output_t));
+    test.teardown_outputs = da_init(1, sizeof(taf_state_test_output_t));
+    test.teardown_errors = da_init(1, sizeof(taf_state_test_output_t));
+
+    da_append(state->tests, &test);
+
+    size_t count = da_size(state->test_started_cbs);
+    for (size_t i = 0; i < count; ++i) {
+        test_cb *cb = da_get(state->test_started_cbs, i);
+        if (cb && *cb) {
+            (*cb)(&test);
+        }
+    }
+}
+
+static taf_state_test_t *taf_state_get_current_test(taf_state_t *state) {
+    size_t tests_count = da_size(state->tests);
+    assert(tests_count != 0);
+    taf_state_test_t *test = da_get(state->tests, tests_count - 1);
+    return test;
+}
+
+void taf_state_test_log(taf_state_t *state, taf_log_level level,
+                        const char *file, int line, const char *buffer,
+                        size_t buffer_len) {
+    char time[TS_LEN];
+    get_date_time_now(time);
+
+    taf_state_test_output_t o = {
+        .file = file ? strdup(file) : strdup("unknown"),
+        .line = line,
+        .level = level,
+        .date_time = strdup(time),
+        .msg = strndup(buffer, buffer_len),
+        .msg_len = buffer_len,
+    };
+
+    taf_state_test_t *test = taf_state_get_current_test(state);
+
+    switch (test->status) {
+    case TEST_STATUS_RUNNING:
+        da_append(test->outputs, &o);
+        if (level == TAF_LOG_LEVEL_ERROR) {
+            taf_state_test_output_t o = {
+                .file = file ? strdup(file) : strdup("unknown"),
+                .line = line,
+                .level = level,
+                .date_time = strdup(time),
+                .msg = strndup(buffer, buffer_len),
+                .msg_len = buffer_len,
+            };
+            da_append(test->failure_reasons, &o);
+        }
+        break;
+    case TEST_STATUS_TEARDOWN_AFTER_PASSED:
+    case TEST_STATUS_TEARDOWN_AFTER_FAILED:
+        da_append(test->teardown_outputs, &o);
+        break;
+    default:
+        break;
+    }
+
+    taf_mark_test_failed();
+
+    size_t count = da_size(state->test_log_cbs);
+    for (size_t i = 0; i < count; ++i) {
+        test_log_cb *cb = da_get(state->test_log_cbs, i);
+        if (cb && *cb) {
+            (*cb)(test, &o);
+        }
+    }
+}
+
+void taf_state_test_defer_queue_started(taf_state_t *state) {
+    char time[TS_LEN];
+    get_date_time_now(time);
+
+    taf_state_test_t *test = taf_state_get_current_test(state);
+
+    test->teardown_start = strdup(time);
+
+    if (test->status == TEST_STATUS_FAILED)
+        test->status = TEST_STATUS_TEARDOWN_AFTER_FAILED;
+    if (test->status == TEST_STATUS_PASSED)
+        test->status = TEST_STATUS_TEARDOWN_AFTER_PASSED;
+
+    size_t count = da_size(state->test_teardown_started_cbs);
+    for (size_t i = 0; i < count; ++i) {
+        test_cb *cb = da_get(state->test_teardown_started_cbs, i);
+        if (cb && *cb) {
+            (*cb)(test);
+        }
+    }
+}
+
+void taf_state_test_defer_failed(taf_state_t *state, const char *file, int line,
+                                 const char *msg) {
+    char time[TS_LEN];
+    get_date_time_now(time);
+
+    taf_state_test_output_t o = {
+        .file = file ? strdup(file) : strdup("unknown"),
+        .line = line,
+        .msg = strdup(msg),
+        .msg_len = strlen(msg),
+        .date_time = strdup(time),
+    };
+
+    taf_state_test_t *test = taf_state_get_current_test(state);
+
+    da_append(test->teardown_errors, &o);
+
+    size_t count = da_size(state->test_defer_failed_cbs);
+    for (size_t i = 0; i < count; ++i) {
+        test_log_cb *cb = da_get(state->test_defer_failed_cbs, i);
+        if (cb && *cb) {
+            (*cb)(test, &o);
+        }
+    }
+}
+
+void taf_state_test_defer_queue_finished(taf_state_t *state) {
+    char time[TS_LEN];
+    get_date_time_now(time);
+
+    taf_state_test_t *test = taf_state_get_current_test(state);
+
+    test->teardown_end = strdup(time);
+
+    if (test->status == TEST_STATUS_TEARDOWN_AFTER_FAILED)
+        test->status = TEST_STATUS_FAILED;
+    if (test->status == TEST_STATUS_TEARDOWN_AFTER_PASSED)
+        test->status = TEST_STATUS_PASSED;
+
+    size_t count = da_size(state->test_teardown_finished_cbs);
+    for (size_t i = 0; i < count; ++i) {
+        test_cb *cb = da_get(state->test_teardown_finished_cbs, i);
+        if (cb && *cb) {
+            (*cb)(test);
+        }
+    }
+}
+
+void taf_state_test_passed(taf_state_t *state) {
+    char time[TS_LEN];
+    get_date_time_now(time);
+
+    taf_state_test_t *test = taf_state_get_current_test(state);
+
+    test->status = TEST_STATUS_PASSED;
+    test->status_str = strdup("PASSED");
+    test->finished = strdup(time);
+
+    size_t count = da_size(state->test_finished_cbs);
+    for (size_t i = 0; i < count; ++i) {
+        test_cb *cb = da_get(state->test_finished_cbs, i);
+        if (cb && *cb) {
+            (*cb)(test);
+        }
+    }
+}
+
+void taf_state_test_failed(taf_state_t *state, const char *file, int line,
+                           const char *msg) {
+    char time[TS_LEN];
+    get_date_time_now(time);
+
+    taf_state_test_t *test = taf_state_get_current_test(state);
+
+    test->finished = strdup(time);
+    test->status = TEST_STATUS_FAILED;
+    test->status_str = strdup("FAILED");
+
+    if (msg) {
+        taf_state_test_output_t o = {
+            .file = file ? strdup(file) : strdup("unknown"),
+            .date_time = strdup(time),
+            .msg = strdup(msg),
+            .msg_len = strlen(msg),
+            .line = line,
+            .level = TAF_LOG_LEVEL_CRITICAL,
+        };
+        da_append(test->failure_reasons, &o);
+    }
+
+    size_t count = da_size(state->test_finished_cbs);
+    for (size_t i = 0; i < count; ++i) {
+        test_cb *cb = da_get(state->test_finished_cbs, i);
+        if (cb && *cb) {
+            (*cb)(test);
+        }
+    }
+}
+
+void taf_state_test_run_started(taf_state_t *state) {
+    char time[TS_LEN];
+    get_date_time_now(time);
+
+    state->started = strdup(time);
+
+    size_t count = da_size(state->test_run_started_cbs);
+    for (size_t i = 0; i < count; ++i) {
+        test_run_cb *cb = da_get(state->test_run_started_cbs, i);
+        if (cb && *cb) {
+            (*cb)();
+        }
+    }
+}
+
+void taf_state_test_run_finished(taf_state_t *state) {
+    char time[TS_LEN];
+    get_date_time_now(time);
+
+    state->finished = strdup(time);
+
+    size_t count = da_size(state->test_run_finished_cbs);
+    for (size_t i = 0; i < count; ++i) {
+        test_run_cb *cb = da_get(state->test_run_finished_cbs, i);
+        if (cb && *cb) {
+            (*cb)();
+        }
+    }
 }
 
 taf_state_t *taf_state_new() {
     cmd_test_options *opts = cmd_parser_get_test_options();
     project_parsed_t *proj = get_parsed_project();
 
-    size_t amount;
-    test_case_get_all(&amount);
-
-    char time[TS_LEN];
-    get_date_time_now(time);
+    size_t amount = da_size(test_case_get_all());
 
     taf_state_t *taf_state = calloc(1, sizeof *taf_state);
     taf_state->project_name = strdup(proj->project_name);
-    taf_state->tests = calloc(amount, sizeof(taf_state_test_t));
+    taf_state->tests = da_init(amount, sizeof(taf_state_test_t));
     taf_state->total_amount = amount;
     size_t tags_size = da_size(opts->tags);
     taf_state->tags = da_init(tags_size, sizeof(char *));
@@ -357,7 +599,16 @@ taf_state_t *taf_state_new() {
             da_append(taf_state->vars, &cpy);
         }
     }
-    taf_state->started = strdup(time);
+
+    taf_state->test_run_started_cbs = da_init(1, sizeof(test_run_cb));
+    taf_state->test_run_finished_cbs = da_init(1, sizeof(test_run_cb));
+    taf_state->test_started_cbs = da_init(1, sizeof(test_cb));
+    taf_state->test_finished_cbs = da_init(1, sizeof(test_cb));
+    taf_state->test_teardown_finished_cbs = da_init(1, sizeof(test_cb));
+    taf_state->test_teardown_started_cbs = da_init(1, sizeof(test_cb));
+    taf_state->test_defer_failed_cbs = da_init(1, sizeof(test_log_cb));
+    taf_state->test_log_cbs = da_init(1, sizeof(test_log_cb));
+
     taf_state->taf_version = strdup(TAF_VERSION);
     if (opts->target) {
         taf_state->target = strdup(opts->target);
@@ -376,6 +627,43 @@ taf_state_t *taf_state_new() {
     taf_state->os_version = get_os_string();
 
     return taf_state;
+}
+
+void taf_state_register_test_run_started_cb(taf_state_t *state,
+                                            test_run_cb cb) {
+    da_append(state->test_run_started_cbs, (void *)&cb);
+}
+
+void taf_state_register_test_run_finished_cb(taf_state_t *state,
+                                             test_run_cb cb) {
+    da_append(state->test_run_finished_cbs, (void *)&cb);
+}
+
+void taf_state_register_test_started_cb(taf_state_t *state, test_cb cb) {
+    da_append(state->test_started_cbs, (void *)&cb);
+}
+
+void taf_state_register_test_finished_cb(taf_state_t *state, test_cb cb) {
+    da_append(state->test_finished_cbs, (void *)&cb);
+}
+
+void taf_state_register_test_log_cb(taf_state_t *state, test_log_cb cb) {
+    da_append(state->test_log_cbs, (void *)&cb);
+}
+
+void taf_state_register_test_teardown_started_cb(taf_state_t *state,
+                                                 test_cb cb) {
+    da_append(state->test_teardown_started_cbs, (void *)&cb);
+}
+
+void taf_state_register_test_teardown_finished_cb(taf_state_t *state,
+                                                  test_cb cb) {
+    da_append(state->test_teardown_finished_cbs, (void *)&cb);
+}
+
+void taf_state_register_test_defer_failed_cb(taf_state_t *state,
+                                             test_log_cb cb) {
+    da_append(state->test_defer_failed_cbs, (void *)&cb);
 }
 
 static void taf_state_test_output_free(taf_state_test_output_t *o) {
@@ -442,13 +730,22 @@ static void taf_state_test_free(taf_state_test_t *t) {
     free(t->started);
     free(t->finished);
     free(t->teardown_start);
-    free(t->status);
+    free(t->status_str);
 
     da_free_strings(t->tags);
     da_free_outputs(t->failure_reasons);
     da_free_outputs(t->outputs);
     da_free_outputs(t->teardown_outputs);
     da_free_outputs(t->teardown_errors);
+}
+
+static void taf_state_tests_free(da_t *tests) {
+    size_t tests_count = da_size(tests);
+    for (size_t i = 0; i < tests_count; ++i) {
+        taf_state_test_t *test = da_get(tests, i);
+        taf_state_test_free(test);
+    }
+    da_free(tests);
 }
 
 void taf_state_free(taf_state_t *state) {
@@ -463,15 +760,19 @@ void taf_state_free(taf_state_t *state) {
     free(state->finished);
     free(state->target);
 
+    da_free(state->test_run_started_cbs);
+    da_free(state->test_run_finished_cbs);
+    da_free(state->test_started_cbs);
+    da_free(state->test_finished_cbs);
+    da_free(state->test_teardown_started_cbs);
+    da_free(state->test_teardown_finished_cbs);
+    da_free(state->test_defer_failed_cbs);
+    da_free(state->test_log_cbs);
+
     da_free_vars(state->vars);
     da_free_strings(state->tags);
 
-    if (state->tests) {
-        for (size_t i = 0; i < state->total_amount; ++i) {
-            taf_state_test_free(&state->tests[i]);
-        }
-        free(state->tests);
-    }
+    taf_state_tests_free(state->tests);
 
     free(state);
 }

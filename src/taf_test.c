@@ -1,7 +1,6 @@
 #include "taf_test.h"
 
 #include "cmd_parser.h"
-#include "headless.h"
 #include "internal_logging.h"
 #include "project_parser.h"
 #include "taf_hooks.h"
@@ -47,13 +46,6 @@ static size_t current_test_index = 0;
 
 void taf_mark_test_failed() { test_marked_failed = true; }
 
-test_case_t *taf_test_get_current_test() {
-    size_t count;
-    test_case_t *tests = test_case_get_all(&count);
-    assert(current_test_index < count);
-    return &tests[current_test_index];
-}
-
 static void line_hook(lua_State *L, lua_Debug *ar) {
     if (lua_getinfo(L, "Sl", ar) && ar->currentline > 0) {
 
@@ -92,7 +84,7 @@ static int taf_errhandler(lua_State *L) {
     return 1;                     // 1 return value for pcall
 }
 
-static void run_deferred(lua_State *L, const char *status) {
+static void run_deferred(lua_State *L, taf_state_t *state, const char *status) {
     LOG("Running deferred test queue...");
 
     lua_getfield(L, LUA_REGISTRYINDEX, DEFER_LIST_KEY);
@@ -105,7 +97,7 @@ static void run_deferred(lua_State *L, const char *status) {
     int list = lua_gettop(L);
     lua_Integer n = luaL_len(L, list);
 
-    taf_log_defer_queue_started();
+    taf_state_test_defer_queue_started(state);
 
     for (lua_Integer i = n; i >= 1; --i) { // LIFO
 
@@ -152,12 +144,12 @@ static void run_deferred(lua_State *L, const char *status) {
             }
             lua_pop(L, 1); /* pop traceback */
 
-            taf_log_defer_failed(trace, file, line);
+            taf_state_test_defer_failed(state, file, line, trace);
         }
         lua_pop(L, 1);
     }
 
-    taf_log_defer_queue_finished();
+    taf_state_test_defer_queue_finished(state);
 
     LOG("Clearing defer list...");
     lua_pushnil(L);
@@ -167,24 +159,30 @@ static void run_deferred(lua_State *L, const char *status) {
     LOG("Finished running defer queue.");
 }
 
-static int run_all_tests(lua_State *L) {
+static int run_all_tests(lua_State *L, taf_state_t *state) {
     LOG("Running tests...");
 
     size_t passed = 0;
 
-    size_t amount;
-    test_case_t *tests = test_case_get_all(&amount);
+    da_t *tests = test_case_get_all();
+    size_t amount = da_size(tests);
     LOG("Test amount: %zu", amount);
-    taf_log_tests_create(amount);
+
+    taf_state_test_run_started(state);
+
     taf_hooks_run(L, TAF_HOOK_FN_TEST_RUN_STARTED);
+
     reset_taf_start_millis();
 
     for (size_t i = 0; i < amount; ++i) {
 
+        test_case_t *tc = da_get(tests, i);
+
         test_marked_failed = false;
         current_test_index = i;
 
-        taf_log_test_started(i + 1, tests[i]);
+        taf_state_test_started(state, tc);
+
         taf_hooks_run(L, TAF_HOOK_FN_TEST_STARTED);
 
         LOG("Setting up error handler...");
@@ -192,8 +190,8 @@ static int run_all_tests(lua_State *L) {
         int erridx = lua_gettop(L);
         LOG("Error handler index: %d", erridx);
 
-        LOG("Pushing test body with index %d...", tests[i].ref);
-        lua_rawgeti(L, LUA_REGISTRYINDEX, tests[i].ref);
+        LOG("Pushing test body with index %d...", tc->ref);
+        lua_rawgeti(L, LUA_REGISTRYINDEX, tc->ref);
         lua_pushvalue(L, -1);
         lua_Debug ar;
         if (lua_getinfo(L, ">S", &ar)) {
@@ -204,9 +202,9 @@ static int run_all_tests(lua_State *L) {
         LOG("Resetting taf.millis...");
         reset_millis();
 
-        LOG("Executing test '%s'...", tests[i].name);
+        LOG("Executing test '%s'...", tc->name);
         int rc = lua_pcall(L, 0, 0, erridx);
-        LOG("Finished executing test '%s', status: %d", tests[i].name, rc);
+        LOG("Finished executing test '%s', status: %d", tc->name, rc);
 
         char *file = NULL;
         int line = 0;
@@ -214,7 +212,7 @@ static int run_all_tests(lua_State *L) {
 
         if (rc != LUA_OK) {
             trace = strdup(lua_tostring(L, -1)); /* traceback string */
-            LOG("Test '%s' traceback: %s", tests[i].name, trace);
+            LOG("Test '%s' traceback: %s", tc->name, trace);
 
             if (trace) {
                 const char *colon1 = strchr(trace, ':');
@@ -234,26 +232,25 @@ static int run_all_tests(lua_State *L) {
 
         if (rc == LUA_OK) {
             if (test_marked_failed) {
-                taf_log_test_failed(i + 1, tests[i], NULL, NULL, 0);
+                taf_state_test_failed(state, NULL, 0, NULL);
             } else {
-                taf_log_test_passed(i + 1, tests[i]);
+                taf_state_test_passed(state);
                 passed++;
             }
         } else {
-            taf_log_test_failed(i + 1, tests[i],
-                                trace ? trace : "unknown error",
-                                file ? file : "(?)", line);
+            taf_state_test_failed(state, file ? file : "unknown", line,
+                                  trace ? trace : "unknown");
             free(file);
             free(trace);
         }
 
-        run_deferred(L, rc == LUA_OK ? "passed" : "failed");
+        run_deferred(L, state, rc == LUA_OK ? "passed" : "failed");
 
         taf_hooks_run(L, TAF_HOOK_FN_TEST_FINISHED);
     }
 
     taf_hooks_run(L, TAF_HOOK_FN_TEST_RUN_FINISHED);
-    taf_log_tests_finalize();
+    taf_state_test_run_finished(state);
 
     return passed == amount ? EXIT_SUCCESS : EXIT_FAILURE;
 }
@@ -476,9 +473,10 @@ int taf_test() {
     }
 
     register_test_api(L);
-    taf_hooks_init();
 
     int exitcode = EXIT_FAILURE;
+
+    taf_state_t *state = NULL;
 
     LOG("Project lib directory path: %s", lib_dir_path);
     if (load_lua_dir(lib_dir_path, L) == -2) {
@@ -507,8 +505,7 @@ int taf_test() {
         goto deinit;
     }
 
-    size_t amount;
-    test_case_get_all(&amount);
+    size_t amount = da_size(test_case_get_all());
 
     if (amount == 0) {
         LOG("No tests found.");
@@ -516,12 +513,22 @@ int taf_test() {
         goto deinit;
     }
 
-    if (!opts->headless && taf_tui_init()) {
+    state = taf_state_new();
+    l_module_taf_init(state);
+    taf_log_init(state);
+    taf_hooks_init(state);
+
+    if (!opts->headless && taf_tui_init(state)) {
         goto deinit;
     }
 
+    // TODO
+    // if (opts->headless) {
+    //     taf_headless_init();
+    // }
     if (opts->headless) {
-        taf_headless_init();
+        fprintf(stderr, "Headless is in rework.\n");
+        goto deinit;
     }
 
     if (!opts->headless) {
@@ -529,7 +536,7 @@ int taf_test() {
         lua_sethook(L, line_hook, LUA_MASKLINE, 0);
     }
 
-    exitcode = run_all_tests(L);
+    exitcode = run_all_tests(L, state);
 
     if (!opts->headless) {
         taf_tui_deinit();
@@ -546,6 +553,7 @@ deinit:
     taf_hooks_deinit();
     taf_free_vars();
     taf_free_secrets();
+    taf_state_free(state);
     free(hooks_dir_path);
     free(module_path);
     free(test_common_dir_path);

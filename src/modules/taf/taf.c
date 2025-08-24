@@ -3,17 +3,18 @@
 #include "cmd_parser.h"
 #include "internal_logging.h"
 #include "taf_secrets.h"
-#include "taf_test.h"
 #include "taf_vars.h"
 #include "test_case.h"
-#include "test_logs.h"
 
 #include "util/kv.h"
 #include "util/lua.h"
 #include "util/time.h"
 
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+
+static taf_state_t *taf_state = NULL;
 
 int l_module_taf_sleep(lua_State *L) {
     LOG("Invoked taf-main sleep...");
@@ -154,7 +155,9 @@ int l_module_taf_get_active_test_tags(lua_State *L) {
     LOG("Getting active test tags...");
 
     cmd_test_options *opts = cmd_parser_get_test_options();
-    test_case_t *test = taf_test_get_current_test();
+    size_t tests_count = da_size(taf_state->tests);
+    assert(tests_count != 0);
+    taf_state_test_t *test = da_get(taf_state->tests, tests_count - 1);
 
     lua_newtable(L);
     size_t index = 1;
@@ -421,7 +424,9 @@ static inline void log_helper(taf_log_level level, int n, int s, lua_State *L) {
     }
     LOG("File: %s, line: %d", file, line);
 
-    taf_log_test(level, file, line, copy, mlen);
+    if (taf_state) {
+        taf_state_test_log(taf_state, level, file, line, copy, mlen);
+    }
 
     if (level == TAF_LOG_LEVEL_CRITICAL) {
         LOG("Log level is critical, raising error...");
@@ -533,4 +538,9 @@ int l_module_taf_register_module(lua_State *L) {
 
     LOG("Successfully registered taf-main module.");
     return 1;
+}
+
+void l_module_taf_init(taf_state_t *state) {
+    //
+    taf_state = state;
 }

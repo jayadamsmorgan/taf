@@ -9,19 +9,6 @@
 #include <stdbool.h>
 
 typedef struct {
-    const char *name;
-    const char *default_value;
-    const char **values;
-    size_t values_amount;
-    bool any_value;
-} test_var_t;
-
-typedef struct {
-    test_var_t *var;
-    size_t var_amount;
-} test_vars_t;
-
-typedef struct {
     const char *name; /* test name           */
     const char *desc; /* test description    */
     da_t *tags;       /* test tags           */
@@ -30,7 +17,7 @@ typedef struct {
 
 int test_case_enqueue(lua_State *L, test_case_t *tc);
 
-test_case_t *test_case_get_all(size_t *amount);
+da_t *test_case_get_all();
 
 void test_case_free_all(lua_State *L);
 
