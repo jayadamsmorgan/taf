@@ -386,6 +386,7 @@ void taf_state_test_log(taf_state_t *state, taf_log_level level,
                 .msg_len = buffer_len,
             };
             da_append(test->failure_reasons, &o);
+            taf_mark_test_failed();
         }
         break;
     case TEST_STATUS_TEARDOWN_AFTER_PASSED:
@@ -395,8 +396,6 @@ void taf_state_test_log(taf_state_t *state, taf_log_level level,
     default:
         break;
     }
-
-    taf_mark_test_failed();
 
     size_t count = da_size(state->test_log_cbs);
     for (size_t i = 0; i < count; ++i) {
