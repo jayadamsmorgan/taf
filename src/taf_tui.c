@@ -222,16 +222,16 @@ static void taf_tui_test_progress_render(pico_t *ui)
 
 
 }
-static void taf_tui_summary_render(pico_t *ui){
+static void taf_tui_summary_render(pico_t *ui, size_t size){
 
     /* Line 12: Test Case Summary */
-    pico_ui_clear_line(ui, 12);
-    pico_ui_puts_yx(ui, 12, 0, "└─ Summary:");
+    pico_ui_clear_line(ui, size);
+    pico_ui_puts_yx(ui, size, 0, "└─ Summary:");
 
     /* Line 13: Test Case Status */
-    pico_ui_clear_line(ui, 13);
+    pico_ui_clear_line(ui, size+1);
     pico_ui_printf_yx(
-        ui, 13, 0,
+        ui, size+1, 0,
         "   ├─ Test Case Status: Total: %zu | Passsed: %zu | Failed: %zu",
         taf_state->total_amount, taf_state->passed_amount,
         taf_state->failed_amount);
@@ -243,8 +243,8 @@ static void taf_tui_summary_render(pico_t *ui){
     const unsigned long seconds = (ms / 1000) % 60;
     const unsigned long millis = ms % 1000;
 
-    pico_ui_clear_line(ui, 14);
-    pico_ui_printf_yx(ui, 14, 0, "   └─ Elapsed Time: %lum %lu.%03lus ",
+    pico_ui_clear_line(ui, size+2);
+    pico_ui_printf_yx(ui, size+2, 0, "   └─ Elapsed Time: %lum %lu.%03lus ",
                       minutes, seconds, millis);
 }
 static void taf_tui_test_run_result(pico_t *ui, size_t tests_count){
@@ -276,7 +276,7 @@ static void render_ui(pico_t *ui, void *ud)
 
     taf_tui_test_progress_render(ui);
     
-    taf_tui_summary_render(ui);
+    taf_tui_summary_render(ui, 12);
 
 }
 
@@ -285,7 +285,7 @@ static void render_progress(pico_t *ui, void *ud) {
     
     taf_tui_test_progress_render(ui);
     
-    taf_tui_summary_render(ui);
+    taf_tui_summary_render(ui,12);
 }
 
 static void render_result(pico_t *ui, void *ud){
@@ -295,9 +295,11 @@ static void render_result(pico_t *ui, void *ud){
     size_t tests_count = da_size(taf_state->tests); 
     pico_set_ui_rows(ui, tests_count+12);
     
+    taf_tui_test_progress_render(ui);
+    
     taf_tui_test_run_result(ui, tests_count);
 
-    taf_tui_summary_render(ui);
+    taf_tui_summary_render(ui, tests_count+9);
 }
 
 void taf_tui_test_started(taf_state_test_t *test) {
