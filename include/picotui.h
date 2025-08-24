@@ -43,6 +43,10 @@ void pico_print_block(pico_t *ui, const char *block);
 /* Force UI redraw (calls render callback). */
 void pico_redraw_ui(pico_t *ui);
 
+/* Remove and Restore cursor in UI. */
+void pico_remove_cursor();
+void pico_restore_cursor();
+
 /* Shutdown and free. */
 void pico_shutdown(pico_t *ui);
 void pico_free(pico_t *ui);

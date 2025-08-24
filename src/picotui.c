@@ -712,6 +712,16 @@ void pico_underline_off(pico_t *ui) {
         write_cstr("\x1b[24m"); /* underline off */
     }
 }
+
+void pico_remove_cursor()
+{
+    write_cstr("\033[?25l"); // Turn off cursor
+}
+
+void pico_restore_cursor()
+{
+    printf("\033[?25h"); // Turn on cursor
+}
 /* ------------ shutdown/free ------------------------------------------------
  */
 
