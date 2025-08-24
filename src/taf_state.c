@@ -486,6 +486,8 @@ void taf_state_test_passed(taf_state_t *state) {
     test->status = TEST_STATUS_PASSED;
     test->status_str = strdup("PASSED");
     test->finished = strdup(time);
+    state->passed_amount++;
+    state->finished_amount++;
 
     size_t count = da_size(state->test_finished_cbs);
     for (size_t i = 0; i < count; ++i) {
@@ -506,6 +508,8 @@ void taf_state_test_failed(taf_state_t *state, const char *file, int line,
     test->finished = strdup(time);
     test->status = TEST_STATUS_FAILED;
     test->status_str = strdup("FAILED");
+    state->finished_amount++;
+    state->failed_amount++;
 
     if (msg) {
         taf_state_test_output_t o = {
