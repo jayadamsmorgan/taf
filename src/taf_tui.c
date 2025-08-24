@@ -7,7 +7,7 @@
 #include "internal_logging.h"
 #include "util/string.h"
 #include "util/time.h"
-
+#include "util/da.h"
 #include <picotui.h>
 
 #include <locale.h>
@@ -28,8 +28,6 @@ typedef struct {
 
     taf_log_level log_level;
 
-    int current_test_index;
-
     bool is_teardown;
     bool is_hooking;
 
@@ -38,7 +36,6 @@ typedef struct {
     int current_line;
     char *current_line_str;
 
-    uint64_t total_elapsed_ms;
 } ui_state_t;
 
 static ui_state_t ui_state = {0};
@@ -56,15 +53,6 @@ void taf_tui_set_test_progress(double progress) {
     ui_state.current_test_progress = progress;
 }
 
-void taf_tui_set_current_line(const char *file, int line,
-                              const char *line_str) {
-    free(ui_state.current_file);
-    free(ui_state.current_line_str);
-    ui_state.current_file = strdup(file);
-    ui_state.current_line = line;
-    ui_state.current_line_str = string_strip(line_str);
-    taf_tui_update();
-}
 
 static size_t sanitize_inplace(char *buf, size_t len) {
     size_t r = 0; /* read cursor */
@@ -127,32 +115,13 @@ void taf_tui_log(taf_state_test_t *test, taf_state_test_output_t *output) {
     free(tmp);
 }
 
-void taf_tui_test_started(taf_state_test_t *test) {
-    ui_state.current_test_index++;
-    taf_tui_update();
-}
-
-void taf_tui_defer_queue_started(taf_state_test_t *test) {}
-
-void taf_tui_defer_queue_finished(taf_state_test_t *test) {}
-
-void taf_tui_defer_failed(taf_state_test_t *test,
-                          taf_state_test_output_t *output) {}
-
-void taf_tui_test_finished(taf_state_test_t *test) { taf_tui_update(); }
-
-void taf_tui_hooks_started() {}
-
-void taf_tui_hooks_finished() {}
-
-void taf_tui_hook_failed() {}
 
 /*------------------- TAF UI functions -------------------*/
-static void render_ui(pico_t *ui, void *ud) {
-    (void)ud;
+static void taf_tui_project_header_render(pico_t *ui)
+{
 
     pico_reset_colors(ui); // better to do it
-
+    
     /* Line 0: Main title */
     pico_set_colors(ui, PICO_COLOR_BRIGHT_CYAN, -1);
     pico_ui_clear_line(ui, 0);
@@ -204,14 +173,16 @@ static void render_ui(pico_t *ui, void *ud) {
     pico_ui_printf_yx(ui, 7, 17, "%s",
                       taf_log_level_to_str(ui_state.log_level));
 
+}
+
+static void taf_tui_test_progress_render(pico_t *ui)
+{
+
     pico_set_colors(ui, PICO_COLOR_BRIGHT_CYAN, -1);
 
     /* Line 8: Test Progress */
     pico_ui_clear_line(ui, 8);
     pico_ui_puts_yx(ui, 8, 0, "├─ Test Progress:");
-
-    if (ui_state.current_test_index == -1)
-        return;
 
     size_t tests_count = da_size(taf_state->tests);
     if (tests_count == 0)
@@ -225,17 +196,17 @@ static void render_ui(pico_t *ui, void *ud) {
     LOG("WOW %s %s", test->name, test->started);
     pico_ui_printf_yx(ui, 9, 0, "│  ├─ Name: %s", test->name);
 
-    // pico_ui_printf_yx(ui, 9, strlen(test->name) + 13, "[ %lums ]",
-    //                   test->status == RUNNING ? millis_since_start()
-    //                                          : hist->elapsed);
 
     /* Line 10: Test Progress */
     pico_ui_clear_line(ui, 10);
     pico_ui_printf_yx(ui, 10, 0, "│  ├─ Progress: %d%%",
                       (unsigned int)(ui_state.current_test_progress * 100));
 
+    pico_ui_printf_yx(ui, 10, strlen(test->name) + 13, "[ %lums ]",
+                       millis_since_start());
+    
     /* Line 11: Current Line in Test */
-    if (!test->status) {
+    if (test->status==TEST_STATUS_RUNNING) {
         char *file_str = ui_state.current_file;
         if (file_str) {
             size_t len = strlen(ui_state.current_file);
@@ -248,6 +219,10 @@ static void render_ui(pico_t *ui, void *ud) {
                               ui_state.current_line, ui_state.current_line_str);
         }
     }
+
+
+}
+static void taf_tui_summary_render(pico_t *ui){
 
     /* Line 12: Test Case Summary */
     pico_ui_clear_line(ui, 12);
@@ -263,12 +238,7 @@ static void render_ui(pico_t *ui, void *ud) {
 
     /* Line 14: Test Elapsed Time */
     uint64_t ms;
-    if (taf_state->finished_amount == taf_state->total_amount) {
-        // Probably finished executing
-        ms = ui_state.total_elapsed_ms;
-    } else {
         ms = millis_since_taf_start();
-    }
     const unsigned long minutes = ms / 60000;
     const unsigned long seconds = (ms / 1000) % 60;
     const unsigned long millis = ms % 1000;
@@ -277,6 +247,86 @@ static void render_ui(pico_t *ui, void *ud) {
     pico_ui_printf_yx(ui, 14, 0, "   └─ Elapsed Time: %lum %lu.%03lus ",
                       minutes, seconds, millis);
 }
+static void taf_tui_test_run_result(pico_t *ui, size_t tests_count){
+
+    pico_set_colors(ui, PICO_COLOR_BRIGHT_CYAN, -1);
+
+    /* Line 8: Test Progress */
+    pico_ui_clear_line(ui, 8);
+    pico_ui_puts_yx(ui, 8, 0, "├─ Test Results:");
+
+
+    
+    /* Line 9: Test Name and millis from the start*/
+    for (int i = 0;i < tests_count; ++i)
+    {
+        taf_state_test_t *test = da_get(taf_state->tests, i);
+        pico_ui_clear_line(ui, 9 + i);
+        pico_ui_printf_yx(ui, 9 + i, 0, "│  ├─ Name: %s    Result: %s    Started: %s    Finished: %s", test->name, test->status_str, test->started, test->finished);
+    }
+}
+
+static void render_ui(pico_t *ui, void *ud)
+{
+    (void)ud;
+
+    pico_remove_cursor();
+    
+    taf_tui_project_header_render(ui);
+
+    taf_tui_test_progress_render(ui);
+    
+    taf_tui_summary_render(ui);
+
+}
+
+static void render_progress(pico_t *ui, void *ud) {
+    (void)ud;
+    
+    taf_tui_test_progress_render(ui);
+    
+    taf_tui_summary_render(ui);
+}
+
+static void render_result(pico_t *ui, void *ud){
+    (void)ud;
+
+    // Numder of tests 
+    size_t tests_count = da_size(taf_state->tests); 
+    pico_set_ui_rows(ui, tests_count+12);
+    
+    taf_tui_test_run_result(ui, tests_count);
+
+    taf_tui_summary_render(ui);
+}
+
+void taf_tui_test_started(taf_state_test_t *test) {
+    
+    render_ui(ui, NULL);
+    //taf_tui_update();
+}
+
+void taf_tui_defer_queue_started(taf_state_test_t *test) {}
+
+void taf_tui_defer_queue_finished(taf_state_test_t *test) {}
+
+void taf_tui_defer_failed(taf_state_test_t *test,
+                          taf_state_test_output_t *output) {}
+
+void taf_tui_test_finished(taf_state_test_t *test) { 
+    
+    //taf_tui_update(); 
+}
+void taf_tui_tests_set_finished(taf_state_test_t *test)
+{
+    render_result(ui,NULL);
+}
+
+void taf_tui_hooks_started() {}
+
+void taf_tui_hooks_finished() {}
+
+void taf_tui_hook_failed() {}
 
 int taf_tui_init(taf_state_t *state) {
 
@@ -284,7 +334,7 @@ int taf_tui_init(taf_state_t *state) {
 
     taf_state = state;
 
-    // taf_state_register_test_run_started_cb(...)
+    //taf_state_register_test_run_started_cb();
     taf_state_register_test_started_cb(state, taf_tui_test_started);
     taf_state_register_test_finished_cb(state, taf_tui_test_finished);
     taf_state_register_test_log_cb(state, taf_tui_log);
@@ -293,13 +343,12 @@ int taf_tui_init(taf_state_t *state) {
     taf_state_register_test_teardown_finished_cb(state,
                                                  taf_tui_defer_queue_finished);
     taf_state_register_test_defer_failed_cb(state, taf_tui_defer_failed);
-    // taf_state_register_test_run_finished_cb(...)
+    taf_state_register_test_run_finished_cb(state, taf_tui_tests_set_finished);
 
     // Get project information
     cmd_test_options *opts = cmd_parser_get_test_options();
     ui_state.log_level = opts->log_level;
 
-    ui_state.current_test_index = -1;
 
     // To  write Unicode
     setlocale(LC_ALL, "");
@@ -308,7 +357,6 @@ int taf_tui_init(taf_state_t *state) {
     ui = pico_init(15, render_ui, NULL);
     if (!ui)
         return 1;
-
     pico_attach(ui);
     pico_install_sigint_handler(ui);
     return 0;
@@ -317,13 +365,13 @@ int taf_tui_init(taf_state_t *state) {
 void taf_tui_deinit() {
 
     LOG("Start TUI deinit");
-
-    // Update UI last time
-    taf_tui_update();
-
+    
     // Turn off UI and free resources
     pico_shutdown(ui);
-
+    
+    // Restore cursor 
+    pico_restore_cursor();
+    
     // Shift to new string
     puts("\n");
 
@@ -342,3 +390,14 @@ void taf_tui_update() {
     // UI panel update
     pico_redraw_ui(ui);
 }
+void taf_tui_set_current_line(const char *file, int line,
+                              const char *line_str) {
+    free(ui_state.current_file);
+    free(ui_state.current_line_str);
+    ui_state.current_file = strdup(file);
+    ui_state.current_line = line;
+    ui_state.current_line_str = string_strip(line_str);
+    render_progress(ui, NULL);
+    //taf_tui_update();
+}
+

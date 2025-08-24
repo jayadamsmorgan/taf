@@ -71,8 +71,6 @@ static void line_hook(lua_State *L, lua_Debug *ar) {
             progress = div == 0 ? 0 : (double)(ar->currentline - g_first) / div;
             taf_tui_set_test_progress(progress);
         }
-
-        taf_tui_update();
     }
 }
 
