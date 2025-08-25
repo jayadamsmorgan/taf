@@ -160,11 +160,13 @@ static void taf_tui_project_header_render(pico_t *ui)
     pico_ui_clear_line(ui, 6);
     pico_ui_printf_yx(ui, 6, 0, "│  ├─ Vars: [ ");
     size_t vars_count = da_size(taf_state->vars);
+    offset = 14;
     for (size_t i = 0; i < vars_count; ++i) {
         taf_var_entry_t *e = da_get(taf_state->vars, i);
-        pico_ui_printf(ui, "'%s=%s' ", e->name, e->final_value);
+        pico_ui_printf_yx(ui, 6, offset, "'%s=%s' ", e->name, e->final_value);
+        offset += strlen(e->name) + strlen(e->final_value) + 3;
     }
-    pico_ui_printf(ui, "]");
+    pico_ui_printf_yx(ui,6, offset, "]");
 
     /* Line 7: Project Log Level */
     pico_ui_clear_line(ui, 7);
