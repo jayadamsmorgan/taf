@@ -293,12 +293,16 @@ static void render_progress(pico_t *ui, void *ud) {
 static void render_result(pico_t *ui, void *ud){
     (void)ud;
 
-    // Numder of tests 
+    // Remove strings before resize
     size_t tests_count = da_size(taf_state->tests); 
+        for(int i =0;i< tests_count+12;++i){
+        pico_ui_clear_line(ui, i); 
+    }
+    // Resize strings
     pico_set_ui_rows(ui, tests_count+12);
     
-    taf_tui_test_progress_render(ui);
-    
+    taf_tui_project_header_render(ui);
+
     taf_tui_test_run_result(ui, tests_count);
 
     taf_tui_summary_render(ui, tests_count+9);
