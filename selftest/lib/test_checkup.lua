@@ -4,8 +4,8 @@ local taf = require("taf")
 local util = require("util")
 
 --- @alias status_t
---- | '"passed"'
---- | '"failed"'
+--- | '"PASSED"'
+--- | '"FAILED"'
 
 --- @alias log_level_t
 --- | '"CRITICAL"'

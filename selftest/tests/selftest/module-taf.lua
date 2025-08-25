@@ -7,7 +7,7 @@ taf.test({
 	name = "Test module-taf (common)",
 	tags = { "module-taf", "common" },
 	body = function()
-		local log_obj = util.load_log({ "test", "bootstrap", "-t", "common", "-e" })
+		local log_obj = util.load_log({ "test", "bootstrap", "-t", "common" })
 
 		assert(log_obj.tags ~= nil)
 		assert(#log_obj.tags == 1)
@@ -18,7 +18,7 @@ taf.test({
 
 		local test = log_obj.tests[1]
 
-		check.check_test(test, "Test common TAF test", "passed")
+		check.check_test(test, "Test common TAF test", "PASSED")
 		util.test_tags(test, { "common" })
 		util.error_if(#test.output ~= 1, test, "Outputs not match")
 		if #test.output == 1 then
@@ -31,7 +31,7 @@ taf.test({
 	name = "Test module-taf (logging)",
 	tags = { "module-taf", "logging" },
 	body = function()
-		local log_obj = util.load_log({ "test", "bootstrap", "-t", "logging", "-e" })
+		local log_obj = util.load_log({ "test", "bootstrap", "-t", "logging" })
 
 		assert(log_obj.tags ~= nil)
 		assert(#log_obj.tags == 1)
@@ -51,12 +51,12 @@ taf.test({
 			util.test_tags(log_test, { "module-taf", "logging" })
 			util.error_if(#log_test.output ~= amount, log_test, "Outputs not match")
 			local str_to_find = ("Testing logging with %s log level."):format(log_level)
-			if status == "failed" then
+			if status == "FAILED" then
 				util.error_if(#log_test.failure_reasons ~= amount, log_test, "Outputs not match")
 			end
 			for i = 1, amount do
 				check.check_output(log_test, log_test.output[i], str_to_find, log_level)
-				if status == "failed" then
+				if status == "FAILED" then
 					local contains = log_level == "CRITICAL"
 					-- When log level is CRITICAL failure reason will have a traceback as a message,
 					-- hence we are trying to find message inside traceback with `contains`
@@ -74,19 +74,19 @@ taf.test({
 			end
 		end
 
-		test_logging_tests(log_obj.tests[1], "TRACE", 5, "passed")
-		test_logging_tests(log_obj.tests[2], "DEBUG", 5, "passed")
-		test_logging_tests(log_obj.tests[3], "INFO", 5, "passed")
-		test_logging_tests(log_obj.tests[4], "WARNING", 5, "passed")
-		test_logging_tests(log_obj.tests[5], "ERROR", 5, "failed")
-		test_logging_tests(log_obj.tests[6], "CRITICAL", 1, "failed", " ('CRITICAL')")
-		test_logging_tests(log_obj.tests[7], "CRITICAL", 1, "failed", " ('critical')")
-		test_logging_tests(log_obj.tests[8], "CRITICAL", 1, "failed", " ('C')")
-		test_logging_tests(log_obj.tests[9], "CRITICAL", 1, "failed", " ('c')")
-		test_logging_tests(log_obj.tests[10], "CRITICAL", 1, "failed", " ('taf.log_critical')")
+		test_logging_tests(log_obj.tests[1], "TRACE", 5, "PASSED")
+		test_logging_tests(log_obj.tests[2], "DEBUG", 5, "PASSED")
+		test_logging_tests(log_obj.tests[3], "INFO", 5, "PASSED")
+		test_logging_tests(log_obj.tests[4], "WARNING", 5, "PASSED")
+		test_logging_tests(log_obj.tests[5], "ERROR", 5, "FAILED")
+		test_logging_tests(log_obj.tests[6], "CRITICAL", 1, "FAILED", " ('CRITICAL')")
+		test_logging_tests(log_obj.tests[7], "CRITICAL", 1, "FAILED", " ('critical')")
+		test_logging_tests(log_obj.tests[8], "CRITICAL", 1, "FAILED", " ('C')")
+		test_logging_tests(log_obj.tests[9], "CRITICAL", 1, "FAILED", " ('c')")
+		test_logging_tests(log_obj.tests[10], "CRITICAL", 1, "FAILED", " ('taf.log_critical')")
 
 		local test = log_obj.tests[11]
-		check.check_test(test, "Test logging with incorrect log level", "failed")
+		check.check_test(test, "Test logging with incorrect log level", "FAILED")
 		util.test_tags(test, { "module-taf", "logging" })
 		util.error_if(#test.output ~= 0, test, "Outputs not match")
 		util.error_if(#test.failure_reasons ~= 1, test, "Outputs not match")
@@ -94,13 +94,13 @@ taf.test({
 		util.error_if(test.failure_reasons[1].msg:find("stack traceback:") == nil, test, "Unable to find traceback")
 
 		test = log_obj.tests[12]
-		check.check_test(test, "Test logging with multiple arguments", "passed")
+		check.check_test(test, "Test logging with multiple arguments", "PASSED")
 		util.test_tags(test, { "module-taf", "logging" })
 		util.error_if(#test.output ~= 1, test, "Outputs not match")
 		check.check_output(test, test.output[1], "test1\ttest2\ttest3\ttest4 test5", "INFO")
 
 		test = log_obj.tests[13]
-		check.check_test(test, "Test Lua's 'print' is forwarded to logging with INFO log level", "passed")
+		check.check_test(test, "Test Lua's 'print' is forwarded to logging with INFO log level", "PASSED")
 		util.test_tags(test, { "module-taf", "logging" })
 		util.error_if(#test.output ~= 2, test, "Outputs not match")
 		for i = 1, 2 do
@@ -113,7 +113,7 @@ taf.test({
 	name = "Test module-taf (utils)",
 	tags = { "module-taf", "utils" },
 	body = function()
-		local log_obj = util.load_log({ "test", "bootstrap", "-t", "utils,other-tag,some-other-tag", "-e" })
+		local log_obj = util.load_log({ "test", "bootstrap", "-t", "utils,other-tag,some-other-tag" })
 
 		assert(log_obj.tags ~= nil)
 		assert(#log_obj.tags == 3)
@@ -125,18 +125,18 @@ taf.test({
 		assert(#log_obj.tests == 6, "Expected 6 tests, got " .. #log_obj.tests)
 
 		local test = log_obj.tests[1]
-		check.check_test(test, "Test taf.sleep", "passed")
+		check.check_test(test, "Test taf.sleep", "PASSED")
 		util.test_tags(test, { "module-taf", "utils" })
 		util.error_if(test.finished == test.started, test, "No sleep")
 
 		test = log_obj.tests[2]
-		check.check_test(test, "Test taf.get_current_target", "passed")
+		check.check_test(test, "Test taf.get_current_target", "PASSED")
 		util.test_tags(test, { "module-taf", "utils" })
 		util.error_if(#test.output ~= 1, test, "Outputs not match")
 		check.check_output(test, test.output[1], "bootstrap", "INFO")
 
 		test = log_obj.tests[3]
-		check.check_test(test, "Test taf.defer", "passed")
+		check.check_test(test, "Test taf.defer", "PASSED")
 		util.test_tags(test, { "module-taf", "utils" })
 		util.error_if(#test.output ~= 0, test, "Outputs not match")
 		util.error_if(#test.teardown_output ~= 5, test, "Outputs not match")
@@ -150,7 +150,7 @@ taf.test({
 		check.check_output(test, test.teardown_errors[1], "assertion failed", "CRITICAL", true)
 
 		test = log_obj.tests[4]
-		check.check_test(test, "Test taf.millis", "passed")
+		check.check_test(test, "Test taf.millis", "PASSED")
 		util.test_tags(test, { "module-taf", "utils" })
 		util.error_if(#test.output ~= 2, test, "Outputs not match")
 		check.check_output(test, test.output[1], nil, "INFO")
@@ -165,7 +165,7 @@ taf.test({
 		end
 
 		test = log_obj.tests[5]
-		check.check_test(test, "Test taf.get_active_tags", "passed")
+		check.check_test(test, "Test taf.get_active_tags", "PASSED")
 		util.test_tags(test, { "module-taf", "utils" })
 		util.error_if(#test.output ~= 3, test, "Outputs not match")
 		check.check_output(test, test.output[1], "utils", "INFO")
@@ -173,7 +173,7 @@ taf.test({
 		check.check_output(test, test.output[3], "some-other-tag", "INFO")
 
 		test = log_obj.tests[6]
-		check.check_test(test, "Test taf.get_active_test_tags", "passed")
+		check.check_test(test, "Test taf.get_active_test_tags", "PASSED")
 		util.test_tags(test, { "module-taf", "utils", "some-other-tag" })
 		util.error_if(#test.output ~= 2, test, "Outputs not match")
 		check.check_output(test, test.output[1], "utils", "INFO")
