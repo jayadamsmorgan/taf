@@ -5,18 +5,6 @@
 #include <lua.h>
 #include <lualib.h>
 
-typedef enum {
-    TAF_HOOK_FN_TEST_RUN_STARTED = 0,
-    TAF_HOOK_FN_TEST_STARTED = 1,
-    TAF_HOOK_FN_TEST_FINISHED = 2,
-    TAF_HOOK_FN_TEST_RUN_FINISHED = 3,
-} taf_hook_fn;
-
-typedef struct {
-    int ref;
-    taf_hook_fn fn;
-} taf_hook_t;
-
 /******************* API START ***********************/
 
 // hooks:register_test_run_started(fn:fun(context))

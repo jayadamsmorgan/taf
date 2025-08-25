@@ -16,10 +16,4 @@ void taf_tui_set_test_progress(double progress);
 
 void taf_tui_set_current_line(const char *file, int line, const char *line_str);
 
-void taf_tui_hooks_started();
-
-void taf_tui_hooks_finished();
-
-void taf_tui_hook_failed();
-
 #endif // TAF_TUI_H

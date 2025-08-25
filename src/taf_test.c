@@ -1,7 +1,9 @@
 #include "taf_test.h"
 
 #include "cmd_parser.h"
+#include "headless.h"
 #include "internal_logging.h"
+#include "modules/hooks/taf-hooks.h"
 #include "project_parser.h"
 #include "taf_hooks.h"
 #include "taf_secrets.h"
@@ -481,11 +483,6 @@ int taf_test() {
         goto deinit;
     }
 
-    asprintf(&hooks_dir_path, "%s/hooks", proj->project_path);
-    if (load_lua_dir(hooks_dir_path, L) == -2) {
-        goto deinit;
-    }
-
     if (proj->multitarget) {
         if (load_lua_dir(test_common_dir_path, L) == -2) {
             goto deinit;
@@ -512,21 +509,25 @@ int taf_test() {
     }
 
     state = taf_state_new();
+
     l_module_taf_init(state);
-    taf_log_init(state);
+
+    if (!opts->no_logs) {
+        taf_log_init(state);
+    }
+
     taf_hooks_init(state);
+    asprintf(&hooks_dir_path, "%s/hooks", proj->project_path);
+    if (load_lua_dir(hooks_dir_path, L) == -2) {
+        goto deinit;
+    }
 
     if (!opts->headless && taf_tui_init(state)) {
         goto deinit;
     }
 
-    // TODO
-    // if (opts->headless) {
-    //     taf_headless_init();
-    // }
     if (opts->headless) {
-        fprintf(stderr, "Headless is in rework.\n");
-        goto deinit;
+        taf_headless_init(state);
     }
 
     if (!opts->headless) {
@@ -545,10 +546,10 @@ deinit:
     LOG("Tidying up...");
 
     test_case_free_all(L);
+    taf_hooks_deinit(L);
     lua_close(L);
     project_parser_free();
     internal_logging_deinit();
-    taf_hooks_deinit();
     taf_free_vars();
     taf_free_secrets();
     taf_state_free(state);

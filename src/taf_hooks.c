@@ -1,72 +1,46 @@
 #include "taf_hooks.h"
 
-#include "taf_tui.h"
-
-#include "cmd_parser.h"
-#include "headless.h"
 #include "internal_logging.h"
 
 #include "test_logs.h"
-#include "util/time.h"
 
 #include <stdlib.h>
 
-typedef struct {
-    taf_hook_t *hooks;
-    size_t count;
-    size_t capacity;
-} hook_da_t;
+static da_t *hooks_test_run_started;
+static da_t *hooks_test_started;
+static da_t *hooks_test_finished;
+static da_t *hooks_test_run_finished;
 
-static hook_da_t hooks_test_run_started = {
-    .hooks = NULL,
-    .capacity = 2,
-    .count = 0,
-};
-static hook_da_t hooks_test_started = {
-    .hooks = NULL,
-    .capacity = 2,
-    .count = 0,
-};
-static hook_da_t hooks_test_finished = {
-    .hooks = NULL,
-    .capacity = 2,
-    .count = 0,
-};
-static hook_da_t hooks_test_run_finished = {
-    .hooks = NULL,
-    .capacity = 2,
-    .count = 0,
-};
-
-static bool headless = false;
+static da_t *hook_started_cbs;
+static da_t *hook_finished_cbs;
+static da_t *hook_failed_cbs;
 
 static taf_state_t *taf_state = NULL;
 
-static inline hook_da_t *taf_get_hooks(taf_hook_fn fn) {
-    switch (fn) {
-    case TAF_HOOK_FN_TEST_RUN_STARTED:
-        return &hooks_test_run_started;
-    case TAF_HOOK_FN_TEST_STARTED:
-        return &hooks_test_started;
-    case TAF_HOOK_FN_TEST_FINISHED:
-        return &hooks_test_finished;
-    case TAF_HOOK_FN_TEST_RUN_FINISHED:
-        return &hooks_test_run_finished;
-    }
-    return NULL;
+void taf_hooks_register_hook_started_cb(hook_cb cb) {
+    da_append(hook_started_cbs, (void *)&cb);
 }
 
-static void hook_da_append(hook_da_t *hook_da, taf_hook_t hook) {
-    if (!hook_da->hooks) {
-        hook_da->hooks = malloc(sizeof(taf_hook_t) * hook_da->capacity);
+void taf_hooks_register_hook_finished_cb(hook_cb cb) {
+    da_append(hook_finished_cbs, (void *)&cb);
+}
+
+void taf_hooks_register_hook_failed_cb(hook_err_cb cb) {
+    da_append(hook_failed_cbs, (void *)&cb);
+}
+
+static inline da_t *taf_get_hooks(taf_hook_fn fn) {
+    switch (fn) {
+    case TAF_HOOK_FN_TEST_RUN_STARTED:
+        return hooks_test_run_started;
+    case TAF_HOOK_FN_TEST_STARTED:
+        return hooks_test_started;
+    case TAF_HOOK_FN_TEST_FINISHED:
+        return hooks_test_finished;
+    case TAF_HOOK_FN_TEST_RUN_FINISHED:
+        return hooks_test_run_finished;
     }
-    if (hook_da->count >= hook_da->capacity) {
-        hook_da->capacity *= 2;
-        hook_da->hooks =
-            realloc(hook_da->hooks, sizeof(taf_hook_t) * hook_da->capacity);
-    }
-    hook_da->hooks[hook_da->count] = hook;
-    hook_da->count++;
+    return NULL;
 }
 
 void taf_hooks_init(taf_state_t *state) {
@@ -74,16 +48,22 @@ void taf_hooks_init(taf_state_t *state) {
 
     taf_state = state;
 
-    cmd_test_options *opts = cmd_parser_get_test_options();
-    headless = opts->headless;
+    hooks_test_run_started = da_init(1, sizeof(taf_hook_t));
+    hooks_test_started = da_init(1, sizeof(taf_hook_t));
+    hooks_test_finished = da_init(1, sizeof(taf_hook_t));
+    hooks_test_run_finished = da_init(1, sizeof(taf_hook_t));
+
+    hook_started_cbs = da_init(1, sizeof(hook_cb));
+    hook_finished_cbs = da_init(1, sizeof(hook_cb));
+    hook_failed_cbs = da_init(1, sizeof(hook_err_cb));
 
     LOG("Successfully initialized TAF hooks.");
 }
 
 void taf_hooks_add_to_queue(taf_hook_t hook) {
     LOG("Adding hook with type %d and ref %d", hook.fn, hook.ref);
-    hook_da_t *hooks_da = taf_get_hooks(hook.fn);
-    hook_da_append(hooks_da, hook);
+    da_t *hooks_da = taf_get_hooks(hook.fn);
+    da_append(hooks_da, &hook);
     LOG("Successfully added hook.");
 }
 
@@ -221,41 +201,84 @@ static int hooks_context_push(lua_State *L) {
     return 1; // context remains on the stack
 }
 
+static void run_taf_hook_started_cbs(taf_hook_fn fn) {
+    size_t size = da_size(hook_started_cbs);
+    for (size_t i = 0; i < size; ++i) {
+        hook_cb *cb = da_get(hook_started_cbs, i);
+        if (cb && *cb) {
+            (*cb)(fn);
+        }
+    }
+}
+
+static void run_taf_hook_finished_cbs(taf_hook_fn fn) {
+    size_t size = da_size(hook_finished_cbs);
+    for (size_t i = 0; i < size; ++i) {
+        hook_cb *cb = da_get(hook_finished_cbs, i);
+        if (cb && *cb) {
+            (*cb)(fn);
+        }
+    }
+}
+
+static void run_taf_hook_failed_cbs(taf_hook_fn fn, const char *msg) {
+    size_t size = da_size(hook_failed_cbs);
+    for (size_t i = 0; i < size; ++i) {
+        hook_err_cb *cb = da_get(hook_failed_cbs, i);
+        if (cb && *cb) {
+            (*cb)(fn, msg);
+        }
+    }
+}
+
 void taf_hooks_run(lua_State *L, taf_hook_fn fn) {
     LOG("Running all hooks with type %d...", fn);
-    hook_da_t *hooks = taf_get_hooks(fn);
-    if (hooks->count == 0) {
+    da_t *hooks = taf_get_hooks(fn);
+    size_t hooks_count = da_size(hooks);
+    if (hooks_count == 0) {
         LOG("No hooks found for type %d", fn);
         return;
     }
-    for (size_t i = 0; i < hooks->count; i++) {
-        int ref = hooks->hooks[i].ref;
+    for (size_t i = 0; i < hooks_count; i++) {
+        run_taf_hook_started_cbs(fn);
+        taf_hook_t *hook = da_get(hooks, i);
+        int ref = hook->ref;
         LOG("Running hook with type %d and ref %d", fn, ref);
-        lua_rawgeti(L, LUA_REGISTRYINDEX, hooks->hooks[i].ref);
+        lua_rawgeti(L, LUA_REGISTRYINDEX, ref);
         hooks_context_push(L);
         if (lua_pcall(L, 1, 0, 0) != LUA_OK) {
             const char *err = lua_tostring(L, -1);
             LOG("Error running hook with type %d and ref %d:\n%s", fn, ref,
                 err);
-            if (headless) {
-                taf_headless_hook_failed(err);
-            } else {
-                char ts[TS_LEN];
-                get_date_time_now(ts);
-                taf_tui_hook_failed();
-            }
+            run_taf_hook_failed_cbs(fn, err);
             continue;
         }
         LOG("Successfully ran hook with type %d and ref %d", fn, ref);
+        run_taf_hook_finished_cbs(fn);
     }
     LOG("Successfully ran all hooks with type %d.", fn);
 }
 
-void taf_hooks_deinit() {
+static void free_hooks_da(da_t *hooks, lua_State *L) {
+    size_t size = da_size(hooks);
+    for (size_t i = 0; i < size; ++i) {
+        taf_hook_t *hook = da_get(hooks, i);
+        luaL_unref(L, LUA_REGISTRYINDEX, hook->ref);
+    }
+}
+
+void taf_hooks_deinit(lua_State *L) {
     LOG("Deinitializing TAF hooks...");
-    free(hooks_test_run_started.hooks);
-    free(hooks_test_started.hooks);
-    free(hooks_test_finished.hooks);
-    free(hooks_test_run_finished.hooks);
+
+    free_hooks_da(hooks_test_run_started, L);
+    free_hooks_da(hooks_test_run_started, L);
+    free_hooks_da(hooks_test_started, L);
+    free_hooks_da(hooks_test_finished, L);
+    free_hooks_da(hooks_test_run_finished, L);
+
+    da_free(hook_started_cbs);
+    da_free(hook_finished_cbs);
+    da_free(hook_failed_cbs);
+
     LOG("Successfully deinitialized TAF hooks.");
 }

@@ -1,6 +1,7 @@
 #include "taf_tui.h"
 
 #include "cmd_parser.h"
+#include "taf_hooks.h"
 #include "taf_vars.h"
 #include "version.h"
 
@@ -250,62 +251,42 @@ static void taf_tui_test_run_result(pico_t *ui, size_t tests_count) {
     pico_ui_puts_yx(ui, 8, 0, "├─ Test Results:");
 
     /* Line 9: Test Name and millis from the start*/
-    for (size_t i = 0; i < tests_count -1; ++i) {
+    for (size_t i = 0; i < tests_count - 1; ++i) {
         taf_state_test_t *test = da_get(taf_state->tests, i);
-        pico_ui_clear_line(ui, 9 + i*4);
-        pico_ui_clear_line(ui, 10 + i*4);
-        pico_ui_clear_line(ui, 11 + i*4);
-        pico_ui_clear_line(ui, 12 + i*4);
-       
+        pico_ui_clear_line(ui, 9 + i * 4);
+        pico_ui_clear_line(ui, 10 + i * 4);
+        pico_ui_clear_line(ui, 11 + i * 4);
+        pico_ui_clear_line(ui, 12 + i * 4);
 
-        pico_ui_printf_yx(
-            ui, 9 + i*4, 0,
-            "│  ├─ Name: %s ",
-            test->name);
-    
-        pico_ui_printf_yx(
-            ui, 9 + i*4 + 1, 0,
-            "│  │  ├─ Result:   %s",
-             test->status_str);
-    
-        pico_ui_printf_yx(
-            ui, 9 + i*4 + 2, 0,
-            "│  │  ├─ Started:  %s",
-            test->started);
-    
-        pico_ui_printf_yx(
-            ui, 9 + i*4 + 3, 0,
-            "│  │  └─ Finished: %s",
-             test->finished);
+        pico_ui_printf_yx(ui, 9 + i * 4, 0, "│  ├─ Name: %s ", test->name);
+
+        pico_ui_printf_yx(ui, 9 + i * 4 + 1, 0, "│  │  ├─ Result:   %s",
+                          test->status_str);
+
+        pico_ui_printf_yx(ui, 9 + i * 4 + 2, 0, "│  │  ├─ Started:  %s",
+                          test->started);
+
+        pico_ui_printf_yx(ui, 9 + i * 4 + 3, 0, "│  │  └─ Finished: %s",
+                          test->finished);
     }
 
-        size_t offset = tests_count - 1;
-        taf_state_test_t *test = da_get(taf_state->tests, offset);
-        pico_ui_clear_line(ui, 9 + offset*4);
-        pico_ui_clear_line(ui, 10 + offset*4);
-        pico_ui_clear_line(ui, 11 + offset*4);
-        pico_ui_clear_line(ui, 12 + offset*4);
-       
+    size_t offset = tests_count - 1;
+    taf_state_test_t *test = da_get(taf_state->tests, offset);
+    pico_ui_clear_line(ui, 9 + offset * 4);
+    pico_ui_clear_line(ui, 10 + offset * 4);
+    pico_ui_clear_line(ui, 11 + offset * 4);
+    pico_ui_clear_line(ui, 12 + offset * 4);
 
-        pico_ui_printf_yx(
-            ui, 9 + offset*4, 0,
-            "│  └─ Name: %s",
-            test->name);
-    
-        pico_ui_printf_yx(
-            ui, 9 + offset*4 + 1, 0,
-            "│     ├─ Result:   %s",
-             test->status_str);
-    
-        pico_ui_printf_yx(
-            ui, 9 + offset*4 + 2, 0,
-            "│     ├─ Started:  %s",
-            test->started);
-    
-        pico_ui_printf_yx(
-            ui, 9 + offset*4 + 3, 0,
-            "│     └─ Finished: %s ",
-             test->finished);
+    pico_ui_printf_yx(ui, 9 + offset * 4, 0, "│  └─ Name: %s", test->name);
+
+    pico_ui_printf_yx(ui, 9 + offset * 4 + 1, 0, "│     ├─ Result:   %s",
+                      test->status_str);
+
+    pico_ui_printf_yx(ui, 9 + offset * 4 + 2, 0, "│     ├─ Started:  %s",
+                      test->started);
+
+    pico_ui_printf_yx(ui, 9 + offset * 4 + 3, 0, "│     └─ Finished: %s ",
+                      test->finished);
 }
 
 static void render_ui(pico_t *ui, void *ud) {
@@ -332,18 +313,18 @@ static void render_result(pico_t *ui, void *ud) {
     (void)ud;
 
     // Remove strings before resize
-    size_t tests_count = da_size(taf_state->tests); 
-        for(size_t i =0;i< (tests_count*4)+12;++i){
-        pico_ui_clear_line(ui, i); 
+    size_t tests_count = da_size(taf_state->tests);
+    for (size_t i = 0; i < (tests_count * 4) + 12; ++i) {
+        pico_ui_clear_line(ui, i);
     }
     // Resize strings
-    pico_set_ui_rows(ui, 12 + tests_count*4);
-    
+    pico_set_ui_rows(ui, 12 + tests_count * 4);
+
     taf_tui_project_header_render(ui);
 
     taf_tui_test_run_result(ui, (tests_count));
 
-    taf_tui_summary_render(ui, tests_count*4 + 9);
+    taf_tui_summary_render(ui, tests_count * 4 + 9);
 }
 
 void taf_tui_test_started(taf_state_test_t *test) {
@@ -365,11 +346,11 @@ void taf_tui_test_finished(taf_state_test_t *test) {
 }
 void taf_tui_tests_set_finished() { render_result(ui, NULL); }
 
-void taf_tui_hooks_started() {}
+void taf_tui_hook_started(taf_hook_fn fn) {}
 
-void taf_tui_hooks_finished() {}
+void taf_tui_hook_finished(taf_hook_fn fn) {}
 
-void taf_tui_hook_failed() {}
+void taf_tui_hook_failed(taf_hook_fn fn, const char *msg) {}
 
 int taf_tui_init(taf_state_t *state) {
 
@@ -387,6 +368,10 @@ int taf_tui_init(taf_state_t *state) {
                                                  taf_tui_defer_queue_finished);
     taf_state_register_test_defer_failed_cb(state, taf_tui_defer_failed);
     taf_state_register_test_run_finished_cb(state, taf_tui_tests_set_finished);
+
+    taf_hooks_register_hook_started_cb(taf_tui_hook_started);
+    taf_hooks_register_hook_finished_cb(taf_tui_hook_finished);
+    taf_hooks_register_hook_failed_cb(taf_tui_hook_failed);
 
     // Get project information
     cmd_test_options *opts = cmd_parser_get_test_options();
