@@ -7,7 +7,7 @@ taf.test({
 	name = "Test module-webdriver",
 	tags = { "module-webdriver" },
 	body = function()
-		local log_obj = util.load_log({ "test", "bootstrap", "-t", "module-webdriver", "-e" })
+		local log_obj = util.load_log({ "test", "bootstrap", "-t", "module-webdriver" })
 
 		assert(log_obj.tags ~= nil)
 		assert(#log_obj.tags == 1)
@@ -17,7 +17,7 @@ taf.test({
 		assert(#log_obj.tests == 1, "Expected 1 test, got " .. #log_obj.tests)
 
 		local test = log_obj.tests[1]
-		check.check_test(test, "Test minimal webdriver possibilities", "passed")
+		check.check_test(test, "Test minimal webdriver possibilities", "PASSED")
 		util.test_tags(test, { "module-webdriver" })
 		util.error_if(#test.output ~= 2, test, "Outputs not match")
 		check.check_output(test, test.output[1], "https://github.com/", "INFO")
