@@ -440,7 +440,7 @@ static void set_test_scenario(const char *arg) {
         }
     }
 
-    if (da_size(test_opts.tags) != 0) {
+    if (da_size(test_opts.tags) == 0) {
         for (size_t i = 0; i < da_size(sc->tags); ++i) {
             da_append(test_opts.tags, da_get(sc->tags, i));
         }
