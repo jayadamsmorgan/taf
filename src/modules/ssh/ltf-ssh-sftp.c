@@ -156,7 +156,8 @@ int l_module_ssh_sftp_write(lua_State *L) {
                       "session was not initialized");
         return 0;
     }
-    const char *s = luaL_checkstring(L, 2);
+    size_t len;
+    const char *s = luaL_checklstring(L, 2, &len);
 
     int v = luaL_checkinteger(L, 3);
     if (v < 0) {
@@ -164,8 +165,8 @@ int l_module_ssh_sftp_write(lua_State *L) {
                       "argument 3 is negative");
         return 0;
     }
-    size_t len = (size_t)v;
-    if (strlen(s) < len) {
+
+    if (len < (size_t)v) {
         luaL_error(L, "l_module_ssh_sftp_write() failed because size of "
                       "string is biger then 3rd argument");
         return 0;
